@@ -8,6 +8,14 @@ circuit.
 
 Built with Tauri 2, React, TypeScript, avr8js, Wokwi Elements, Monaco Editor and PlatformIO.
 
+**[⬇ Download the Windows installer](../../releases/latest)**
+
+![I²C LCD example running: firmware drives an LCD over the emulated TWI bus while a potentiometer is read on A0](docs/images/screenshot-dark.png)
+
+| Light theme — traffic light running on a breadboard | 20 ready-to-run example projects |
+|---|---|
+| ![Traffic light example in the light theme](docs/images/screenshot-light.png) | ![Examples and templates gallery](docs/images/screenshot-examples.png) |
+
 ## Highlights
 
 - **Workspace**: infinite pan/zoom canvas, drag-and-drop library, rotate/flip/duplicate,
@@ -36,7 +44,9 @@ Built with Tauri 2, React, TypeScript, avr8js, Wokwi Elements, Monaco Editor and
 
 ## Getting started (users)
 
-1. Install `Embedded Systems Virtual Lab_0.1.0_x64-setup.exe` (or the `.msi`).
+1. Download `EmbeddedSystemsVirtualLab_0.1.0_x64-setup.exe` (or the `.msi`) from the
+   [Releases page](../../releases/latest) and run it. Windows 10/11 x64; the installer is not
+   code-signed yet, so SmartScreen may ask you to confirm ("More info" → "Run anyway").
 2. On first compile the app offers to install the firmware toolchain (PlatformIO, ~300 MB,
    needs Python 3.9+ and internet once). Afterwards everything works offline.
 3. Open **Examples** and press **F5**.
