@@ -64,6 +64,7 @@ export const arduinoUno: ComponentDefinition = {
   ],
   properties: [],
   simulation: { support: 'full', model: 'mcu-board', notes: AVR_NOTES },
+  controls: [{ kind: 'keys', keys: [{ id: 'reset', label: 'RESET (click to restart the sketch)', x: 32, y: 8, w: 19, h: 19, round: true, input: 'reset' }] }],
   mcu: {
     ...ATMEGA328P_BASE,
     toolchain: { platform: 'atmelavr', board: 'uno', framework: 'arduino' },
@@ -104,6 +105,7 @@ export const arduinoNano: ComponentDefinition = {
   ],
   properties: [],
   simulation: { support: 'full', model: 'mcu-board', notes: AVR_NOTES + ' A6/A7 are analog-only inputs.' },
+  controls: [{ kind: 'keys', keys: [{ id: 'reset', label: 'RESET (click to restart the sketch)', x: 91, y: 25, w: 16, h: 16, round: true, input: 'reset' }] }],
   mcu: {
     ...ATMEGA328P_BASE,
     toolchain: { platform: 'atmelavr', board: 'nanoatmega328', framework: 'arduino' },

@@ -383,7 +383,7 @@ class DcSourceModel implements SimModel {
     if (this.window > 0) this.avgI = this.charge / this.window;
     this.charge = 0;
     this.window = 0;
-    return undefined;
+    return { _amps: this.avgI, _volts: this.volts };
   }
   diagnostics(): Diagnostic[] {
     const limit = numProp(this.ctx, 'maxCurrent', 1);

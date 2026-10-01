@@ -1,7 +1,7 @@
 import type { CircuitDocument, ComponentInstance, PinRef, Point, Wire } from '../../core/model/circuit';
 import type { ComponentDefinition, PinDefinition } from '../../core/model/component';
 import { GRID } from '../../core/model/component';
-import { componentBounds, pinWorld, type Rect } from '../../core/circuit/geometry';
+import { componentBounds, localToWorld, pinWorld, type Rect } from '../../core/circuit/geometry';
 import { lookup } from '../../app/registry';
 
 export interface IndexedPin {
@@ -124,13 +124,30 @@ export function nearestSegment(pts: Point[], p: Point): number {
   return best;
 }
 
-export function selectionBounds(circuit: CircuitDocument, ids: string[]): Rect | null {
+/** Grows a part's bounds by on-canvas controls drawn outside it (distance-sensor obstacles). */
+function withControlExtents(inst: ComponentInstance, def: ComponentDefinition, b: Rect): Rect {
+  let r = b;
+  for (const c of def.controls ?? []) {
+    if (c.kind !== 'range-target') continue;
+    const d = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[c.direction];
+    const far = localToWorld(inst, def, { x: c.origin.x + d[0] * (170 * c.scale + 20), y: c.origin.y + d[1] * (170 * c.scale + 20) });
+    const x1 = Math.min(r.x, far.x - 35);
+    const y1 = Math.min(r.y, far.y - 35);
+    const x2 = Math.max(r.x + r.width, far.x + 35);
+    const y2 = Math.max(r.y + r.height, far.y + 35);
+    r = { x: x1, y: y1, width: x2 - x1, height: y2 - y1 };
+  }
+  return r;
+}
+
+/** Bounds of the given parts; `withControls` adds controls drawn outside them (for fitting the view). */
+export function selectionBounds(circuit: CircuitDocument, ids: string[], withControls = false): Rect | null {
   let r: Rect | null = null;
   for (const inst of circuit.components) {
     if (!ids.includes(inst.id)) continue;
     const def = lookup(inst.type);
     if (!def) continue;
-    const b = componentBounds(inst, def);
+    const b = withControls ? withControlExtents(inst, def, componentBounds(inst, def)) : componentBounds(inst, def);
     if (!r) r = { ...b };
     else {
       const x2 = Math.max(r.x + r.width, b.x + b.width);

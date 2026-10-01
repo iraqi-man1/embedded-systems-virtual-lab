@@ -54,6 +54,8 @@ export interface Overlay {
   hoverPin: Point | null;
   netPins: Point[];
   probes: { x: number; y: number; color: string; label: string }[];
+  /** Logic level of IC/MCU pins while simulating. */
+  levels: { x: number; y: number; level: 'high' | 'low' | 'mid' | 'float' }[];
 }
 
 interface Props {
@@ -83,6 +85,9 @@ export function WireLayer({ circuit, selectedWires, zoom, overlay }: Props) {
           strokeLinecap="round"
         />
       )}
+      {overlay.levels.map((p, i) => (
+        <circle key={`l${i}`} className={`lvl ${p.level}`} cx={p.x} cy={p.y} r={2.6} />
+      ))}
       {overlay.hoverPin && <circle className="pin-hover" cx={overlay.hoverPin.x} cy={overlay.hoverPin.y} r={5} strokeWidth={2 / zoom} />}
       {overlay.probes.map((p, i) => (
         <g key={i}>

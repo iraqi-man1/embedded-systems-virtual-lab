@@ -49,6 +49,8 @@ function wks(
     simNotes: string;
     params?: Record<string, unknown>;
     interaction?: ComponentDefinition['interaction'];
+    controls?: ComponentDefinition['controls'];
+    indicators?: ComponentDefinition['indicators'];
     attrs?: Record<string, string | number | boolean>;
     pins?: ComponentDefinition['pins'];
     size?: ComponentDefinition['size'];
@@ -71,6 +73,8 @@ function wks(
     properties: b.properties ?? [],
     simulation: { support: b.support, model: b.model, params: b.params, notes: b.simNotes },
     interaction: b.interaction,
+    controls: b.controls,
+    indicators: b.indicators,
     docs: { summary: b.summary, datasheetUrl: b.datasheetUrl },
   };
 }
@@ -350,6 +354,11 @@ export const sensors: ComponentDefinition[] = [
     support: 'full',
     simNotes: 'Single-wire protocol with datasheet timings (start ≥1 ms, 80/80 µs response, 50 µs + 26/70 µs bits, checksum). Measurement noise and the 2 s refresh limit are not enforced (a warning is shown).',
     params: { data: 'SDA' },
+    controls: [
+      { kind: 'slider', prop: 'temperature', icon: 'thermometer' },
+      { kind: 'slider', prop: 'humidity', icon: 'droplets' },
+    ],
+    indicators: [{ kind: 'pulse', value: '_reads', at: { x: 28.5, y: 28 }, color: '#4caf50' }],
   }, 'io'),
   (() => {
     const d = headerModule({ title: 'DHT11', pcb: '#2266aa', bottom: [V, 'DATA', G], fallback: 'io' });
@@ -365,6 +374,11 @@ export const sensors: ComponentDefinition[] = [
       pins: d.pins,
       properties: [live('temperature', 'Temperature', 24, 0, 50, 1, '°C'), live('humidity', 'Humidity', 40, 20, 90, 1, '%')],
       simulation: { support: 'full', model: 'dht', params: { data: 'DATA', variant: 'dht11' }, notes: 'DHT11 single-wire protocol (18 ms start, integer readings).' },
+      controls: [
+        { kind: 'slider', prop: 'temperature', icon: 'thermometer' },
+        { kind: 'slider', prop: 'humidity', icon: 'droplets' },
+      ],
+      indicators: [{ kind: 'pulse', value: '_reads', at: { x: d.size.width / 2, y: 14 }, color: '#4caf50' }],
       docs: { summary: 'Basic temperature/humidity sensor module with an on-board pull-up.' },
     } as ComponentDefinition;
   })(),
@@ -384,6 +398,7 @@ export const sensors: ComponentDefinition[] = [
     support: 'full',
     simNotes: 'Divider output from the β-model, sourced through 1 kΩ.',
     params: { ao: 'OUT', sensor: 'ntc' },
+    controls: [{ kind: 'slider', prop: 'temperature', icon: 'thermometer' }],
   }),
   wks('wokwi-photoresistor-sensor', {
     type: 'evlab.ldr-module',
@@ -397,6 +412,8 @@ export const sensors: ComponentDefinition[] = [
     support: 'full',
     simNotes: 'LDR (GL55xx curve) against 10 kΩ; DO comparator with ideal threshold (no hysteresis).',
     params: { ao: 'AO', do: 'DO', sensor: 'ldr' },
+    controls: [{ kind: 'slider', prop: 'lux', icon: 'sun', log: true }],
+    indicators: [{ kind: 'glow', value: 'prop:lux', at: { x: 18, y: 32 }, radius: 30, color: '#ffd54f', max: 100000, log: true }],
   }),
   mod({ type: 'evlab.bh1750', name: 'BH1750 Light Sensor', category: 'Sensors', subcategory: 'Light', tags: ['bh1750', 'lux', 'light', 'i2c'], summary: 'Digital ambient light sensor (I2C).', pins: [V, G, 'SCL', 'SDA', 'ADDR'], pcb: '#1e5aa8', notes: 'I2C model planned.' }),
   wks('wokwi-gas-sensor', {
@@ -411,6 +428,11 @@ export const sensors: ComponentDefinition[] = [
     support: 'partial',
     simNotes: 'AO is set directly from the "gas level" property; heater warm-up and ppm curves are not modelled.',
     params: { ao: 'AOUT', do: 'DOUT', sensor: 'level' },
+    controls: [{ kind: 'slider', prop: 'level', icon: 'wind', label: 'gas', min: 0, max: 1 }],
+    indicators: [
+      { kind: 'glow', value: '_level', at: { x: 40, y: 33 }, radius: 40, color: '#90a4ae' },
+      { kind: 'readout', value: '_triggered', map: { true: 'DO: gas detected', false: 'DO: clear' } },
+    ],
   }),
   mod({ type: 'evlab.mq135', name: 'MQ-135 Air Quality Sensor', category: 'Sensors', subcategory: 'Gas', tags: ['mq135', 'air quality', 'co2', 'gas'], summary: 'Air-quality gas sensor module.', pins: [V, G, 'DO', 'AO'], pcb: '#1e5aa8' }),
   wks('wokwi-pir-motion-sensor', {
@@ -425,6 +447,14 @@ export const sensors: ComponentDefinition[] = [
     support: 'full',
     simNotes: 'Digital output with retriggerable hold time; detection range and warm-up are not modelled.',
     interaction: { kind: 'momentary', input: 'trigger' },
+    controls: [
+      { kind: 'action', input: 'trigger', label: 'Person passes', icon: 'footprints', mode: 'trigger' },
+      { kind: 'slider', prop: 'holdTime', icon: 'clock', label: 'hold', min: 0.5, max: 30, step: 0.5 },
+    ],
+    indicators: [
+      { kind: 'cone', value: '_active', origin: { x: 45.3, y: 10 }, direction: 'up', length: 110, spread: 80, color: '#ef6c00' },
+      { kind: 'readout', value: '_active', map: { true: 'OUT HIGH · motion', false: 'OUT LOW · idle' } },
+    ],
   }),
   wk('wokwi-mpu6050', { type: 'evlab.mpu6050', name: 'MPU-6050 Accelerometer/Gyro', category: 'Sensors', subcategory: 'Motion', tags: ['mpu6050', 'imu', 'accelerometer', 'gyroscope', 'i2c'], summary: '6-axis IMU (I2C).', notes: 'I2C register model planned.' }),
   wks('wokwi-tilt-switch', {
@@ -437,7 +467,10 @@ export const sensors: ComponentDefinition[] = [
     model: 'event-sensor',
     support: 'full',
     simNotes: 'OUT is HIGH while tilted; contact chatter is not modelled.',
+    params: { tiltAngle: -25 },
     interaction: { kind: 'toggle', input: 'toggle' },
+    controls: [{ kind: 'action', input: 'toggle', label: 'Tilt / level', icon: 'rotate', mode: 'trigger' }],
+    indicators: [{ kind: 'readout', value: '_active', map: { true: 'tilted · OUT HIGH', false: 'level · OUT LOW' } }],
   }),
   wks('wokwi-hc-sr04', {
     type: 'evlab.hc-sr04',
@@ -445,11 +478,12 @@ export const sensors: ComponentDefinition[] = [
     category: 'Sensors',
     subcategory: 'Distance',
     tags: ['hc-sr04', 'ultrasonic', 'distance', 'sonar', 'range'],
-    summary: 'Ultrasonic distance sensor, 2–400 cm. Pulse TRIG for 10 µs, then measure the ECHO pulse width with pulseIn() (58 µs per cm).',
+    summary: 'Ultrasonic distance sensor, 2–400 cm. Pulse TRIG for 10 µs, then measure the ECHO pulse width with pulseIn() (58 µs per cm). Drag the obstacle in front of it to change the distance.',
     properties: [live('distance', 'Distance to obstacle', 100, 2, 450, 1, 'cm')],
     model: 'hc-sr04',
     support: 'full',
     simNotes: 'Trigger detection (≥8 µs), 250 µs burst latency, echo width = 2·d / 343 m/s; >400 cm returns a 38 ms timeout pulse.',
+    controls: [{ kind: 'range-target', prop: 'distance', min: 2, max: 400, unit: 'cm', origin: { x: 85, y: 4 }, direction: 'up', scale: 1, pingKey: '_pings' }],
   }),
   mod({ type: 'evlab.vl53l0x', name: 'VL53L0X ToF Sensor', category: 'Sensors', subcategory: 'Distance', tags: ['vl53l0x', 'tof', 'laser', 'distance', 'i2c'], summary: 'Time-of-flight laser distance sensor (I2C).', pins: [V, G, 'SCL', 'SDA', 'XSHUT', 'GPIO1'], pcb: '#6a1b9a' }),
   mod({ type: 'evlab.sharp-gp2y0a21', name: 'Sharp GP2Y0A21 IR Distance', category: 'Sensors', subcategory: 'Distance', tags: ['sharp', 'ir', 'distance', 'analog'], summary: 'Analog infrared distance sensor (10–80 cm).', pins: ['VO', G, V], pcb: '#333' }),
@@ -467,6 +501,14 @@ export const sensors: ComponentDefinition[] = [
     support: 'partial',
     simNotes: 'AO follows the "IR level" property directly.',
     params: { ao: 'AOUT', do: 'DOUT', sensor: 'level' },
+    controls: [
+      { kind: 'slider', prop: 'level', icon: 'flame', label: 'flame', min: 0, max: 1 },
+      { kind: 'action', input: 'burst', label: 'Flicker', icon: 'flame', mode: 'trigger' },
+    ],
+    indicators: [
+      { kind: 'glow', value: '_level', at: { x: 14, y: 32 }, radius: 34, color: '#ff7043' },
+      { kind: 'readout', value: '_triggered', map: { true: 'DO: flame', false: 'DO: none' } },
+    ],
   }),
   mod({ type: 'evlab.a3144', name: 'A3144 Hall Effect Sensor', category: 'Sensors', subcategory: 'Magnetic', tags: ['hall', 'a3144', 'magnetic'], summary: 'Digital (unipolar) Hall-effect switch.', pins: [V, G, 'OUT'], pcb: '#333' }),
   mod({ type: 'evlab.acs712', name: 'ACS712 Current Sensor', category: 'Sensors', subcategory: 'Electrical', tags: ['acs712', 'current', 'hall'], summary: 'Hall-effect current sensor with analog output (185 mV/A for 5 A).', pins: [V, 'OUT', G], pcb: '#c62828' }),
@@ -483,8 +525,16 @@ export const sensors: ComponentDefinition[] = [
     properties: [live('level', 'Sound level (fraction)', 0.2, 0, 1, 0.01), live('threshold', 'DO threshold (fraction)', 0.5, 0, 1, 0.01)],
     model: 'analog-module',
     support: 'partial',
-    simNotes: 'AO is a static level set by the property (no audio waveform).',
+    simNotes: 'AO is a static level set by the property (no audio waveform); "Clap" produces a 150 ms loud burst.',
     params: { ao: 'AOUT', do: 'DOUT', sensor: 'level' },
+    controls: [
+      { kind: 'slider', prop: 'level', icon: 'volume', label: 'sound', min: 0, max: 1 },
+      { kind: 'action', input: 'burst', label: 'Clap', icon: 'hand', mode: 'trigger' },
+    ],
+    indicators: [
+      { kind: 'waves', value: '_triggered', at: { x: 128, y: 27 }, direction: 'right', color: '#7e57c2' },
+      { kind: 'readout', value: '_triggered', map: { true: 'DO: loud', false: 'DO: quiet' } },
+    ],
   }),
   wk('wokwi-heart-beat-sensor', { type: 'evlab.pulse-sensor', name: 'Pulse Sensor', category: 'Sensors', subcategory: 'Biometric', tags: ['heart', 'pulse', 'bpm'], summary: 'Optical heart-rate sensor (analog).' }),
   wks('wokwi-analog-joystick', {
@@ -493,12 +543,12 @@ export const sensors: ComponentDefinition[] = [
     category: 'Input',
     subcategory: 'Joysticks',
     tags: ['joystick', 'thumbstick', 'analog', 'xy'],
-    summary: 'Two 10 kΩ potentiometers (HORZ, VERT) and a push switch to GND (SEL — use INPUT_PULLUP). Move it with the Inspector sliders; click to press.',
-    properties: [live('x', 'X position', 0.5, 0, 1, 0.01), live('y', 'Y position', 0.5, 0, 1, 0.01)],
+    summary: 'Two 10 kΩ potentiometers (HORZ, VERT) and a push switch to GND (SEL — use INPUT_PULLUP). While simulating, drag the stick (it springs back) and click it to press. Up = VERT high, left = HORZ high.',
+    properties: [live('x', 'X resting position', 0.5, 0, 1, 0.01), live('y', 'Y resting position', 0.5, 0, 1, 0.01)],
     model: 'joystick',
     support: 'full',
     simNotes: 'Linear potentiometers and an ideal switch.',
-    interaction: { kind: 'momentary', input: 'pressed' },
+    controls: [{ kind: 'stick', xProp: 'x', yProp: 'y', center: { x: 51.4, y: 51.4 }, radius: 36, invertX: true, invertY: true, pressInput: 'pressed' }],
   }),
   wk('wokwi-ky-040', { type: 'evlab.ky040', name: 'Rotary Encoder (KY-040)', category: 'Input', subcategory: 'Encoders', tags: ['rotary encoder', 'ky-040', 'quadrature', 'encoder'], summary: 'Incremental quadrature rotary encoder with push switch.' }),
   wks('wokwi-dip-switch-8', {
@@ -508,12 +558,13 @@ export const sensors: ComponentDefinition[] = [
     subcategory: 'Switches',
     tags: ['dip switch', 'switch', 'configuration'],
     designator: 'SW',
-    summary: 'Eight independent SPST switches (Na ↔ Nb). Set them in the Inspector.',
+    summary: 'Eight independent SPST switches (Na ↔ Nb). Click a lever to flip it (also when stopped: select the part first).',
     properties: Array.from({ length: 8 }, (_, i) => ({ key: `sw${i + 1}`, label: `Switch ${i + 1}`, type: 'boolean' as const, default: false, live: true })),
     model: 'switch-array',
     support: 'full',
     simNotes: 'Ideal contacts (50 mΩ).',
     params: { pairs: Array.from({ length: 8 }, (_, i) => [`${i + 1}a`, `${i + 1}b`]) },
+    controls: [{ kind: 'keys', keys: Array.from({ length: 8 }, (_, i) => ({ id: `${i + 1}`, label: `Switch ${i + 1}`, x: 3.6 + i * 9.6, y: 12, w: 9, h: 30, prop: `sw${i + 1}` })) }],
   }, 'passive'),
   wk('wokwi-membrane-keypad', { type: 'evlab.keypad-4x4', name: 'Membrane Keypad 4×4', category: 'Input', subcategory: 'Keypads', tags: ['keypad', 'matrix', 'membrane', '4x4'], summary: '16-key matrix keypad (4 rows × 4 columns).' }, 'passive'),
   wk('wokwi-rotary-dialer', { type: 'evlab.rotary-dialer', name: 'Rotary Dialer', category: 'Input', subcategory: 'Switches', tags: ['rotary', 'dialer', 'telephone', 'pulse'], summary: 'Telephone rotary dial generating pulses.' }),
@@ -534,6 +585,7 @@ export const actuators: ComponentDefinition[] = [
     model: 'servo',
     support: 'partial',
     simNotes: 'Decodes pulse width to angle (Servo library calibration) and moves at ~600°/s. Load, torque and supply current are not modelled.',
+    indicators: [{ kind: 'readout', value: 'angle', unit: '°', digits: 3, anchor: 'top' }],
   }),
   wk('wokwi-stepper-motor', { type: 'evlab.stepper', name: 'Stepper Motor (NEMA 17)', category: 'Actuators', subcategory: 'Motors', tags: ['stepper', 'nema17', 'bipolar', 'motor'], designator: 'M', summary: 'Bipolar stepper motor, 200 steps/rev.' }),
   wk('wokwi-biaxial-stepper', { type: 'evlab.biaxial-stepper', name: 'Biaxial Stepper Motor', category: 'Actuators', subcategory: 'Motors', tags: ['stepper', 'biaxial', 'clock'], designator: 'M', summary: 'Two concentric stepper motors (e.g. clock hands).' }),
@@ -552,6 +604,10 @@ export const actuators: ComponentDefinition[] = [
     model: 'buzzer',
     support: 'partial',
     simNotes: 'Detects the drive frequency from pin edges and plays a pure tone; acoustic response is not modelled.',
+    indicators: [
+      { kind: 'waves', value: 'hasSignal', at: { x: 37.5, y: 22 }, direction: 'up', color: '#7e57c2' },
+      { kind: 'readout', value: 'frequency', engineering: true, unit: 'Hz', anchor: 'top' },
+    ],
   }, 'passive'),
   wks('wokwi-ks2e-m-dc5', {
     type: 'evlab.relay-ks2e',
@@ -565,6 +621,7 @@ export const actuators: ComponentDefinition[] = [
     support: 'full',
     simNotes: 'Resistive coil with pull-in 3.75 V / drop-out 1.5 V hysteresis; ideal contacts. Switching time and inductive kick are not modelled.',
     params: { coil: ['COIL1', 'COIL2'], rCoil: 125, poles: [{ com: 'P1', no: 'NO1', nc: 'NC1' }, { com: 'P2', no: 'NO2', nc: 'NC2' }] },
+    indicators: [{ kind: 'readout', value: '_energized', map: { true: 'coil ON · COM–NO', false: 'coil off · COM–NC' } }],
   }, 'passive'),
   (() => {
     const d = headerModule({ title: 'Relay Module', pcb: '#1e5aa8', bottom: ['IN', G, { id: 'VCC', kind: 'passive' }, { id: 'COM', kind: 'passive' }, { id: 'NO', kind: 'passive' }, { id: 'NC', kind: 'passive' }], fallback: 'io', chip: { label: 'SRD-05VDC', w: 44, h: 22, color: '#2b4fa8' } });
@@ -580,6 +637,7 @@ export const actuators: ComponentDefinition[] = [
       pins: d.pins,
       properties: [{ key: 'trigger', label: 'Trigger', type: 'enum', default: 'low', options: [{ value: 'low', label: 'Active LOW' }, { value: 'high', label: 'Active HIGH' }] }],
       simulation: { support: 'full', model: 'relay-module', notes: 'Opto-isolated input (≈1 kΩ to VCC); COM switches between NC and NO. Contact timing not modelled.' },
+      indicators: [{ kind: 'readout', value: '_energized', map: { true: 'ON · COM–NO', false: 'off · COM–NC' } }],
       docs: { summary: '5 V relay module with optocoupler and driver transistor. Most modules switch on when IN is pulled LOW.' },
     } as ComponentDefinition;
   })(),
@@ -608,6 +666,11 @@ export const instruments: ComponentDefinition[] = [
         { key: 'duty', label: 'Duty (square)', type: 'number', default: 50, unit: '%', min: 1, max: 99, step: 1, live: true },
       ],
       simulation: { support: 'partial', model: 'signal-generator', notes: 'Square waves have exact edges; sine/triangle are sampled at 64 points per period (quasi-static solver). 50 Ω output.' },
+      controls: [
+        { kind: 'select', prop: 'waveform', icon: 'waves' },
+        { kind: 'slider', prop: 'frequency', icon: 'activity', log: true },
+        { kind: 'slider', prop: 'amplitude', icon: 'zap', label: 'p-p', max: 10 },
+      ],
       docs: { summary: 'Bench function generator. Wire GND to the circuit ground. Probe OUT with the oscilloscope.' },
     } as ComponentDefinition;
   })(),

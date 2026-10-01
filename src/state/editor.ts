@@ -31,6 +31,8 @@ interface Prefs {
   showDock: boolean;
   wireColor: string;
   sound: boolean;
+  /** Coloured dots on IC/MCU pins while simulating (high/low/floating). */
+  showLogicLevels: boolean;
 }
 
 const PREFS_KEY = 'evlab.prefs.v1';
@@ -53,6 +55,7 @@ function loadPrefs(): Prefs {
     showDock: true,
     wireColor: '#2ecc71',
     sound: true,
+    showLogicLevels: false,
   };
   try {
     const raw = localStorage.getItem(PREFS_KEY);
@@ -127,6 +130,7 @@ export const useEditor = create<EditorState>((set, get) => ({
       showDock: s.showDock,
       wireColor: s.wireColor,
       sound: s.sound,
+      showLogicLevels: s.showLogicLevels,
     };
     try {
       localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));

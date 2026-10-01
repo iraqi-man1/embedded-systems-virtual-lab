@@ -331,6 +331,7 @@ export function fitView() {
   const b = selectionBounds(
     c,
     c.components.map((x) => x.id),
+    true,
   );
   if (!b) {
     ed().set({ viewport: { x: 80, y: 60, zoom: 1 } });

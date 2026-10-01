@@ -36,6 +36,7 @@ import {
   EyeOff,
   FilePlus2,
   Flame,
+  Footprints,
   FlipHorizontal2,
   FolderOpen,
   Gamepad2,
@@ -87,6 +88,7 @@ import {
   Undo2,
   Volume2,
   Waves,
+  Wind,
   Wrench,
   X,
   Zap,
@@ -189,6 +191,8 @@ const ICONS: Record<string, LucideIcon> = {
   'target': Target,
   'ruler': Ruler,
   'disc': Disc3,
+  footprints: Footprints,
+  wind: Wind,
 };
 
 export function Icon({ name, size, className, fill }: { name: string; size?: number; className?: string; fill?: string }) {

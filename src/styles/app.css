@@ -159,9 +159,65 @@ input, select, textarea { user-select: text; }
 .wires .endpoint { fill: var(--bg-panel-2); stroke-width: 1.5; }
 .wires .pin-hover { fill: none; stroke: var(--pin-hover); stroke-width: 2; }
 .wires .net-pin { fill: var(--net-highlight); }
+.wires .lvl { stroke: var(--bg-canvas); stroke-width: 0.8; }
+.wires .lvl.high { fill: #e53935; }
+.wires .lvl.low { fill: #1e88e5; }
+.wires .lvl.mid { fill: #fbc02d; }
+.wires .lvl.float { fill: #9e9e9e; }
 .wires .probe-mark { stroke: #fff; stroke-width: 1; }
 .wires .marquee { fill: var(--selection-fill); stroke: var(--selection); stroke-dasharray: 4 3; stroke-width: 1; }
 .wires .wire-label { font-size: 9px; font-family: var(--font-mono); fill: var(--text); paint-order: stroke; stroke: var(--bg-canvas); stroke-width: 3px; }
+/* -------------------------------------------- simulation controls & feedback */
+.comp.inert > .body { opacity: 0.55; filter: grayscale(0.5); }
+.comp-label .vo-tag { margin-left: 4px; padding: 0 4px; border-radius: 3px; background: var(--bg-hover); color: var(--text-3); font-style: italic; }
+.simctl-layer { position: absolute; left: 0; top: 0; z-index: var(--z-sim-controls); }
+.simctl-host { position: absolute; transform-origin: center center; pointer-events: none; }
+.simctl-svg { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.simctl-svg .beam { fill: color-mix(in srgb, var(--accent) 14%, transparent); stroke: color-mix(in srgb, var(--accent) 45%, transparent); stroke-width: 0.8; stroke-dasharray: 3 2; }
+.simctl-svg .beam.out { fill: color-mix(in srgb, var(--text-3) 10%, transparent); }
+.simctl-svg .target { fill: #8d6e63; stroke: #4e342e; stroke-width: 1; pointer-events: none; }
+.simctl-svg .target.editable { pointer-events: all; cursor: ns-resize; }
+.simctl-svg .target.editable:hover { fill: #a1887f; }
+.simctl-svg .target-label { font: 600 8.5px var(--font-mono); fill: var(--text); paint-order: stroke; stroke: var(--bg-canvas); stroke-width: 3px; pointer-events: none; }
+.simctl-svg .echo { fill: none; stroke: var(--accent); stroke-width: 1.2; transform-box: fill-box; transform-origin: center; animation: echo 600ms ease-out forwards; }
+@keyframes echo { from { transform: scale(0.15); opacity: 0.9; } to { transform: scale(1); opacity: 0; } }
+.simctl-svg .glow { mix-blend-mode: screen; }
+.simctl-svg .waves .wave { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; opacity: 0; animation: wave 900ms ease-out infinite; }
+.simctl-svg .waves .w1 { animation-delay: 300ms; }
+.simctl-svg .waves .w2 { animation-delay: 600ms; }
+@keyframes wave { from { transform: translateX(2px) scale(0.6); opacity: 0.9; } to { transform: translateX(22px) scale(1.4); opacity: 0; } }
+.simctl-svg .cone { fill: currentColor; opacity: 0.05; transition: opacity 120ms; }
+.simctl-svg .cone.on { opacity: 0.28; }
+.simctl-svg .pulse { fill: currentColor; transform-box: fill-box; transform-origin: center; animation: pulse-dot 450ms ease-out forwards; }
+@keyframes pulse-dot { from { opacity: 0.95; transform: scale(0.6); } to { opacity: 0; transform: scale(2); } }
+.simctl-svg .rotor circle { fill: color-mix(in srgb, var(--bg-panel-2) 70%, transparent); stroke: var(--text-2); stroke-width: 1; }
+.simctl-svg .rotor line { stroke: var(--err); stroke-width: 2; stroke-linecap: round; }
+.simctl-svg .rotor g circle { fill: var(--err); stroke: none; }
+.simctl-key { position: absolute; pointer-events: auto; cursor: pointer; border-radius: 3px; }
+.simctl-key.round { border-radius: 50%; }
+.simctl-key:hover { background: rgba(90, 160, 255, 0.18); box-shadow: inset 0 0 0 1px rgba(90, 160, 255, 0.55); }
+.simctl-key.on { background: rgba(90, 210, 120, 0.35); box-shadow: inset 0 0 0 1.5px rgba(40, 170, 80, 0.9); }
+.simctl-stick, .simctl-rotary { position: absolute; pointer-events: auto; border-radius: 50%; cursor: grab; }
+.simctl-stick:hover, .simctl-rotary:hover { box-shadow: 0 0 0 1.5px rgba(90, 160, 255, 0.6); }
+.simctl-stick:active, .simctl-rotary:active { cursor: grabbing; }
+.simctl-stick .dot { position: absolute; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: rgba(90, 160, 255, 0.85); box-shadow: 0 0 0 2px #fff; pointer-events: none; }
+.simctl-chips { position: absolute; transform-origin: top center; display: flex; flex-direction: column; align-items: center; gap: 3px; pointer-events: none; }
+.simctl-chips.above { transform-origin: bottom center; }
+.simctl-chip { pointer-events: auto; display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border-radius: 999px; background: var(--bg-panel-2); border: 1px solid var(--border); box-shadow: 0 2px 8px rgba(16, 24, 40, 0.14); font-size: 11px; color: var(--text); white-space: nowrap; }
+.simctl-chip svg { width: 13px; height: 13px; color: var(--text-2); flex: none; }
+.simctl-chip .lbl { color: var(--text-3); }
+.simctl-chip .val { font-family: var(--font-mono); font-size: 10.5px; min-width: 44px; text-align: right; }
+.simctl-chip.slider input[type='range'] { width: 96px; height: 14px; margin: 0; }
+.simctl-chip select { height: 18px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-input); font-size: 11px; }
+.simctl-chip.readout { pointer-events: none; height: 20px; padding: 0 7px; font-family: var(--font-mono); font-size: 10.5px; background: color-mix(in srgb, var(--bg-panel-2) 92%, transparent); }
+.simctl-chip.action { cursor: pointer; font: inherit; font-size: 11px; }
+.simctl-chip.action:hover { background: var(--bg-hover); }
+.simctl-chip.action.on { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.simctl-chip.action.on svg { color: inherit; }
+.simctl-chip.tilt { height: auto; padding: 4px 8px 4px 4px; border-radius: 8px; align-items: center; }
+.simctl-chip.tilt .pad { position: relative; width: 48px; height: 48px; border-radius: 6px; background: radial-gradient(circle, var(--bg-hover) 0 1px, transparent 1.5px) center / 12px 12px, var(--bg-input); border: 1px solid var(--border-strong); cursor: crosshair; }
+.simctl-chip.tilt .dot { position: absolute; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: var(--accent); pointer-events: none; }
+.simctl-chip.tilt .val { text-align: left; line-height: 1.25; min-width: 0; }
 .pin-tip { z-index: var(--z-tooltip); pointer-events: none; background: var(--bg-panel-2); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 4px 8px; font-size: var(--fs-xs); white-space: nowrap; }
 .pin-tip b { font-family: var(--font-mono); }
 .pin-tip .v { font-family: var(--font-mono); color: var(--accent); }

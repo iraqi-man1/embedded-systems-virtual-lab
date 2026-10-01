@@ -205,6 +205,9 @@ class McuBoardModel implements SimModel {
     if (key === 'serial' && typeof value === 'number') {
       this.rxQueue.push(value & 0xff);
       this.pumpRx();
+    } else if (key === 'reset' && !value) {
+      // On-board RESET button: the sketch restarts when the button is released.
+      this.reset();
     }
   }
 

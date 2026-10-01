@@ -24,6 +24,7 @@ import { AnchoredPopover } from '../common/Popover';
 import { Tip } from '../common/Tooltip';
 import { CanvasMenuItems } from '../shell/ContextMenu';
 import { loadExample } from '../../examples';
+import { SimControlsLayer } from './SimControls';
 import { useWireToolbarVisible, WireToolbar } from './WireToolbar';
 
 type Drag =
@@ -518,6 +519,25 @@ export function Workspace() {
       .map((p) => ({ x: p.x, y: p.y }));
   }, [hoverNet, netlist, index, hover]);
 
+  // Logic levels on IC and MCU pins (View › Show Logic Levels).
+  const showLevels = useEditor((s) => s.showLogicLevels) && simulating;
+  const levels = useMemo(() => {
+    if (!showLevels) return [];
+    const out: Overlay['levels'] = [];
+    for (const ip of index.pins) {
+      const k = ip.pin.kind;
+      if (k !== 'io' && k !== 'analog' && k !== 'input' && k !== 'output') continue;
+      if (!ip.def.mcu && ip.def.category !== 'Integrated Circuits') continue;
+      const net = netlist.netOf(ip.ref);
+      if (net === undefined || netlist.nets[net].activePinCount < 2) continue;
+      const vcc = ip.def.mcu?.vcc ?? 5;
+      const v = voltages[net];
+      const level = !driven[net] ? 'float' : v >= 0.6 * vcc ? 'high' : v <= 0.3 * vcc ? 'low' : 'mid';
+      out.push({ x: ip.x, y: ip.y, level });
+    }
+    return out;
+  }, [showLevels, index, netlist, voltages, driven]);
+
   const draftFrom = wiring ? pinPosition(circuit, wiring.from) : null;
   const overlay: Overlay = {
     draft: wiring && draftFrom
@@ -531,6 +551,7 @@ export function Workspace() {
     hoverPin: hover && !dragging ? { x: hover.x, y: hover.y } : wiring && hover ? { x: hover.x, y: hover.y } : null,
     netPins: dragging ? [] : netPins,
     probes: probeMarkers(circuit, instruments),
+    levels,
   };
 
   // Pin tooltip with live values.
@@ -601,7 +622,8 @@ export function Workspace() {
     return (
       <div key={c.id} className="comp-label" style={{ left: b.x + b.width / 2, top: b.y }}>
         {c.label}
-        {def.simulation.support === 'visual-only' && <span className="vo"> (visual)</span>}
+        {def.simulation.support === 'visual-only' &&
+          (simulating ? <span className="vo-tag">not simulated</span> : <span className="vo"> (visual)</span>)}
       </div>
     );
   });
@@ -625,10 +647,13 @@ export function Workspace() {
       <div className="world" style={{ transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})` }}>
         {renderOrder.map((c) => {
           const def = lookup(c.type);
-          return def ? <ComponentView key={c.id} inst={c} def={def} selected={selectedSet.has(c.id)} /> : null;
+          return def ? (
+            <ComponentView key={c.id} inst={c} def={def} selected={selectedSet.has(c.id)} inert={simulating && def.simulation.support === 'visual-only'} />
+          ) : null;
         })}
         {labels}
         <WireLayer circuit={circuit} selectedWires={selectedWires} zoom={viewport.zoom} overlay={overlay} />
+        <SimControlsLayer components={circuit.components} simulating={simulating} selected={selectedSet} zoom={viewport.zoom} toWorld={toWorld} />
       </div>
       {!circuit.components.length && (
         <div className="canvas-hint">

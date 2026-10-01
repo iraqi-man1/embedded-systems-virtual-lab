@@ -34,7 +34,7 @@ const MENUS: { name: string; items: Entry[] }[] = [
   },
   {
     name: 'View',
-    items: ['zoomIn', 'zoomOut', 'zoomReset', 'fit', { sub: 'Zoom', render: () => <ZoomItems /> }, '-', 'grid', 'snap', '-', 'toggleLibrary', 'toggleCode', 'toggleInspector', 'toggleDock', '-', 'sound', 'theme'],
+    items: ['zoomIn', 'zoomOut', 'zoomReset', 'fit', { sub: 'Zoom', render: () => <ZoomItems /> }, '-', 'grid', 'snap', 'logicLevels', '-', 'toggleLibrary', 'toggleCode', 'toggleInspector', 'toggleDock', '-', 'sound', 'theme'],
   },
   {
     name: 'Simulation',
@@ -48,6 +48,7 @@ const TOGGLES: Record<string, () => boolean> = {
   snap: () => useEditor.getState().snap,
   theme: () => useEditor.getState().theme === 'dark',
   sound: () => useEditor.getState().sound,
+  logicLevels: () => useEditor.getState().showLogicLevels,
   toggleLibrary: () => useEditor.getState().showLibrary,
   toggleInspector: () => useEditor.getState().showInspector,
   toggleCode: () => useEditor.getState().showCode,
@@ -57,7 +58,7 @@ const TOGGLES: Record<string, () => boolean> = {
 function CommandEntry({ id }: { id: string }) {
   const c = commands[id];
   // Toggles reflect the current preferences.
-  useEditor((s) => [s.showGrid, s.snap, s.theme, s.sound, s.showLibrary, s.showInspector, s.showCode, s.showDock].join());
+  useEditor((s) => [s.showGrid, s.snap, s.theme, s.sound, s.showLibrary, s.showInspector, s.showCode, s.showDock, s.showLogicLevels].join());
   const disabled = !!c.enabled && !c.enabled();
   if (TOGGLES[id]) return <MenuCheckItem label={c.label} checked={TOGGLES[id]()} shortcut={c.shortcut} disabled={disabled} onSelect={c.run} />;
   return <MenuItem label={c.label} icon={c.icon} shortcut={c.shortcut} disabled={disabled} onSelect={c.run} />;

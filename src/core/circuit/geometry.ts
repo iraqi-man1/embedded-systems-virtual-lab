@@ -23,6 +23,28 @@ export function localToWorld(inst: ComponentInstance, def: ComponentDefinition, 
   return { x: inst.x + cx + dx, y: inst.y + cy + dy };
 }
 
+/** Inverse of `localToWorld`: a world point in the component's unrotated local frame. */
+export function worldToLocal(inst: ComponentInstance, def: ComponentDefinition, p: Point): Point {
+  const { width: w, height: h } = def.size;
+  const cx = w / 2;
+  const cy = h / 2;
+  let dx = p.x - (inst.x + cx);
+  let dy = p.y - (inst.y + cy);
+  switch (inst.rotation) {
+    case 90:
+      [dx, dy] = [dy, -dx];
+      break;
+    case 180:
+      [dx, dy] = [-dx, -dy];
+      break;
+    case 270:
+      [dx, dy] = [-dy, dx];
+      break;
+  }
+  const x = dx + cx;
+  return { x: inst.flip ? w - x : x, y: dy + cy };
+}
+
 export function pinWorld(inst: ComponentInstance, def: ComponentDefinition, pin: PinDefinition): Point {
   return localToWorld(inst, def, pin);
 }
