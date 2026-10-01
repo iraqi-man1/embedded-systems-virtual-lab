@@ -15,10 +15,21 @@ export interface Toast {
 /** What the canvas context menu was opened on (the menu positions itself at the pointer). */
 export type ContextMenuState = { kind: 'component'; id: string } | { kind: 'wire'; id: string } | { kind: 'canvas'; world: { x: number; y: number } };
 
+/** A project file opened or saved recently (File › Open Recent). */
+export interface RecentProject {
+  path: string;
+  name: string;
+  /** ISO timestamp of the last open/save. */
+  at: string;
+}
+
+const MAX_RECENT_PROJECTS = 10;
+
 interface Prefs {
   theme: Theme;
   favorites: string[];
   recent: string[];
+  recentProjects: RecentProject[];
   showGrid: boolean;
   snap: boolean;
   libraryWidth: number;
@@ -44,6 +55,7 @@ function loadPrefs(): Prefs {
     theme: dark ? 'dark' : 'light',
     favorites: ['evlab.arduino-uno', 'evlab.breadboard-half', 'evlab.resistor', 'evlab.led', 'evlab.pushbutton', 'evlab.potentiometer'],
     recent: [],
+    recentProjects: [],
     showGrid: true,
     snap: true,
     libraryWidth: 280,
@@ -80,6 +92,8 @@ interface EditorState extends Prefs {
   contextMenu: ContextMenuState | null;
   dialog: null | 'examples' | 'toolchain' | 'shortcuts' | 'about' | 'project';
   toasts: Toast[];
+  /** Open command palette: run commands, or add a part (optionally at a canvas point). */
+  palette: null | { mode: 'commands' | 'add'; at?: { x: number; y: number } };
   /** Component type being dragged from the library (drop preview). */
   dragType: string | null;
   /** Line to reveal in the code editor (set by the Problems panel). */
@@ -91,6 +105,8 @@ interface EditorState extends Prefs {
   clearSelection(): void;
   toggleFavorite(type: string): void;
   pushRecent(type: string): void;
+  rememberProject(path: string, name: string): void;
+  forgetProject(path?: string): void;
   notify(message: string, kind?: Toast['kind']): void;
   dismissToast(id: number): void;
 }
@@ -112,6 +128,7 @@ export const useEditor = create<EditorState>((set, get) => ({
   dialog: null,
   toasts: [],
   dragType: null,
+  palette: null,
   revealLine: null,
 
   set: (partial) => set(partial),
@@ -122,6 +139,7 @@ export const useEditor = create<EditorState>((set, get) => ({
       theme: s.theme,
       favorites: s.favorites,
       recent: s.recent,
+      recentProjects: s.recentProjects,
       showGrid: s.showGrid,
       snap: s.snap,
       libraryWidth: s.libraryWidth,
@@ -154,6 +172,13 @@ export const useEditor = create<EditorState>((set, get) => ({
   },
   pushRecent(type) {
     get().setPrefs({ recent: [type, ...get().recent.filter((t) => t !== type)].slice(0, 12) });
+  },
+  rememberProject(path, name) {
+    const entry = { path, name, at: new Date().toISOString() };
+    get().setPrefs({ recentProjects: [entry, ...get().recentProjects.filter((r) => r.path !== path)].slice(0, MAX_RECENT_PROJECTS) });
+  },
+  forgetProject(path) {
+    get().setPrefs({ recentProjects: path ? get().recentProjects.filter((r) => r.path !== path) : [] });
   },
   notify(message, kind = 'info') {
     const id = ++toastSeq;

@@ -29,7 +29,21 @@ export interface CompileState {
   flashBytes: number | null;
   ramBytes: number | null;
   durationMs: number | null;
+  /** File contents of the last successful build (marks files edited since). */
+  built: Record<string, string> | null;
 }
+
+export const EMPTY_COMPILE: CompileState = {
+  status: 'idle',
+  log: '',
+  diagnostics: [],
+  hex: {},
+  hash: null,
+  flashBytes: null,
+  ramBytes: null,
+  durationMs: null,
+  built: null,
+};
 
 interface SimState {
   state: SimRunState;
@@ -55,7 +69,7 @@ export const useSim = create<SimState>((set) => ({
   mcus: [],
   diagnostics: [],
   serial: {},
-  compile: { status: 'idle', log: '', diagnostics: [], hex: {}, hash: null, flashBytes: null, ramBytes: null, durationMs: null },
+  compile: EMPTY_COMPILE,
   toolchain: null,
   starting: false,
   set: (p) => set(p),
@@ -125,9 +139,31 @@ export function findTargetBoard(project: Project): ComponentInstance | undefined
   return boards.find((b) => b.id === project.firmware.target) ?? boards[0];
 }
 
-function sourceHash(project: Project, board: ComponentInstance | undefined): string {
+export function sourceHash(project: Project, board: ComponentInstance | undefined): string {
   const def = board && lookup(board.type);
   return JSON.stringify([def?.mcu?.toolchain, project.firmware.files]);
+}
+
+/**
+ * Firmware build state shown in the status bar: `none` without a
+ * programmable board, `modified` when the sources (or the target board)
+ * changed since the last successful build.
+ */
+export type BuildState = 'none' | 'unbuilt' | 'compiling' | 'built' | 'modified' | 'failed';
+
+export function buildStateOf(project: Project, compile: CompileState): BuildState {
+  const board = findTargetBoard(project);
+  const def = board && lookup(board.type);
+  if (!board || !def?.mcu || def.simulation.support === 'visual-only') return 'none';
+  if (compile.status === 'compiling') return 'compiling';
+  if (compile.status === 'error') return 'failed';
+  if (!compile.hex[board.id] || !compile.built) return 'unbuilt';
+  return compile.hash === sourceHash(project, board) ? 'built' : 'modified';
+}
+
+export function useBuildState(): BuildState {
+  const compile = useSim((s) => s.compile);
+  return useProject((s) => buildStateOf(s.project, compile));
 }
 
 function probeRequests(project: Project): ProbeRequest[] {
@@ -180,6 +216,7 @@ export async function compileFirmware(): Promise<boolean> {
         diagnostics: res.diagnostics,
         hex,
         hash: res.success ? sourceHash(project, board) : null,
+        built: res.success ? Object.fromEntries(project.firmware.files.map((f) => [f.name, f.content])) : useSim.getState().compile.built,
         flashBytes: res.flashBytes,
         ramBytes: res.ramBytes,
         durationMs: res.durationMs,

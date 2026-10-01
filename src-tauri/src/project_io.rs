@@ -6,6 +6,32 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager};
 
+/// First command-line argument naming an existing project file (double-clicked
+/// `.evlab` file, "Open with…", or a second launch forwarded to this instance).
+/// Relative paths resolve against `cwd`.
+pub fn project_arg<I: IntoIterator<Item = String>>(args: I, cwd: &Path) -> Option<String> {
+    args.into_iter()
+        .filter(|a| !a.starts_with('-'))
+        .map(|a| {
+            let p = PathBuf::from(&a);
+            if p.is_absolute() {
+                p
+            } else {
+                cwd.join(p)
+            }
+        })
+        .find(|p| {
+            p.extension().is_some_and(|e| e.eq_ignore_ascii_case("evlab")) && p.is_file()
+        })
+        .map(|p| p.to_string_lossy().into_owned())
+}
+
+/// Project file the application was launched with; handed to the UI once.
+#[tauri::command]
+pub fn take_launch_file(state: tauri::State<'_, crate::AppState>) -> Option<String> {
+    state.launch_file.lock().ok()?.take()
+}
+
 #[tauri::command]
 pub fn read_text_file(path: String) -> Result<String, String> {
     fs::read_to_string(&path).map_err(|e| format!("Cannot read {path}: {e}"))
@@ -104,6 +130,21 @@ mod tests {
         assert!(!dir.join("current.evlab.tmp").exists());
         clear_autosave(&dir).unwrap();
         assert!(read_autosave(&dir).unwrap().is_none());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn finds_project_argument() {
+        let dir = std::env::temp_dir().join(format!("evlab-arg-test-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("Blink.EVLAB"), "{}").unwrap();
+        fs::write(dir.join("notes.txt"), "").unwrap();
+        let args = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        // Flags, other files and missing projects are skipped; relative paths use cwd.
+        let found = project_arg(args(&["--flag", "notes.txt", "missing.evlab", "Blink.EVLAB"]), &dir).unwrap();
+        assert_eq!(PathBuf::from(found), dir.join("Blink.EVLAB"));
+        assert!(project_arg(args(&["notes.txt"]), &dir).is_none());
         let _ = fs::remove_dir_all(&dir);
     }
 }

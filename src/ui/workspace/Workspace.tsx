@@ -25,6 +25,7 @@ import { AnchoredPopover } from '../common/Popover';
 import { Tip } from '../common/Tooltip';
 import { CanvasMenuItems } from '../shell/ContextMenu';
 import { loadExample } from '../../examples';
+import { fileTitle, openRecent } from '../../app/fileOps';
 import { SimControlsLayer } from './SimControls';
 import { useWireToolbarVisible, WireToolbar } from './WireToolbar';
 
@@ -44,6 +45,24 @@ function wireColorFor(a: IndexedPin | undefined, b: IndexedPin | undefined, fall
   if (kinds.includes('ground')) return '#222222';
   if (kinds.includes('power')) return '#e74c3c';
   return fallback;
+}
+
+/** Recently opened projects on the empty canvas. */
+function RecentProjects() {
+  const recent = useEditor((s) => s.recentProjects);
+  if (!recent.length) return null;
+  return (
+    <div className="recent-projects">
+      <h4>Recent projects</h4>
+      {recent.slice(0, 5).map((r) => (
+        <button key={r.path} className="recent-item" title={r.path} onClick={() => void openRecent(r.path)}>
+          <Icon name="history" />
+          <span className="name">{fileTitle(r.path)}</span>
+          <span className="when">{new Date(r.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+        </button>
+      ))}
+    </div>
+  );
 }
 
 export function Workspace() {
@@ -479,6 +498,9 @@ export function Workspace() {
       });
     } else if (target.closest('[data-comp]')) {
       useEditor.getState().setPrefs({ showInspector: true });
+    } else if (!target.closest('button, .simctl-chip, .simctl-key, .canvas-hint') && !useEditor.getState().wiring) {
+      // Double-click on empty canvas: add a part right here.
+      useEditor.getState().set({ palette: { mode: 'add', at: world } });
     }
   };
 
@@ -802,6 +824,7 @@ export function Workspace() {
               <Icon name="book" /> Browse examples
             </button>
           </div>
+          <RecentProjects />
         </div>
       )}
       {simulating && (

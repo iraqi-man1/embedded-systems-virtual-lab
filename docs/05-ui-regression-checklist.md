@@ -27,8 +27,8 @@ node tools/ui-floating-check.mjs
 
 Opens every toolbar menu, every menu-bar menu and submenu, the canvas context menu at the four
 window edges, the wire context menu and its submenu, the floating wire toolbar, a library info
-card near the bottom of the window and the toolbar overflow menu in a narrow window — in both
-themes — and fails if any of them is outside the window or covered by something else.
+card near the bottom of the window, the command palette / quick-add, and the toolbar overflow
+menu and palette in a narrow window — in both themes — and fails if any of them is outside the window or covered by something else.
 
 ## Manual checks (keyboard and focus)
 
@@ -43,3 +43,17 @@ themes — and fails if any of them is outside the window or covered by somethin
 - While drawing a wire, `1`–`9` / `C` change the colour of the wire being drawn.
 - Tooltips: hovering a toolbar button shows its name and shortcut; they never stay open over an
   open menu.
+- Command palette: Ctrl+Shift+P lists every command (disabled ones greyed), typing filters
+  (synonyms such as "zoom to fit" work), Enter runs, Esc closes and the next opening starts empty.
+- Quick add: Ctrl+K adds the chosen part at the centre of the view; double-clicking empty canvas
+  adds it at that point. With no query it lists recently used and favourite parts.
+- Build state (status bar): *Not built* → *Compiling…* → *Built*; editing code shows
+  *Modified* and a dot on the changed tab; undoing the edit returns to *Built*; a failed build
+  shows *Build failed* and opens Problems on click.
+- Code tabs: + opens an inline name field (Enter adds, Esc cancels, invalid names are outlined
+  red); double-clicking a tab renames it (not `sketch.ino`).
+- Recent projects: File › Open Recent and the empty canvas list opened/saved projects; a missing
+  file is removed from the list with a message.
+- Desktop only: double-clicking an `.evlab` file opens it (in the running window if the app is
+  already open); dropping an `.evlab` file onto the window opens it; dragging parts from the
+  library onto the canvas works (HTML5 drag and drop needs `dragDropEnabled: false`).

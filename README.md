@@ -22,6 +22,9 @@ Built with Tauri 2, React, TypeScript, avr8js, Wokwi Elements, Monaco Editor and
   multi-select, align/distribute, undo/redo, copy/paste, context menus, keyboard shortcuts,
   grid snapping, orthogonal wires with editable bends, junctions, net labels, wire colours and
   labels, A* auto-routing.
+- **Fast to drive from the keyboard**: command palette (Ctrl+Shift+P), quick add a part
+  (Ctrl+K or double-click the canvas), recent projects, `.evlab` file association and drag and
+  drop, live build state in the status bar.
 - **Breadboards that understand connectivity**: legs dropped on holes connect automatically;
   hover a hole to see every connected hole highlighted.
 - **Component library**: 140 parts across 12 categories; 76 have simulation models (54 full,

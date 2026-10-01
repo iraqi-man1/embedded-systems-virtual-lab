@@ -9,6 +9,7 @@ import { BottomDock } from './instruments/BottomDock';
 import { LibraryPanel } from './library/LibraryPanel';
 import { DialogHost } from './common/Dialog';
 import { TooltipProvider } from './common/Tooltip';
+import { CommandPalette } from './shell/CommandPalette';
 import { Dialogs, Toasts } from './shell/Dialogs';
 import { MenuBar } from './shell/MenuBar';
 import { StatusBar } from './shell/StatusBar';
@@ -144,6 +145,7 @@ export function App() {
         <StatusBar />
         <Dialogs />
         <DialogHost />
+        <CommandPalette />
         <Toasts />
       </div>
     </TooltipProvider>

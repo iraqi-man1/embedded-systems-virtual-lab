@@ -37,6 +37,8 @@ interface ProjectState {
   setFile(name: string, content: string): void;
   addFile(name: string): void;
   removeFile(name: string): void;
+  /** Renames a source file (the main sketch keeps its name). */
+  renameFile(from: string, to: string): void;
 }
 
 export const useProject = create<ProjectState>((set, get) => ({
@@ -119,6 +121,13 @@ export const useProject = create<ProjectState>((set, get) => ({
   removeFile(name) {
     get().updateProject((p) => {
       p.firmware.files = p.firmware.files.filter((f) => f.name !== name || f.name === 'sketch.ino');
+    });
+  },
+  renameFile(from, to) {
+    get().updateProject((p) => {
+      if (from === 'sketch.ino' || from === to || p.firmware.files.some((f) => f.name === to)) return;
+      const f = p.firmware.files.find((x) => x.name === from);
+      if (f) f.name = to;
     });
   },
 }));

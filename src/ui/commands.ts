@@ -131,6 +131,8 @@ export const commands: Record<string, Command> = {
   probeLogic: { id: 'probeLogic', label: 'Probe with Logic Analyzer', icon: 'activity', run: () => ed().set({ tool: 'probe-logic' }) },
   probeScope: { id: 'probeScope', label: 'Probe with Oscilloscope', icon: 'waves', run: () => ed().set({ tool: 'probe-scope' }) },
   toolchain: { id: 'toolchain', label: 'Firmware Toolchain…', icon: 'wrench', run: () => ed().set({ dialog: 'toolchain' }) },
+  palette: { id: 'palette', label: 'Command Palette…', icon: 'command', shortcut: 'Ctrl+Shift+P', run: () => ed().set({ palette: { mode: 'commands' } }) },
+  quickAdd: { id: 'quickAdd', label: 'Add a Part…', icon: 'plus', shortcut: 'Ctrl+K', run: () => ed().set({ palette: { mode: 'add' } }) },
   shortcuts: { id: 'shortcuts', label: 'Keyboard Shortcuts', icon: 'keyboard', shortcut: '?', run: () => ed().set({ dialog: 'shortcuts' }) },
   about: { id: 'about', label: 'About', icon: 'info', run: () => ed().set({ dialog: 'about' }) },
 };
@@ -169,6 +171,8 @@ export function installShortcuts(): () => void {
     if (ctrl && k.toLowerCase() === 'o') return run('open');
     if (ctrl && k.toLowerCase() === 'n') return run('new');
     if (ctrl && k.toLowerCase() === 'b') return run('compile');
+    if (ctrl && e.shiftKey && k.toLowerCase() === 'p') return run('palette');
+    if (ctrl && !e.shiftKey && k.toLowerCase() === 'k') return run('quickAdd');
     if (ctrl && (e.code === 'Backquote' || k === '`')) return run('focusCanvas');
     if (k === 'F5') return run(ctrl ? 'reset' : e.shiftKey ? 'stop' : 'run');
     if (k === 'F6') return run('pause');

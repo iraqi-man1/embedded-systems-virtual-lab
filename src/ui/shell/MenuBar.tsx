@@ -1,3 +1,4 @@
+import { fileTitle, openRecent } from '../../app/fileOps';
 import { useEditor } from '../../state/editor';
 import { useProject } from '../../state/project';
 import { commands } from '../commands';
@@ -20,9 +21,23 @@ function ZoomItems() {
   );
 }
 
+function RecentItems() {
+  const recent = useEditor((s) => s.recentProjects);
+  if (!recent.length) return <MenuItem label="No recent projects" disabled onSelect={() => {}} />;
+  return (
+    <>
+      {recent.map((r, i) => (
+        <MenuItem key={r.path} label={`${i + 1}  ${fileTitle(r.path)}`} shortcut={r.name !== fileTitle(r.path) ? r.name : undefined} onSelect={() => void openRecent(r.path)} />
+      ))}
+      <MenuSeparator />
+      <MenuItem label="Clear recent list" icon="trash" onSelect={() => useEditor.getState().forgetProject()} />
+    </>
+  );
+}
+
 const MENUS: { name: string; items: Entry[] }[] = [
-  { name: 'File', items: ['new', 'open', '-', 'save', 'saveAs', '-', 'examples'] },
-  { name: 'Edit', items: ['undo', 'redo', '-', 'cut', 'copy', 'paste', 'duplicate', 'delete', '-', 'selectAll', '-', 'rotate', 'rotateCcw', 'flip'] },
+  { name: 'File', items: ['new', 'open', { sub: 'Open Recent', icon: 'history', render: () => <RecentItems /> }, '-', 'save', 'saveAs', '-', 'examples'] },
+  { name: 'Edit', items: ['undo', 'redo', '-', 'cut', 'copy', 'paste', 'duplicate', 'delete', '-', 'selectAll', '-', 'rotate', 'rotateCcw', 'flip', '-', 'quickAdd', 'palette'] },
   {
     name: 'Arrange',
     items: [
@@ -40,7 +55,7 @@ const MENUS: { name: string; items: Entry[] }[] = [
     name: 'Simulation',
     items: ['compile', '-', 'run', 'pause', 'step', 'stepInstr', 'reset', 'stop', '-', { sub: 'Speed', icon: 'gauge', render: () => <SpeedItems /> }, '-', 'probeLogic', 'probeScope', '-', 'toolchain'],
   },
-  { name: 'Help', items: ['examples', 'shortcuts', '-', 'about'] },
+  { name: 'Help', items: ['palette', 'quickAdd', '-', 'examples', 'shortcuts', '-', 'about'] },
 ];
 
 const TOGGLES: Record<string, () => boolean> = {

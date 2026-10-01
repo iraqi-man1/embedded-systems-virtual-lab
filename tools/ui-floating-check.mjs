@@ -128,6 +128,17 @@ for (const theme of ['light', 'dark']) {
   await closeAll();
   await page.keyboard.press('Escape');
 
+  // Command palette and quick-add (modal layer, above everything else).
+  await page.keyboard.press('Control+Shift+P');
+  await page.waitForTimeout(200);
+  await visible('.cmdk-dialog', `[${theme}] command palette`);
+  await shot(`${theme}-palette`);
+  await closeAll();
+  await page.keyboard.press('Control+k');
+  await page.waitForTimeout(200);
+  await visible('.cmdk-dialog', `[${theme}] quick add`);
+  await closeAll();
+
   // Library info card for an item at the bottom of the window.
   const items = page.locator('.lib-item');
   const count = await items.count();
@@ -154,6 +165,10 @@ for (const theme of ['light', 'dark']) {
   await page.waitForTimeout(200);
   await visible('.dropdown', `[${theme}] overflow menu`);
   await shot(`${theme}-overflow`);
+  await closeAll();
+  await page.keyboard.press('Control+Shift+P');
+  await page.waitForTimeout(200);
+  await visible('.cmdk-dialog', `[${theme}] command palette in a narrow window`);
   await closeAll();
 }
 

@@ -1,12 +1,13 @@
 /**
  * Desktop window lifecycle: unsaved-changes prompt on close, crash-recovery
- * autosave, and the native window title.
+ * autosave, the native window title, and project files opened from the
+ * operating system (double-click, second launch, drag and drop).
  */
-import { isTauri } from '../platform';
+import { isTauri, launch } from '../platform';
 import { useProject } from '../state/project';
 import { askSaveChanges, dialogOpen } from '../ui/common/Dialog';
 import { clearAutosave, offerRestore, startAutosave } from './autosave';
-import { saveDocument } from './fileOps';
+import { openDroppedFile, openPath, saveDocument } from './fileOps';
 
 export function windowTitle(name: string, dirty: boolean) {
   return `${dirty ? '● ' : ''}${name} — Embedded Systems Virtual Lab`;
@@ -65,14 +66,45 @@ async function installCloseGuard(): Promise<() => void> {
   });
 }
 
+/**
+ * Project files dropped anywhere on the window open the project. Other drags
+ * (parts from the library) are left to their own targets.
+ */
+function installFileDrop(): () => void {
+  const hasFiles = (e: DragEvent) => !!e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files');
+  const over = (e: DragEvent) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    e.dataTransfer!.dropEffect = 'copy';
+  };
+  const drop = (e: DragEvent) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    const file = e.dataTransfer!.files[0];
+    if (file) void openDroppedFile(file);
+  };
+  window.addEventListener('dragover', over);
+  window.addEventListener('drop', drop);
+  return () => {
+    window.removeEventListener('dragover', over);
+    window.removeEventListener('drop', drop);
+  };
+}
+
 /** Called once at start-up. Returns a cleanup function. */
 export function installLifecycle(): () => void {
-  const cleanups: (() => void)[] = [installTitleSync()];
+  const cleanups: (() => void)[] = [installTitleSync(), installFileDrop()];
   let disposed = false;
-  void installCloseGuard().then((off) => (disposed ? off() : cleanups.push(off)));
-  // Offer to restore a crash copy before autosave may overwrite it.
-  void offerRestore().then(() => {
-    if (!disposed) cleanups.push(startAutosave());
+  const keep = (off: () => void) => (disposed ? off() : cleanups.push(off));
+  void installCloseGuard().then(keep);
+  void launch.onOpenFile((path) => void openPath(path)).then(keep);
+  // Offer to restore a crash copy before autosave may overwrite it; a project
+  // the app was launched with opens next (asking to keep a restored copy).
+  void offerRestore().then(async () => {
+    if (disposed) return;
+    cleanups.push(startAutosave());
+    const file = await launch.takeLaunchFile().catch(() => null);
+    if (file && !disposed) await openPath(file);
   });
   return () => {
     disposed = true;
