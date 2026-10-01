@@ -22,7 +22,8 @@ interface Prefs {
   showGrid: boolean;
   snap: boolean;
   libraryWidth: number;
-  inspectorWidth: number;
+  /** Height of the Properties panel under the component library. */
+  inspectorHeight: number;
   codeWidth: number;
   dockHeight: number;
   showLibrary: boolean;
@@ -45,9 +46,9 @@ function loadPrefs(): Prefs {
     recent: [],
     showGrid: true,
     snap: true,
-    libraryWidth: 270,
-    inspectorWidth: 300,
-    codeWidth: 520,
+    libraryWidth: 280,
+    inspectorHeight: 340,
+    codeWidth: 460,
     dockHeight: 240,
     showLibrary: true,
     showInspector: true,
@@ -79,6 +80,8 @@ interface EditorState extends Prefs {
   contextMenu: ContextMenuState | null;
   dialog: null | 'examples' | 'toolchain' | 'shortcuts' | 'about' | 'project';
   toasts: Toast[];
+  /** Component type being dragged from the library (drop preview). */
+  dragType: string | null;
   /** Line to reveal in the code editor (set by the Problems panel). */
   revealLine: { file: string; line: number; nonce: number } | null;
 
@@ -108,6 +111,7 @@ export const useEditor = create<EditorState>((set, get) => ({
   contextMenu: null,
   dialog: null,
   toasts: [],
+  dragType: null,
   revealLine: null,
 
   set: (partial) => set(partial),
@@ -121,7 +125,7 @@ export const useEditor = create<EditorState>((set, get) => ({
       showGrid: s.showGrid,
       snap: s.snap,
       libraryWidth: s.libraryWidth,
-      inspectorWidth: s.inspectorWidth,
+      inspectorHeight: s.inspectorHeight,
       codeWidth: s.codeWidth,
       dockHeight: s.dockHeight,
       showLibrary: s.showLibrary,

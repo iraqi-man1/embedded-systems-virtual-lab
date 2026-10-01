@@ -34,7 +34,7 @@ const MENUS: { name: string; items: Entry[] }[] = [
   },
   {
     name: 'View',
-    items: ['zoomIn', 'zoomOut', 'zoomReset', 'fit', { sub: 'Zoom', render: () => <ZoomItems /> }, '-', 'grid', 'snap', 'logicLevels', '-', 'toggleLibrary', 'toggleCode', 'toggleInspector', 'toggleDock', '-', 'sound', 'theme'],
+    items: ['zoomIn', 'zoomOut', 'zoomReset', 'fit', 'zoomSelection', { sub: 'Zoom', render: () => <ZoomItems /> }, '-', 'grid', 'snap', 'logicLevels', '-', 'toggleLibrary', 'toggleInspector', 'toggleCode', 'toggleDock', 'focusCanvas', '-', 'sound', 'theme'],
   },
   {
     name: 'Simulation',

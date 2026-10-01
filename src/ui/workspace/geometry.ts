@@ -1,7 +1,7 @@
 import type { CircuitDocument, ComponentInstance, PinRef, Point, Wire } from '../../core/model/circuit';
 import type { ComponentDefinition, PinDefinition } from '../../core/model/component';
 import { GRID } from '../../core/model/component';
-import { componentBounds, localToWorld, pinWorld, type Rect } from '../../core/circuit/geometry';
+import { componentBounds, localToWorld, pinWorld, rectsIntersect, type Rect } from '../../core/circuit/geometry';
 import { lookup } from '../../app/registry';
 
 export interface IndexedPin {
@@ -235,4 +235,100 @@ export function autoRoute(circuit: CircuitDocument, w: Wire): Point[] | null {
     }
   }
   return null;
+}
+
+// ------------------------------------------------------------------ marquee
+function segmentHitsRect(a: Point, b: Point, r: Rect): boolean {
+  const inside = (p: Point) => p.x >= r.x && p.x <= r.x + r.width && p.y >= r.y && p.y <= r.y + r.height;
+  if (inside(a) || inside(b)) return true;
+  // Wire segments are axis-aligned or short diagonals: test against the rectangle edges.
+  const edges: [Point, Point][] = [
+    [{ x: r.x, y: r.y }, { x: r.x + r.width, y: r.y }],
+    [{ x: r.x + r.width, y: r.y }, { x: r.x + r.width, y: r.y + r.height }],
+    [{ x: r.x + r.width, y: r.y + r.height }, { x: r.x, y: r.y + r.height }],
+    [{ x: r.x, y: r.y + r.height }, { x: r.x, y: r.y }],
+  ];
+  const cross = (p: Point, q: Point, s: Point) => (q.x - p.x) * (s.y - p.y) - (q.y - p.y) * (s.x - p.x);
+  return edges.some(([c, d]) => cross(a, b, c) * cross(a, b, d) <= 0 && cross(c, d, a) * cross(c, d, b) <= 0);
+}
+
+/**
+ * Box selection, CAD convention: dragging left→right ("window") selects what
+ * lies completely inside the box; right→left ("crossing") selects everything
+ * the box touches.
+ */
+export function marqueeSelection(circuit: CircuitDocument, rect: Rect, crossing: boolean): { components: string[]; wires: string[] } {
+  const contains = (b: Rect) => b.x >= rect.x && b.y >= rect.y && b.x + b.width <= rect.x + rect.width && b.y + b.height <= rect.y + rect.height;
+  const components = circuit.components
+    .filter((c) => {
+      const def = lookup(c.type);
+      if (!def) return false;
+      const b = componentBounds(c, def);
+      return crossing ? rectsIntersect(b, rect) : contains(b);
+    })
+    .map((c) => c.id);
+  const wires = circuit.wires
+    .filter((w) => {
+      const pts = wirePolyline(circuit, w);
+      if (!pts) return false;
+      if (!crossing) return pts.every((p) => contains({ x: p.x, y: p.y, width: 0, height: 0 }));
+      for (let i = 0; i + 1 < pts.length; i++) if (segmentHitsRect(pts[i], pts[i + 1], rect)) return true;
+      return false;
+    })
+    .map((w) => w.id);
+  return { components, wires };
+}
+
+// -------------------------------------------------------- insertion preview
+/**
+ * Breadboard holes (socket pins) that legs at `points` would plug into, and
+ * the other holes of the same strips. Sockets of `exclude`d parts (the ones
+ * being moved) are ignored.
+ */
+export function insertionPreview(
+  circuit: CircuitDocument,
+  netlist: { netOf(ref: PinRef): number | undefined; nets: { pins: PinRef[] }[] },
+  points: Point[],
+  exclude: Set<string>,
+  tolerance = 3.6,
+): { holes: Point[]; strips: Point[] } {
+  const index = pinIndex(circuit);
+  const holes: Point[] = [];
+  const holeKeys = new Set<string>();
+  const nets = new Set<number>();
+  for (const p of points) {
+    const cx = Math.floor(p.x / CELL);
+    const cy = Math.floor(p.y / CELL);
+    let best: IndexedPin | null = null;
+    let bestD = tolerance;
+    for (let ix = cx - 1; ix <= cx + 1; ix++) {
+      for (let iy = cy - 1; iy <= cy + 1; iy++) {
+        for (const ip of index.cells.get(`${ix},${iy}`) ?? []) {
+          if (ip.pin.kind !== 'socket' || exclude.has(ip.ref.componentId)) continue;
+          const d = Math.hypot(ip.x - p.x, ip.y - p.y);
+          if (d <= bestD) {
+            bestD = d;
+            best = ip;
+          }
+        }
+      }
+    }
+    if (!best) continue;
+    const key = `${best.ref.componentId}:${best.ref.pinId}`;
+    if (holeKeys.has(key)) continue;
+    holeKeys.add(key);
+    holes.push({ x: best.x, y: best.y });
+    const n = netlist.netOf(best.ref);
+    if (n !== undefined) nets.add(n);
+  }
+  const strips: Point[] = [];
+  for (const n of nets) {
+    for (const ref of netlist.nets[n]?.pins ?? []) {
+      const key = `${ref.componentId}:${ref.pinId}`;
+      if (holeKeys.has(key) || exclude.has(ref.componentId)) continue;
+      const ip = index.byKey.get(key);
+      if (ip && ip.pin.kind === 'socket') strips.push({ x: ip.x, y: ip.y });
+    }
+  }
+  return { holes, strips };
 }

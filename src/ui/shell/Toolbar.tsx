@@ -144,7 +144,7 @@ const PROBES = [
   { tool: 'probe-scope' as const, icon: 'waves', title: 'Oscilloscope probe: click a pin to add a channel' },
   { tool: 'probe-meter-red' as const, icon: 'gauge', title: 'Multimeter: place the red probe' },
 ];
-const VIEW_TOGGLES = ['toggleLibrary', 'toggleCode', 'toggleDock', 'toggleInspector'] as const;
+const VIEW_TOGGLES = ['toggleLibrary', 'toggleInspector', 'toggleCode', 'toggleDock'] as const;
 
 /** Order in which groups move into the overflow menu when the window is narrow. */
 const HIDE_ORDER = ['probes', 'arrange', 'view', 'file', 'edit', 'speed'];
@@ -158,7 +158,7 @@ export function Toolbar() {
   const settings = useProject((s) => s.project.simulation);
   const wireColor = useEditor((s) => s.wireColor);
   const theme = useEditor((s) => s.theme);
-  const panels = useEditor((s) => [s.showLibrary, s.showCode, s.showDock, s.showInspector].join());
+  const panels = useEditor((s) => [s.showLibrary, s.showInspector, s.showCode, s.showDock].join());
   const panelOn = Object.fromEntries(panels.split(',').map((x, i) => [VIEW_TOGGLES[i], x === 'true'])) as Record<string, boolean>;
   useCommandRefresh();
 

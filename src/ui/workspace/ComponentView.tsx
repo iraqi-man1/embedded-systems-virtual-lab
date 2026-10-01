@@ -113,6 +113,8 @@ interface Props {
   selected: boolean;
   /** Visual-only part while the simulation runs (drawn dimmed). */
   inert?: boolean;
+  /** Worst diagnostic on this part (outlined on the canvas). */
+  problem?: 'error' | 'warning';
 }
 
 /** `$rotate` in the visual state turns the part's body (e.g. a tilt switch being tilted). */
@@ -131,7 +133,7 @@ function useBodyRotation(id: string, active: boolean) {
   return ref;
 }
 
-export const ComponentView = memo(function ComponentView({ inst, def, selected, inert }: Props) {
+export const ComponentView = memo(function ComponentView({ inst, def, selected, inert, problem }: Props) {
   const { width, height } = def.size;
   const transform = `rotate(${inst.rotation}deg)${inst.flip ? ' scaleX(-1)' : ''}`;
   const bodyRef = useBodyRotation(inst.id, !!def.simulation.model);
@@ -141,7 +143,7 @@ export const ComponentView = memo(function ComponentView({ inst, def, selected, 
   else body = renderBuiltin(def.visual.renderer, inst, def);
   return (
     <div
-      className={`comp${selected ? ' selected' : ''}${inert ? ' inert' : ''}`}
+      className={`comp${selected ? ' selected' : ''}${inert ? ' inert' : ''}${problem ? ` problem-${problem}` : ''}`}
       data-comp={inst.id}
       style={{ left: inst.x, top: inst.y, width, height, transform }}
     >

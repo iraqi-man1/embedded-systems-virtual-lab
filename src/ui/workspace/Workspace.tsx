@@ -6,16 +6,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PinRef, Point, Wire } from '../../core/model/circuit';
 import { GRID } from '../../core/model/component';
-import { componentBounds, rectsIntersect, snap, snapComponentPosition } from '../../core/circuit/geometry';
+import { componentBounds, pinWorld, snap, snapComponentPosition } from '../../core/circuit/geometry';
+import { defaultProps } from '../../core/sim/setup';
 import { lookup, registry } from '../../app/registry';
 import { useEditor } from '../../state/editor';
 import { coalescedEdit, createInstance, createWire, useProject } from '../../state/project';
 import { sendInput, useSim } from '../../state/sim';
-import { useNetlist } from '../../state/derived';
+import { useErc, useNetlist } from '../../state/derived';
 import { formatEngineering } from '../../core/model/units';
 import { ComponentView } from './ComponentView';
 import { WireLayer, type Overlay } from './WireLayer';
-import { hitPin, nearestSegment, pinIndex, pinPosition, wirePolyline, type IndexedPin } from './geometry';
+import { hitPin, insertionPreview, marqueeSelection, nearestSegment, pinIndex, pinPosition, wirePolyline, type IndexedPin } from './geometry';
 import { addComponentAt, fitView, withCarried, zoomBy } from './actions';
 import { assignProbe, probeMarkers } from '../instruments/probes';
 import { Icon } from '../common/Icon';
@@ -33,7 +34,8 @@ type Drag =
   | { kind: 'marquee'; start: Point; base: string[]; baseWires: string[] }
   | { kind: 'handle'; wireId: string; index: number }
   | { kind: 'interact'; id: string; mode: 'momentary' | 'slider'; input: string; prop?: string; sx: number; sy: number; v0: number }
-  | { kind: 'pin'; pin: IndexedPin; sx: number; sy: number; dragging: boolean };
+  | { kind: 'pin'; pin: IndexedPin; sx: number; sy: number; dragging: boolean }
+  | { kind: 'wire-end'; wireId: string; end: 'from' | 'to' };
 
 const DRAG_THRESHOLD = 4;
 
@@ -59,6 +61,22 @@ export function Workspace() {
   const driven = useSim((s) => s.driven);
   const mcus = useSim((s) => s.mcus);
   const netlist = useNetlist();
+  const erc = useErc();
+  const simDiagnostics = useSim((s) => s.diagnostics);
+  // Worst problem per part, for outlines and badges on the canvas.
+  const problems = useMemo(() => {
+    const m = new Map<string, { severity: 'error' | 'warning'; messages: string[] }>();
+    for (const d of [...erc, ...simDiagnostics]) {
+      if (d.severity !== 'error' && d.severity !== 'warning') continue;
+      for (const id of d.componentIds ?? []) {
+        const cur = m.get(id) ?? { severity: d.severity, messages: [] };
+        if (d.severity === 'error') cur.severity = 'error';
+        cur.messages.push(d.message);
+        m.set(id, cur);
+      }
+    }
+    return m;
+  }, [erc, simDiagnostics]);
 
   const ref = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag | null>(null);
@@ -67,6 +85,11 @@ export function Workspace() {
   const [cursor, setCursor] = useState<Point>({ x: 0, y: 0 });
   const [marquee, setMarquee] = useState<Overlay['marquee']>(null);
   const [dragging, setDragging] = useState(false);
+  const [ghost, setGhost] = useState<{ type: string; x: number; y: number } | null>(null);
+  const libraryDrag = useEditor((s) => s.dragType);
+  useEffect(() => {
+    if (!libraryDrag) setGhost(null);
+  }, [libraryDrag]);
 
   const index = pinIndex(circuit);
   const simulating = simState !== 'stopped';
@@ -195,6 +218,16 @@ export function Workspace() {
       }
     }
 
+    // Endpoint handle of a selected wire: drag it to another pin to re-attach.
+    const endAttr = target.getAttribute('data-end');
+    if (endAttr && wireEl && !ed.wiring) {
+      useProject.getState().begin();
+      drag.current = { kind: 'wire-end', wireId: wireEl.getAttribute('data-wire')!, end: endAttr === 'to' ? 'to' : 'from' };
+      el.setPointerCapture(e.pointerId);
+      setDragging(true);
+      return;
+    }
+
     if (ed.wiring) {
       if (hit) finishWire(hit);
       else if (wireEl && handleAttr === null) finishOnWire(wireEl.getAttribute('data-wire')!, world);
@@ -277,7 +310,7 @@ export function Workspace() {
     setCursor(world);
     ed.set({ cursor: world });
     const d = drag.current;
-    if (!d || d.kind === 'pin') {
+    if (!d || d.kind === 'pin' || d.kind === 'wire-end') {
       const h = hitPin(index, world, Math.max(4.5, 7 / ed.viewport.zoom));
       if (h !== hover) setHover(h);
     }
@@ -324,7 +357,7 @@ export function Workspace() {
         const y = Math.min(d.start.y, world.y);
         const w = Math.abs(world.x - d.start.x);
         const h = Math.abs(world.y - d.start.y);
-        setMarquee({ x, y, w, h });
+        setMarquee({ x, y, w, h, crossing: world.x < d.start.x });
         break;
       }
       case 'handle':
@@ -371,19 +404,27 @@ export function Workspace() {
         const y1 = Math.min(d.start.y, world.y);
         const rect = { x: x1, y: y1, width: Math.abs(world.x - d.start.x), height: Math.abs(world.y - d.start.y) };
         if (rect.width * ed.viewport.zoom < 3 && rect.height * ed.viewport.zoom < 3) break;
-        const comps = circuit.components.filter((c) => {
-          const def = lookup(c.type);
-          return def && rectsIntersect(componentBounds(c, def), rect);
-        });
-        const inside = (p: Point | null) => !!p && p.x >= rect.x && p.x <= rect.x + rect.width && p.y >= rect.y && p.y <= rect.y + rect.height;
-        const wires = circuit.wires.filter((w) => inside(pinPosition(circuit, w.from)) && inside(pinPosition(circuit, w.to)));
-        ed.select([...new Set([...d.base, ...comps.map((c) => c.id)])], [...new Set([...d.baseWires, ...wires.map((w) => w.id)])]);
+        const hit = marqueeSelection(circuit, rect, world.x < d.start.x);
+        ed.select([...new Set([...d.base, ...hit.components])], [...new Set([...d.baseWires, ...hit.wires])]);
         break;
       }
       case 'interact':
         if (d.mode === 'momentary') sendInput(d.id, d.input, false);
         else useProject.getState().end();
         break;
+      case 'wire-end': {
+        const h = hitPin(index, world, Math.max(4.5, 7 / ed.viewport.zoom));
+        const w = circuit.wires.find((x) => x.id === d.wireId);
+        const other = w && (d.end === 'from' ? w.to : w.from);
+        if (h && w && other && !(h.ref.componentId === other.componentId && h.ref.pinId === other.pinId)) {
+          useProject.getState().edit((doc) => {
+            const target = doc.wires.find((x) => x.id === d.wireId);
+            if (target) target[d.end] = { ...h.ref };
+          });
+        }
+        useProject.getState().end();
+        break;
+      }
       case 'pin': {
         if (!d.dragging) {
           // Click on a pin starts a wire (click-click mode).
@@ -492,32 +533,65 @@ export function Workspace() {
 
   // Drag & drop from the component library.
   const onDragOver = (e: React.DragEvent) => {
-    if (e.dataTransfer.types.includes('application/x-evlab-component')) {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'copy';
-    }
+    if (!e.dataTransfer.types.includes('application/x-evlab-component')) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    const type = useEditor.getState().dragType;
+    const def = type ? registry.get(type) : undefined;
+    if (!def) return;
+    // Same placement as the drop: centred on the cursor, first pin on the grid.
+    const w = toWorld(e.clientX, e.clientY);
+    const probe = { id: 'ghost', type: def.type, x: 0, y: 0, rotation: 0 as const, label: '', props: {} };
+    const p = snapComponentPosition(probe, def, w.x - def.size.width / 2, w.y - def.size.height / 2);
+    if (!ghost || ghost.type !== def.type || ghost.x !== p.x || ghost.y !== p.y) setGhost({ type: def.type, x: p.x, y: p.y });
   };
   const onDrop = (e: React.DragEvent) => {
+    setGhost(null);
     const type = e.dataTransfer.getData('application/x-evlab-component');
+    useEditor.getState().set({ dragType: null });
     if (!type) return;
     e.preventDefault();
     const w = toWorld(e.clientX, e.clientY);
     addComponentAt(type, w.x, w.y);
     ref.current?.focus();
   };
+  const onDragLeave = (e: React.DragEvent) => {
+    if (!ref.current?.contains(e.relatedTarget as Node)) setGhost(null);
+  };
 
   // ------------------------------------------------------------ overlay
   const hoverNet = hover ? netlist.netOf(hover.ref) : undefined;
-  const netPins = useMemo(() => {
-    if (hoverNet === undefined) return [];
-    const net = netlist.nets[hoverNet];
-    if (!net || net.pins.length > 400) return [];
-    return net.pins
-      .filter((p) => !(hover && p.componentId === hover.ref.componentId && p.pinId === hover.ref.pinId))
-      .map((p) => index.byKey.get(`${p.componentId}:${p.pinId}`))
-      .filter((p): p is IndexedPin => !!p)
-      .map((p) => ({ x: p.x, y: p.y }));
-  }, [hoverNet, netlist, index, hover]);
+  const netPinPositions = useCallback(
+    (nets: Iterable<number>, skip?: PinRef) => {
+      const out: Point[] = [];
+      for (const n of nets) {
+        const net = netlist.nets[n];
+        if (!net || net.pins.length > 400) continue;
+        for (const p of net.pins) {
+          if (skip && p.componentId === skip.componentId && p.pinId === skip.pinId) continue;
+          const ip = index.byKey.get(`${p.componentId}:${p.pinId}`);
+          if (ip) out.push({ x: ip.x, y: ip.y });
+        }
+      }
+      return out;
+    },
+    [netlist, index],
+  );
+  const netPins = useMemo(() => (hoverNet === undefined ? [] : netPinPositions([hoverNet], hover?.ref)), [hoverNet, netPinPositions, hover]);
+  // Nets of the selected wires (or of the pin a wire is being drawn from) stay highlighted.
+  const stickyNetPins = useMemo(() => {
+    const nets = new Set<number>();
+    for (const id of selectedWires) {
+      const w = circuit.wires.find((x) => x.id === id);
+      const n = w && netlist.netOf(w.from);
+      if (n !== undefined && n !== null) nets.add(n);
+    }
+    if (wiring) {
+      const n = netlist.netOf(wiring.from);
+      if (n !== undefined) nets.add(n);
+    }
+    return nets.size ? netPinPositions(nets) : [];
+  }, [selectedWires, wiring, circuit.wires, netlist, netPinPositions]);
 
   // Logic levels on IC and MCU pins (View › Show Logic Levels).
   const showLevels = useEditor((s) => s.showLogicLevels) && simulating;
@@ -538,6 +612,35 @@ export function Workspace() {
     return out;
   }, [showLevels, index, netlist, voltages, driven]);
 
+  // Where legs will plug in: the part being dropped from the library, or the parts being moved.
+  const ghostInst = useMemo(
+    () => (ghost ? { id: '__ghost', type: ghost.type, x: ghost.x, y: ghost.y, rotation: 0 as const, label: '', props: defaultProps(registry.get(ghost.type)!) } : null),
+    [ghost],
+  );
+  const moveDrag = drag.current?.kind === 'move' && drag.current.moved ? drag.current : null;
+  const insertion = useMemo(() => {
+    if (ghostInst) {
+      const def = registry.get(ghostInst.type)!;
+      const pts = def.pins.filter((p) => p.kind !== 'socket').map((p) => pinWorld(ghostInst, def, p));
+      return insertionPreview(circuit, netlist, pts, new Set());
+    }
+    if (moveDrag) {
+      const moving = new Set(moveDrag.orig.keys());
+      const pts = index.pins.filter((ip) => moving.has(ip.ref.componentId) && ip.pin.kind !== 'socket').map((ip) => ({ x: ip.x, y: ip.y }));
+      return insertionPreview(circuit, netlist, pts, moving);
+    }
+    return null;
+  }, [ghostInst, moveDrag, circuit, netlist, index]);
+
+  // Re-attaching a wire end: dashed line from the fixed end to the cursor.
+  const endDrag = drag.current?.kind === 'wire-end' ? drag.current : null;
+  let endDragOverlay: Overlay['endDrag'] = null;
+  if (endDrag) {
+    const w = circuit.wires.find((x) => x.id === endDrag.wireId);
+    const fixed = w && pinPosition(circuit, endDrag.end === 'from' ? w.to : w.from);
+    if (w && fixed) endDragOverlay = { from: fixed, to: hover ? { x: hover.x, y: hover.y } : cursor, color: w.color };
+  }
+
   const draftFrom = wiring ? pinPosition(circuit, wiring.from) : null;
   const overlay: Overlay = {
     draft: wiring && draftFrom
@@ -550,6 +653,9 @@ export function Workspace() {
     marquee,
     hoverPin: hover && !dragging ? { x: hover.x, y: hover.y } : wiring && hover ? { x: hover.x, y: hover.y } : null,
     netPins: dragging ? [] : netPins,
+    stickyNetPins: dragging ? [] : stickyNetPins,
+    insertion,
+    endDrag: endDragOverlay,
     probes: probeMarkers(circuit, instruments),
     levels,
   };
@@ -619,8 +725,23 @@ export function Workspace() {
     if (!def || def.visual.kind === 'builtin' && (def.visual.renderer === 'junction' || def.visual.renderer === 'net-label')) return null;
     if (def.pins.length && def.pins.every((p) => p.kind === 'socket')) return null;
     const b = componentBounds(c, def);
+    const p = problems.get(c.id);
     return (
       <div key={c.id} className="comp-label" style={{ left: b.x + b.width / 2, top: b.y }}>
+        {p && (
+          <span
+            className={`comp-badge ${p.severity}`}
+            title={p.messages.join('\n')}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              useEditor.getState().select([c.id]);
+              useEditor.getState().set({ dockTab: 'problems' });
+              useEditor.getState().setPrefs({ showDock: true });
+            }}
+          >
+            !
+          </span>
+        )}
         {c.label}
         {def.simulation.support === 'visual-only' &&
           (simulating ? <span className="vo-tag">not simulated</span> : <span className="vo"> (visual)</span>)}
@@ -642,16 +763,29 @@ export function Workspace() {
       onContextMenu={onContextMenu}
       onDoubleClick={onDoubleClick}
       onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
       onDrop={onDrop}
     >
       <div className="world" style={{ transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})` }}>
         {renderOrder.map((c) => {
           const def = lookup(c.type);
           return def ? (
-            <ComponentView key={c.id} inst={c} def={def} selected={selectedSet.has(c.id)} inert={simulating && def.simulation.support === 'visual-only'} />
+            <ComponentView
+              key={c.id}
+              inst={c}
+              def={def}
+              selected={selectedSet.has(c.id)}
+              inert={simulating && def.simulation.support === 'visual-only'}
+              problem={problems.get(c.id)?.severity}
+            />
           ) : null;
         })}
         {labels}
+        {ghostInst && (
+          <div className="ghost">
+            <ComponentView inst={ghostInst} def={registry.get(ghostInst.type)!} selected={false} />
+          </div>
+        )}
         <WireLayer circuit={circuit} selectedWires={selectedWires} zoom={viewport.zoom} overlay={overlay} />
         <SimControlsLayer components={circuit.components} simulating={simulating} selected={selectedSet} zoom={viewport.zoom} toWorld={toWorld} />
       </div>

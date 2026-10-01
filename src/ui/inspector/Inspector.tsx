@@ -392,10 +392,10 @@ export function Inspector() {
   return (
     <div className="panel" style={{ height: '100%' }}>
       <div className="panel-header">
-        <span className="title">Inspector</span>
+        <span className="title">Properties</span>
         <div className="actions">
-          <button className="icon-btn" title="Hide inspector" onClick={() => useEditor.getState().setPrefs({ showInspector: false })}>
-            <Icon name="panel-right" />
+          <button className="icon-btn" title="Hide properties" onClick={() => useEditor.getState().setPrefs({ showInspector: false })}>
+            <Icon name="x" />
           </button>
         </div>
       </div>

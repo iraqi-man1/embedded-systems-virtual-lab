@@ -1,6 +1,8 @@
 import { useErc } from '../../state/derived';
 import { useEditor, type DockTab } from '../../state/editor';
+import { useProject } from '../../state/project';
 import { useSim } from '../../state/sim';
+import { zoomToComponents } from '../workspace/actions';
 import { Icon } from '../common/Icon';
 import { LogicAnalyzer } from './LogicAnalyzer';
 import { Multimeter } from './Multimeter';
@@ -15,6 +17,16 @@ function useProblems() {
   return { erc, sim, compile };
 }
 
+/** Selects the parts a problem refers to and brings them into view. */
+function revealComponents(ids?: string[]) {
+  if (!ids?.length) return;
+  const existing = new Set(useProject.getState().project.circuit.components.map((c) => c.id));
+  const sel = ids.filter((id) => existing.has(id));
+  if (!sel.length) return;
+  useEditor.getState().select(sel);
+  zoomToComponents(sel, 1.4);
+}
+
 function ProblemsPanel() {
   const { erc, sim, compile } = useProblems();
   const items = [
@@ -25,8 +37,8 @@ function ProblemsPanel() {
       source: 'compiler',
       onClick: () => useEditor.getState().set({ revealLine: { file: d.file, line: d.line, nonce: Math.random() }, showCode: true }),
     })),
-    ...sim.map((d) => ({ severity: d.severity, message: d.message, where: '', source: 'simulation', onClick: () => d.componentIds && useEditor.getState().select(d.componentIds.slice(0, 1)) })),
-    ...erc.map((d) => ({ severity: d.severity, message: d.message, where: '', source: 'circuit check', onClick: () => d.componentIds && useEditor.getState().select(d.componentIds.slice(0, 1)) })),
+    ...sim.map((d) => ({ severity: d.severity, message: d.message, where: '', source: 'simulation', onClick: () => revealComponents(d.componentIds) })),
+    ...erc.map((d) => ({ severity: d.severity, message: d.message, where: '', source: 'circuit check', onClick: () => revealComponents(d.componentIds) })),
   ];
   const rank = { error: 0, warning: 1, info: 2, note: 2 } as Record<string, number>;
   items.sort((a, b) => rank[a.severity] - rank[b.severity]);

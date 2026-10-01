@@ -83,6 +83,11 @@ input, select, textarea { user-select: text; }
 
 /* --------------------------------------------------------------- main */
 .main { display: flex; min-height: 0; min-width: 0; }
+.left-column { display: flex; flex-direction: column; flex: none; min-height: 0; border-right: 1px solid var(--border); }
+.left-top { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.left-top > .panel { flex: 1; }
+.left-bottom { min-height: 0; display: flex; flex-direction: column; border-top: 1px solid var(--border); }
+.left-bottom > .panel { flex: 1; }
 .center { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
 .center-top { display: flex; flex: 1; min-height: 0; min-width: 0; }
 .panel { display: flex; flex-direction: column; background: var(--bg-panel); min-height: 0; min-width: 0; overflow: hidden; }
@@ -115,6 +120,7 @@ input, select, textarea { user-select: text; }
 .lib-sub { padding: 4px 12px 2px 26px; font-size: var(--fs-xs); color: var(--text-3); }
 .lib-item { display: flex; align-items: center; gap: 8px; padding: 4px 8px 4px 14px; margin: 0 4px; border-radius: var(--radius); cursor: grab; }
 .lib-item:hover { background: var(--bg-hover); }
+.lib-item.active { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); }
 .lib-item:active { cursor: grabbing; }
 .lib-item .thumb { width: 30px; height: 24px; flex: none; display: flex; align-items: center; justify-content: center; border-radius: 3px; background: var(--bg-panel-2); border: 1px solid var(--border); overflow: hidden; }
 .lib-item .thumb img { max-width: 28px; max-height: 22px; }
@@ -148,6 +154,12 @@ input, select, textarea { user-select: text; }
 .comp > .body > * { display: block; }
 .comp.selected::after { content: ''; position: absolute; inset: -4px; border: 1.5px dashed var(--selection); border-radius: 3px; background: var(--selection-fill); pointer-events: none; }
 .comp.dragging { opacity: 0.92; }
+.comp.problem-error::before, .comp.problem-warning::before { content: ''; position: absolute; inset: -3px; border-radius: 4px; pointer-events: none; }
+.comp.problem-error::before { box-shadow: 0 0 0 1.5px var(--err), 0 0 10px color-mix(in srgb, var(--err) 45%, transparent); }
+.comp.problem-warning::before { box-shadow: 0 0 0 1.5px var(--warn), 0 0 8px color-mix(in srgb, var(--warn) 40%, transparent); }
+.comp-label .comp-badge { display: inline-flex; align-items: center; justify-content: center; width: 12px; height: 12px; margin-right: 3px; border-radius: 50%; font: 700 9px var(--font-ui); color: #fff; pointer-events: auto; cursor: pointer; vertical-align: 1px; }
+.comp-label .comp-badge.error { background: var(--err); }
+.comp-label .comp-badge.warning { background: var(--warn); color: #111; }
 .comp-label { position: absolute; font-size: 10px; font-family: var(--font-mono); color: var(--text-2); white-space: nowrap; pointer-events: none; transform: translate(-50%, -100%); padding-bottom: 2px; }
 .comp-label .vo { color: var(--text-3); font-style: italic; }
 .wires { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
@@ -159,13 +171,21 @@ input, select, textarea { user-select: text; }
 .wires .endpoint { fill: var(--bg-panel-2); stroke-width: 1.5; }
 .wires .pin-hover { fill: none; stroke: var(--pin-hover); stroke-width: 2; }
 .wires .net-pin { fill: var(--net-highlight); }
+.wires .ins-hole { fill: rgba(46, 204, 113, 0.9); stroke: #fff; stroke-width: 0.8; }
+.wires .ins-strip { fill: rgba(46, 204, 113, 0.35); }
+.ghost { opacity: 0.55; pointer-events: none; }
+.ghost .comp { pointer-events: none; }
+.wires .net-pin.sticky { fill: color-mix(in srgb, var(--selection) 75%, transparent); }
+.wires .end-handle { fill: var(--bg-panel-2); stroke: var(--selection); pointer-events: all; cursor: grab; }
+.wires .end-handle:hover { fill: var(--selection); }
 .wires .lvl { stroke: var(--bg-canvas); stroke-width: 0.8; }
 .wires .lvl.high { fill: #e53935; }
 .wires .lvl.low { fill: #1e88e5; }
 .wires .lvl.mid { fill: #fbc02d; }
 .wires .lvl.float { fill: #9e9e9e; }
 .wires .probe-mark { stroke: #fff; stroke-width: 1; }
-.wires .marquee { fill: var(--selection-fill); stroke: var(--selection); stroke-dasharray: 4 3; stroke-width: 1; }
+.wires .marquee { fill: var(--selection-fill); stroke: var(--selection); stroke-width: 1; }
+.wires .marquee.crossing { fill: color-mix(in srgb, var(--ok) 10%, transparent); stroke: var(--ok); stroke-dasharray: 4 3; }
 .wires .wire-label { font-size: 9px; font-family: var(--font-mono); fill: var(--text); paint-order: stroke; stroke: var(--bg-canvas); stroke-width: 3px; }
 /* -------------------------------------------- simulation controls & feedback */
 .comp.inert > .body { opacity: 0.55; filter: grayscale(0.5); }

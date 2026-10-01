@@ -325,20 +325,28 @@ export function bringToFront(id: string, front = true) {
 }
 
 export function fitView() {
+  zoomToComponents(proj().project.circuit.components.map((x) => x.id));
+}
+
+/** Zooms to the selection (Shift+F), or to the whole circuit when nothing is selected. */
+export function zoomToSelection() {
+  const sel = ed().selectedComponents;
+  if (sel.length) zoomToComponents(sel, 1.6);
+  else fitView();
+}
+
+/** Centres the given parts in the canvas at the largest zoom (≤ maxZoom) that shows them all. */
+export function zoomToComponents(ids: string[], maxZoom = 1.6) {
   const c = proj().project.circuit;
   const el = document.querySelector('.workspace') as HTMLElement | null;
   if (!el) return;
-  const b = selectionBounds(
-    c,
-    c.components.map((x) => x.id),
-    true,
-  );
+  const b = selectionBounds(c, ids, true);
   if (!b) {
     ed().set({ viewport: { x: 80, y: 60, zoom: 1 } });
     return;
   }
   const pad = 60;
-  const zoom = Math.max(0.15, Math.min(1.6, Math.min((el.clientWidth - pad * 2) / b.width, (el.clientHeight - pad * 2) / b.height)));
+  const zoom = Math.max(0.15, Math.min(maxZoom, Math.min((el.clientWidth - pad * 2) / b.width, (el.clientHeight - pad * 2) / b.height)));
   ed().set({
     viewport: {
       zoom,

@@ -8,6 +8,13 @@ import { Tip } from '../common/Tooltip';
 
 const SUPPORT_LABEL = { full: 'Simulated', partial: 'Partial', 'visual-only': 'Visual only' } as const;
 
+/** Transparent drag image (the canvas shows its own preview). */
+const EMPTY_DRAG_IMAGE = (() => {
+  const img = new Image(1, 1);
+  img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+  return img;
+})();
+
 const CATEGORY_ICON: Record<string, string> = {
   Boards: 'chip',
   Prototyping: 'grid',
@@ -54,18 +61,29 @@ const Thumb = memo(function Thumb({ def }: { def: ComponentDefinition }) {
 interface ItemProps {
   def: ComponentDefinition;
   fav: boolean;
+  /** Highlighted by keyboard navigation in search results. */
+  active?: boolean;
 }
 
-const Item = memo(function Item({ def, fav }: ItemProps) {
+const Item = memo(function Item({ def, fav, active }: ItemProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (active) ref.current?.scrollIntoView({ block: 'nearest' });
+  }, [active]);
   return (
     <Tip content={<InfoCard def={def} />} card side="right" align="start" delay={500} direct>
       <div
-        className="lib-item"
+        ref={ref}
+        className={`lib-item${active ? ' active' : ''}`}
         draggable
         onDragStart={(e) => {
           e.dataTransfer.setData('application/x-evlab-component', def.type);
           e.dataTransfer.effectAllowed = 'copy';
+          // The canvas draws a full-size ghost where the part will land.
+          e.dataTransfer.setDragImage(EMPTY_DRAG_IMAGE, 0, 0);
+          useEditor.getState().set({ dragType: def.type });
         }}
+        onDragEnd={() => useEditor.getState().set({ dragType: null })}
         onDoubleClick={() => addComponentAtCenter(def.type)}
       >
         <Thumb def={def} />
@@ -88,6 +106,7 @@ const Item = memo(function Item({ def, fav }: ItemProps) {
 
 export function LibraryPanel() {
   const [query, setQuery] = useState('');
+  const [active, setActive] = useState(0);
   const [simOnly, setSimOnly] = useState(false);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set(['Communication', 'Integrated Circuits', 'Actuators', 'Sensors']));
   const favorites = useEditor((s) => s.favorites);
@@ -121,7 +140,29 @@ export function LibraryPanel() {
       <div className="lib-search">
         <div className="search-box">
           <Icon name="search" />
-          <input placeholder="Search parts (e.g. led, sensor, i2c)…" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <input
+            placeholder="Search parts (e.g. led, sensor, i2c)…  /"
+            aria-label="Search parts"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setActive(0);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                const n = results.length;
+                if (n) setActive((a) => (a + (e.key === 'ArrowDown' ? 1 : n - 1)) % n);
+              } else if (e.key === 'Enter' && results[active]) {
+                e.preventDefault();
+                addComponentAtCenter(results[active].type);
+              } else if (e.key === 'Escape') {
+                if (query) setQuery('');
+                else (e.target as HTMLInputElement).blur();
+                e.stopPropagation();
+              }
+            }}
+          />
           {query && (
             <button className="icon-btn" onClick={() => setQuery('')}>
               <Icon name="x" />
@@ -143,9 +184,10 @@ export function LibraryPanel() {
             <div className="lib-section">
               Results <span className="count">{results.length}</span>
             </div>
-            {results.map((d) => (
-              <Item key={d.type} def={d} fav={favSet.has(d.type)} />
+            {results.map((d, i) => (
+              <Item key={d.type} def={d} fav={favSet.has(d.type)} active={i === active} />
             ))}
+            {results.length > 0 && <div className="lib-sub">↑/↓ to choose · Enter adds to the canvas</div>}
             {!results.length && <div className="lib-sub">No parts match “{query}”.</div>}
           </>
         ) : (

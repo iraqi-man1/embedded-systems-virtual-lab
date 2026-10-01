@@ -17,6 +17,7 @@ import {
   cycleWireColor,
   pickWireColor,
   setZoom,
+  zoomToSelection,
   cutSelection,
   deleteSelection,
   duplicateSelection,
@@ -40,6 +41,21 @@ export interface Command {
 }
 
 const ed = () => useEditor.getState();
+
+type PanelState = Pick<ReturnType<typeof ed>, 'showLibrary' | 'showInspector' | 'showCode' | 'showDock'>;
+let beforeFocus: PanelState | null = null;
+/** Hides every panel around the canvas; the second call restores them. */
+function toggleFocusCanvas() {
+  const { showLibrary, showInspector, showCode, showDock } = ed();
+  const anyShown = showLibrary || showInspector || showCode || showDock;
+  if (anyShown) {
+    beforeFocus = { showLibrary, showInspector, showCode, showDock };
+    ed().setPrefs({ showLibrary: false, showInspector: false, showCode: false, showDock: false });
+  } else {
+    ed().setPrefs(beforeFocus ?? { showLibrary: true, showInspector: true, showCode: true, showDock: true });
+    beforeFocus = null;
+  }
+}
 const hasSelection = () => ed().selectedComponents.length + ed().selectedWires.length > 0;
 const simState = () => useSim.getState().state;
 
@@ -87,13 +103,15 @@ export const commands: Record<string, Command> = {
   zoomOut: { id: 'zoomOut', label: 'Zoom Out', icon: 'zoom-out', shortcut: '−', run: () => zoomBy(1 / 1.2) },
   zoomReset: { id: 'zoomReset', label: 'Actual Size (100%)', shortcut: '0', run: () => setZoom(1) },
   fit: { id: 'fit', label: 'Fit to Window', icon: 'fit', shortcut: 'F', run: fitView },
+  zoomSelection: { id: 'zoomSelection', label: 'Zoom to Selection', icon: 'zoom-in', shortcut: 'Shift+F', run: zoomToSelection },
   grid: { id: 'grid', label: 'Show Grid', icon: 'grid', shortcut: 'G', run: () => ed().setPrefs({ showGrid: !ed().showGrid }) },
   snap: { id: 'snap', label: 'Snap to Grid', icon: 'magnet', run: () => ed().setPrefs({ snap: !ed().snap }) },
   sound: { id: 'sound', label: 'Sound (buzzers)', run: () => ed().setPrefs({ sound: !ed().sound }) },
   logicLevels: { id: 'logicLevels', label: 'Show Logic Levels on Pins', run: () => ed().setPrefs({ showLogicLevels: !ed().showLogicLevels }) },
   theme: { id: 'theme', label: 'Toggle Dark Theme', icon: 'moon', run: () => ed().setPrefs({ theme: ed().theme === 'dark' ? 'light' : 'dark' }) },
   toggleLibrary: { id: 'toggleLibrary', label: 'Component Library', icon: 'panel-left', run: () => ed().setPrefs({ showLibrary: !ed().showLibrary }) },
-  toggleInspector: { id: 'toggleInspector', label: 'Inspector', icon: 'panel-right', run: () => ed().setPrefs({ showInspector: !ed().showInspector }) },
+  toggleInspector: { id: 'toggleInspector', label: 'Properties Panel', icon: 'settings', run: () => ed().setPrefs({ showInspector: !ed().showInspector }) },
+  focusCanvas: { id: 'focusCanvas', label: 'Focus Canvas (hide/restore panels)', icon: 'fit', shortcut: 'Ctrl+`', run: toggleFocusCanvas },
   toggleCode: { id: 'toggleCode', label: 'Code Editor', icon: 'code', run: () => ed().setPrefs({ showCode: !ed().showCode }) },
   toggleDock: { id: 'toggleDock', label: 'Instruments Panel', icon: 'panel-bottom', run: () => ed().setPrefs({ showDock: !ed().showDock }) },
   compile: { id: 'compile', label: 'Compile Firmware', icon: 'build', shortcut: 'Ctrl+B', run: () => void compileFirmware(), enabled: () => useSim.getState().compile.status !== 'compiling' },
@@ -151,6 +169,7 @@ export function installShortcuts(): () => void {
     if (ctrl && k.toLowerCase() === 'o') return run('open');
     if (ctrl && k.toLowerCase() === 'n') return run('new');
     if (ctrl && k.toLowerCase() === 'b') return run('compile');
+    if (ctrl && (e.code === 'Backquote' || k === '`')) return run('focusCanvas');
     if (k === 'F5') return run(ctrl ? 'reset' : e.shiftKey ? 'stop' : 'run');
     if (k === 'F6') return run('pause');
     if (k === 'F10') return run('step');
@@ -186,7 +205,7 @@ export function installShortcuts(): () => void {
         return run('flip');
       case 'f':
       case 'F':
-        return run('fit');
+        return run(e.shiftKey ? 'zoomSelection' : 'fit');
       case 'g':
       case 'G':
         return run('grid');
@@ -200,6 +219,12 @@ export function installShortcuts(): () => void {
         return run('zoomReset');
       case '?':
         return run('shortcuts');
+      case '/': {
+        // Jump to the component search.
+        if (!editor.showLibrary) editor.setPrefs({ showLibrary: true });
+        setTimeout(() => (document.querySelector('.lib-search input') as HTMLInputElement | null)?.focus(), 0);
+        return e.preventDefault();
+      }
       case 'c':
       case 'C':
         return run('cycleWireColor');

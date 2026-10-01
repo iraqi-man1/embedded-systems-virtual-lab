@@ -15,9 +15,10 @@ import { StatusBar } from './shell/StatusBar';
 import { Toolbar } from './shell/Toolbar';
 import { Workspace } from './workspace/Workspace';
 
-type SizeKey = 'libraryWidth' | 'inspectorWidth' | 'codeWidth' | 'dockHeight';
+type SizeKey = 'libraryWidth' | 'inspectorHeight' | 'codeWidth' | 'dockHeight';
 
-function Splitter({ k, dir, invert, min, max }: { k: SizeKey; dir: 'v' | 'h'; invert?: boolean; min: number; max: number }) {
+/** Drag to resize; double-click collapses the panel it belongs to. */
+function Splitter({ k, dir, invert, min, max, onCollapse }: { k: SizeKey; dir: 'v' | 'h'; invert?: boolean; min: number; max: number; onCollapse: () => void }) {
   const onPointerDown = (e: React.PointerEvent) => {
     e.preventDefault();
     const start = dir === 'v' ? e.clientX : e.clientY;
@@ -35,8 +36,19 @@ function Splitter({ k, dir, invert, min, max }: { k: SizeKey; dir: 'v' | 'h'; in
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
   };
-  return <div className={dir === 'v' ? 'splitter-v' : 'splitter-h'} onPointerDown={onPointerDown} />;
+  return (
+    <div
+      className={dir === 'v' ? 'splitter-v' : 'splitter-h'}
+      onPointerDown={onPointerDown}
+      onDoubleClick={onCollapse}
+      title="Drag to resize · double-click to hide"
+      role="separator"
+      aria-orientation={dir === 'v' ? 'vertical' : 'horizontal'}
+    />
+  );
 }
+
+const CHROME_HEIGHT = 28 + 40 + 24; // menu bar + toolbar + status bar
 
 export function App() {
   const theme = useEditor((s) => s.theme);
@@ -45,7 +57,7 @@ export function App() {
   const showCode = useEditor((s) => s.showCode);
   const showDock = useEditor((s) => s.showDock);
   const libraryWidth = useEditor((s) => s.libraryWidth);
-  const inspectorWidth = useEditor((s) => s.inspectorWidth);
+  const inspectorHeight = useEditor((s) => s.inspectorHeight);
   const codeWidth = useEditor((s) => s.codeWidth);
   const dockHeight = useEditor((s) => s.dockHeight);
 
@@ -60,11 +72,13 @@ export function App() {
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
-  const libW = Math.min(libraryWidth, Math.max(200, win.w * 0.2));
-  const inspW = Math.min(inspectorWidth, Math.max(220, win.w * 0.22));
-  const center = win.w - (showLibrary ? libW : 0) - (showInspector ? inspW : 0);
-  const codeW = Math.min(codeWidth, Math.max(280, center * 0.5));
+  const showLeft = showLibrary || showInspector;
+  const leftW = Math.min(libraryWidth, Math.max(220, win.w * 0.25));
+  const center = win.w - (showLeft ? leftW : 0);
+  const codeW = Math.min(codeWidth, Math.max(300, center * 0.5));
   const dockH = Math.min(dockHeight, Math.max(120, win.h * 0.45));
+  const columnH = win.h - CHROME_HEIGHT;
+  const inspH = showLibrary ? Math.max(140, Math.min(inspectorHeight, columnH - 160)) : columnH;
 
   useEffect(() => {
     const off = installShortcuts();
@@ -76,18 +90,33 @@ export function App() {
     };
   }, []);
 
+  const hide = (p: Partial<Record<'showLibrary' | 'showInspector' | 'showCode' | 'showDock', boolean>>) => () => useEditor.getState().setPrefs(p);
+
   return (
     <TooltipProvider>
       <div className="app">
         <MenuBar />
         <Toolbar />
         <div className="main">
-          {showLibrary && (
+          {showLeft && (
             <>
-              <div style={{ width: libW, flex: 'none', minHeight: 0 }}>
-                <LibraryPanel />
+              {/* Components on top, the selection's properties below. */}
+              <div className="left-column" style={{ width: leftW }}>
+                {showLibrary && (
+                  <div className="left-top">
+                    <LibraryPanel />
+                  </div>
+                )}
+                {showLibrary && showInspector && (
+                  <Splitter k="inspectorHeight" dir="h" invert min={140} max={Math.max(160, columnH - 160)} onCollapse={hide({ showInspector: false })} />
+                )}
+                {showInspector && (
+                  <div className="left-bottom" style={{ height: showLibrary ? inspH : undefined, flex: showLibrary ? 'none' : 1 }}>
+                    <Inspector />
+                  </div>
+                )}
               </div>
-              <Splitter k="libraryWidth" dir="v" min={200} max={460} />
+              <Splitter k="libraryWidth" dir="v" min={220} max={520} onCollapse={hide({ showLibrary: false, showInspector: false })} />
             </>
           )}
           <div className="center">
@@ -95,7 +124,7 @@ export function App() {
               <Workspace />
               {showCode && (
                 <>
-                  <Splitter k="codeWidth" dir="v" invert min={320} max={1100} />
+                  <Splitter k="codeWidth" dir="v" invert min={300} max={1100} onCollapse={hide({ showCode: false })} />
                   <div style={{ width: codeW, flex: 'none', display: 'flex', minHeight: 0 }}>
                     <CodeEditor />
                   </div>
@@ -104,21 +133,13 @@ export function App() {
             </div>
             {showDock && (
               <>
-                <Splitter k="dockHeight" dir="h" invert min={120} max={700} />
+                <Splitter k="dockHeight" dir="h" invert min={120} max={700} onCollapse={hide({ showDock: false })} />
                 <div className="dock" style={{ height: dockH }}>
                   <BottomDock />
                 </div>
               </>
             )}
           </div>
-          {showInspector && (
-            <>
-              <Splitter k="inspectorWidth" dir="v" invert min={240} max={520} />
-              <div style={{ width: inspW, flex: 'none', minHeight: 0 }}>
-                <Inspector />
-              </div>
-            </>
-          )}
         </div>
         <StatusBar />
         <Dialogs />
