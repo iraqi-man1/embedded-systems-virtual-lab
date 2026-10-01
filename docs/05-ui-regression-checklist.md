@@ -57,3 +57,9 @@ menu and palette in a narrow window — in both themes — and fails if any of t
 - Desktop only: double-clicking an `.evlab` file opens it (in the running window if the app is
   already open); dropping an `.evlab` file onto the window opens it; dragging parts from the
   library onto the canvas works (HTML5 drag and drop needs `dragDropEnabled: false`).
+- Debugging: while running, Ctrl+B (or *Rebuild & restart board* after an edit) flashes the new
+  build — the serial monitor shows "firmware updated", other parts keep their state. The MCU tab
+  lists wired pins (mode, level, voltage, PWM duty), PC/SP/SREG, R0–R31 (changes highlighted)
+  and flash/RAM bars. `V` toggles voltage badges on wires.
+- Serial monitor: *Time* prefixes lines with the simulation time, *0x* shows a hex dump,
+  *Clear on run* keeps or clears the output between runs, the save button writes the log.

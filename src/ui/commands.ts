@@ -108,6 +108,7 @@ export const commands: Record<string, Command> = {
   snap: { id: 'snap', label: 'Snap to Grid', icon: 'magnet', run: () => ed().setPrefs({ snap: !ed().snap }) },
   sound: { id: 'sound', label: 'Sound (buzzers)', run: () => ed().setPrefs({ sound: !ed().sound }) },
   logicLevels: { id: 'logicLevels', label: 'Show Logic Levels on Pins', run: () => ed().setPrefs({ showLogicLevels: !ed().showLogicLevels }) },
+  voltages: { id: 'voltages', label: 'Show Voltages on Wires', icon: 'zap', shortcut: 'V', run: () => ed().setPrefs({ showVoltages: !ed().showVoltages }) },
   theme: { id: 'theme', label: 'Toggle Dark Theme', icon: 'moon', run: () => ed().setPrefs({ theme: ed().theme === 'dark' ? 'light' : 'dark' }) },
   toggleLibrary: { id: 'toggleLibrary', label: 'Component Library', icon: 'panel-left', run: () => ed().setPrefs({ showLibrary: !ed().showLibrary }) },
   toggleInspector: { id: 'toggleInspector', label: 'Properties Panel', icon: 'settings', run: () => ed().setPrefs({ showInspector: !ed().showInspector }) },
@@ -213,6 +214,9 @@ export function installShortcuts(): () => void {
       case 'g':
       case 'G':
         return run('grid');
+      case 'v':
+      case 'V':
+        return run('voltages');
       case '+':
       case '=':
         return run('zoomIn');

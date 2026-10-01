@@ -12,6 +12,7 @@ import type { Diagnostic } from '../../circuit/diagnostics';
 import type { PropValue } from '../../model/circuit';
 import type { McuDefinition } from '../../model/component';
 import type { SolveResult, StampCollector } from '../analog/solver';
+import type { McuDebug } from '../types';
 import { createMcu, type McuEmulator, type PinDrive } from '../mcu/mcu';
 import { registerModel, type ModelContext, type SimModel } from '../model';
 
@@ -32,6 +33,8 @@ class McuBoardModel implements SimModel {
   private overCurrent = new Map<string, number>();
   private supplyOver = new Map<string, number>();
   private highTime = new Map<string, number>();
+  /** High-time share of each wired pin over the last frame (MCU panel). */
+  private duty: Record<string, number> = {};
   /** Drive of each pin as stamped into the current solution (valid until the next solve). */
   private stamped = new Map<string, PinDrive>();
   private txActivity = 0;
@@ -260,11 +263,24 @@ class McuBoardModel implements SimModel {
         if (avg > sup.maxCurrent) this.supplyOver.set(sup.pin, avg);
       }
     }
+    this.duty = {};
+    for (const pin of this.stamped.keys()) this.duty[pin] = Math.min(1, (this.highTime.get(pin) ?? 0) / w);
     this.pinCharge.clear();
     this.supplyCharge.clear();
     this.highTime.clear();
     this.window = 0;
     return out;
+  }
+
+  mcuDebug(): McuDebug | undefined {
+    const regs = this.mcu.registers?.();
+    if (!regs) return undefined;
+    const inputs: Record<string, boolean> = {};
+    for (const [pin, level] of this.inputLevel) {
+      const d = this.mcu.pinDrive(pin);
+      if (d === 'input' || d === 'input-pullup') inputs[pin] = level;
+    }
+    return { ...regs, duty: this.duty, inputs, floating: [...this.floating] };
   }
 
   diagnostics(): Diagnostic[] {

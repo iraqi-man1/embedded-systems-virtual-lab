@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import type { CircuitDocument, PinRef, Point } from '../core/model/circuit';
 
 export type Tool = 'select' | 'probe-logic' | 'probe-scope' | 'probe-meter-red' | 'probe-meter-black';
-export type DockTab = 'serial' | 'plotter' | 'scope' | 'logic' | 'meter' | 'problems' | 'output';
+export type DockTab = 'serial' | 'plotter' | 'scope' | 'logic' | 'meter' | 'mcu' | 'problems' | 'output';
 export type Theme = 'light' | 'dark';
 
 export interface Toast {
@@ -45,6 +45,14 @@ interface Prefs {
   sound: boolean;
   /** Coloured dots on IC/MCU pins while simulating (high/low/floating). */
   showLogicLevels: boolean;
+  /** Voltage badges on wires while simulating. */
+  showVoltages: boolean;
+  /** Serial monitor: clear the output when a simulation starts. */
+  serialClearOnRun: boolean;
+  /** Serial monitor: prefix lines with the simulation time. */
+  serialTimestamps: boolean;
+  /** Serial monitor: text or hex dump. */
+  serialView: 'text' | 'hex';
 }
 
 const PREFS_KEY = 'evlab.prefs.v1';
@@ -69,6 +77,10 @@ function loadPrefs(): Prefs {
     wireColor: '#2ecc71',
     sound: true,
     showLogicLevels: false,
+    showVoltages: false,
+    serialClearOnRun: true,
+    serialTimestamps: false,
+    serialView: 'text',
   };
   try {
     const raw = localStorage.getItem(PREFS_KEY);
@@ -153,6 +165,10 @@ export const useEditor = create<EditorState>((set, get) => ({
       wireColor: s.wireColor,
       sound: s.sound,
       showLogicLevels: s.showLogicLevels,
+      showVoltages: s.showVoltages,
+      serialClearOnRun: s.serialClearOnRun,
+      serialTimestamps: s.serialTimestamps,
+      serialView: s.serialView,
     };
     try {
       localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));

@@ -21,7 +21,7 @@ export async function confirmDiscard(message?: string): Promise<boolean> {
 
 function resetForNewDocument() {
   if (useSim.getState().state !== 'stopped') stopSimulation();
-  useSim.setState({ compile: EMPTY_COMPILE, serial: {}, diagnostics: [] });
+  useSim.setState({ compile: EMPTY_COMPILE, serial: {}, serialStamps: {}, diagnostics: [] });
 }
 
 /** Replaces the open project (after the caller confirmed discarding changes). */

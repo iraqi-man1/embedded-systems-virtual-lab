@@ -5,6 +5,7 @@ import { useSim } from '../../state/sim';
 import { zoomToComponents } from '../workspace/actions';
 import { Icon } from '../common/Icon';
 import { LogicAnalyzer } from './LogicAnalyzer';
+import { McuPanel } from './McuPanel';
 import { Multimeter } from './Multimeter';
 import { Oscilloscope } from './Oscilloscope';
 import { SerialMonitor } from './SerialMonitor';
@@ -100,6 +101,7 @@ const TABS: { id: DockTab; label: string; icon: string }[] = [
   { id: 'scope', label: 'Oscilloscope', icon: 'waves' },
   { id: 'logic', label: 'Logic Analyzer', icon: 'activity' },
   { id: 'meter', label: 'Multimeter', icon: 'gauge' },
+  { id: 'mcu', label: 'MCU', icon: 'cpu' },
   { id: 'problems', label: 'Problems', icon: 'warning' },
   { id: 'output', label: 'Build Output', icon: 'build' },
 ];
@@ -131,6 +133,7 @@ export function BottomDock() {
       {tab === 'scope' && <Oscilloscope />}
       {tab === 'logic' && <LogicAnalyzer />}
       {tab === 'meter' && <Multimeter />}
+      {tab === 'mcu' && <McuPanel />}
       {tab === 'problems' && <ProblemsPanel />}
       {tab === 'output' && <BuildOutput />}
     </div>

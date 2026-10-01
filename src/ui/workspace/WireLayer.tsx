@@ -69,6 +69,8 @@ export interface Overlay {
   probes: { x: number; y: number; color: string; label: string }[];
   /** Logic level of IC/MCU pins while simulating. */
   levels: { x: number; y: number; level: 'high' | 'low' | 'mid' | 'float' }[];
+  /** Net voltage badges on wires while simulating (View › Show Voltages). */
+  voltages: { x: number; y: number; text: string; float: boolean }[];
 }
 
 interface Props {
@@ -113,6 +115,17 @@ export function WireLayer({ circuit, selectedWires, zoom, overlay }: Props) {
       {overlay.levels.map((p, i) => (
         <circle key={`l${i}`} className={`lvl ${p.level}`} cx={p.x} cy={p.y} r={2.6} />
       ))}
+      {overlay.voltages.map((b, i) => {
+        const w = b.text.length * 5 + 8;
+        return (
+          <g key={`v${i}`} className={`volt-badge${b.float ? ' float' : ''}`} transform={`translate(${b.x} ${b.y})`}>
+            <rect x={-w / 2} y={-6.5} width={w} height={13} rx={6.5} />
+            <text y={3} textAnchor="middle">
+              {b.text}
+            </text>
+          </g>
+        );
+      })}
       {overlay.hoverPin && <circle className="pin-hover" cx={overlay.hoverPin.x} cy={overlay.hoverPin.y} r={5} strokeWidth={2 / zoom} />}
       {overlay.probes.map((p, i) => (
         <g key={i}>

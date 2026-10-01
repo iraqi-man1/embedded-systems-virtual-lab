@@ -95,6 +95,25 @@ export function orthogonalPath(anchors: Point[]): Point[] {
   return out;
 }
 
+export function polylineLength(pts: Point[]): number {
+  let len = 0;
+  for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+  return len;
+}
+
+/** Point at distance `d` along a polyline. */
+export function pointAlong(pts: Point[], d: number): Point {
+  for (let i = 1; i < pts.length; i++) {
+    const seg = Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+    if (d <= seg && seg > 0) {
+      const k = d / seg;
+      return { x: pts[i - 1].x + (pts[i].x - pts[i - 1].x) * k, y: pts[i - 1].y + (pts[i].y - pts[i - 1].y) * k };
+    }
+    d -= seg;
+  }
+  return pts[pts.length - 1];
+}
+
 export function wirePolyline(circuit: CircuitDocument, w: Wire): Point[] | null {
   const a = pinPosition(circuit, w.from);
   const b = pinPosition(circuit, w.to);

@@ -6,7 +6,7 @@ import type { PropValue } from '../model/circuit';
 import type { Diagnostic } from '../circuit/diagnostics';
 import type { SolveResult, StampCollector } from './analog/solver';
 import type { I2CDevice, McuEmulator, SPIDevice } from './mcu/mcu';
-import type { SimComponentSetup } from './types';
+import type { McuDebug, SimComponentSetup } from './types';
 
 export interface ModelContext {
   readonly setup: SimComponentSetup;
@@ -47,6 +47,8 @@ export interface SimModel {
   diagnostics?(): Diagnostic[];
   /** Set for models that own a programmable MCU. */
   readonly mcu?: McuEmulator;
+  /** Registers and pin activity for the MCU panel (called once per frame, after `visualState`). */
+  mcuDebug?(): McuDebug | undefined;
   /** Protocol-level I2C target, reachable when its SDA/SCL nets are an MCU's bus nets. */
   readonly i2c?: I2CDevice & { sdaPin: string; sclPin: string };
   /** Protocol-level SPI peripheral, reachable when its MOSI/SCK nets are an MCU's bus nets. */

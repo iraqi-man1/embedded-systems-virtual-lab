@@ -9,6 +9,7 @@ import type { Project } from '../core/project/schema';
 import { buildSimSetup, type ProbeRequest } from '../core/sim/setup';
 import type { McuStatus, SimCommand, SimEvent, SimRunState, StepKind } from '../core/sim/types';
 import { bytesToText } from '../core/instruments/decoders';
+import { countLines, stampLines } from '../core/instruments/serialLog';
 import { compileRequestFor, type CompileDiagnostic, type ToolchainStatus } from '../core/toolchain/types';
 import { lookup } from '../app/registry';
 import { toolchain } from '../platform';
@@ -54,6 +55,8 @@ interface SimState {
   mcus: McuStatus[];
   diagnostics: Diagnostic[];
   serial: Record<string, string>;
+  /** Simulation time at which each line of `serial` began (for timestamps). */
+  serialStamps: Record<string, number[]>;
   compile: CompileState;
   toolchain: ToolchainStatus | null;
   starting: boolean;
@@ -69,6 +72,7 @@ export const useSim = create<SimState>((set) => ({
   mcus: [],
   diagnostics: [],
   serial: {},
+  serialStamps: {},
   compile: EMPTY_COMPILE,
   toolchain: null,
   starting: false,
@@ -99,13 +103,23 @@ function handleEvent(ev: SimEvent) {
       captures.simTime = ev.simTime;
       for (const p of ev.probes) captures.appendProbe(p.id, p.samples);
       let serial = sim.serial;
+      let serialStamps = sim.serialStamps;
       if (ev.serial.length) {
         serial = { ...serial };
+        serialStamps = { ...serialStamps };
         for (const s of ev.serial) {
           const text = bytesToText(s.data);
-          let t = (serial[s.componentId] ?? '') + text;
-          if (t.length > SERIAL_CAP) t = t.slice(t.length - SERIAL_CAP * 0.8);
+          const prev = serial[s.componentId] ?? '';
+          const stamps = serialStamps[s.componentId]?.slice() ?? [];
+          stampLines(prev, text, stamps, ev.simTime);
+          let t = prev + text;
+          if (t.length > SERIAL_CAP) {
+            const cut = t.length - SERIAL_CAP * 0.8;
+            stamps.splice(0, countLines(t.slice(0, cut)));
+            t = t.slice(cut);
+          }
           serial[s.componentId] = t;
+          serialStamps[s.componentId] = stamps;
           // Feed complete lines to the serial plotter.
           const pending = (serialDecoder.get(s.componentId) ?? '') + text;
           const lines = pending.split(/\r?\n/);
@@ -116,7 +130,7 @@ function handleEvent(ev: SimEvent) {
       const now = performance.now();
       if (now - lastStoreUpdate > 90 || ev.state !== 'running' || serial !== sim.serial) {
         lastStoreUpdate = now;
-        useSim.setState({ simTime: ev.simTime, speed: ev.speed, voltages: ev.voltages, driven: ev.driven, mcus: ev.mcus, serial });
+        useSim.setState({ simTime: ev.simTime, speed: ev.speed, voltages: ev.voltages, driven: ev.driven, mcus: ev.mcus, serial, serialStamps });
       }
       break;
     }
@@ -222,7 +236,10 @@ export async function compileFirmware(): Promise<boolean> {
         durationMs: res.durationMs,
       },
     });
-    if (res.success) {
+    if (res.success && useSim.getState().state !== 'stopped') {
+      // Running: flash the new build into the board; the rest of the circuit keeps its state.
+      reflash(board.id, board.label);
+    } else if (res.success) {
       editor.notify(
         `Compiled in ${(res.durationMs / 1000).toFixed(1)} s — flash ${res.flashBytes ?? '?'} B, RAM ${res.ramBytes ?? '?'} B`,
         'success',
@@ -241,6 +258,23 @@ export async function compileFirmware(): Promise<boolean> {
     if (!status?.installed) editor.set({ dialog: 'toolchain' });
     return false;
   }
+}
+
+/** Appends a marker line (not firmware output) to a board's serial monitor. */
+function serialNote(boardId: string, note: string) {
+  const { serial, serialStamps, simTime } = useSim.getState();
+  const text = serial[boardId] ?? '';
+  const line = `${text && !text.endsWith('\n') ? '\n' : ''}── ${note} ──\n`;
+  const stamps = serialStamps[boardId]?.slice() ?? [];
+  stampLines(text, line, stamps, simTime);
+  useSim.setState({ serial: { ...serial, [boardId]: text + line }, serialStamps: { ...serialStamps, [boardId]: stamps } });
+}
+
+/** Hot-swaps the firmware of a running simulation: the board restarts with the new build. */
+function reflash(boardId: string, label: string) {
+  send({ type: 'update-circuit', setup: currentSetup(), restart: [boardId] });
+  serialNote(boardId, `firmware updated, ${label} restarted`);
+  useEditor.getState().notify(`New firmware flashed — ${label} restarted`, 'success');
 }
 
 export async function startSimulation() {
@@ -262,7 +296,9 @@ export async function startSimulation() {
     captures.clearProbes();
     captures.clearPlotter();
     serialDecoder.clear();
-    useSim.setState({ serial: {}, diagnostics: [], simTime: 0 });
+    if (useEditor.getState().serialClearOnRun) useSim.setState({ serial: {}, serialStamps: {} });
+    useSim.setState({ diagnostics: [], simTime: 0 });
+    for (const id of Object.keys(useSim.getState().serial)) serialNote(id, 'simulation started');
     send({ type: 'setup', setup: currentSetup(), settings: project.simulation });
     send({ type: 'start' });
   } finally {
@@ -305,7 +341,7 @@ export function sendSerial(text: string) {
 }
 
 export function clearSerial() {
-  useSim.setState({ serial: {} });
+  useSim.setState({ serial: {}, serialStamps: {} });
   captures.clearPlotter();
 }
 

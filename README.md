@@ -38,9 +38,12 @@ Built with Tauri 2, React, TypeScript, avr8js, Wokwi Elements, Monaco Editor and
   automatic library resolution, PlatformIO compilation, compiler errors as editor markers.
 - **Simulation**: run, pause, step (1 ms / instruction), reset, stop, 0.01×–4× or max speed;
   live interaction with buttons, knobs, switches and sensors.
-- **Instruments**: serial monitor (bidirectional), serial plotter, oscilloscope with trigger
-  and measurements, 8-channel logic analyzer with UART decoding and VCD export, multimeter
-  (V / Ω / A), signal generator.
+- **Instruments**: serial monitor (bidirectional, timestamps, hex view, save log), serial
+  plotter, oscilloscope with trigger and measurements, 8-channel logic analyzer with UART
+  decoding and VCD export, multimeter (V / Ω / A), signal generator.
+- **Debugging**: MCU panel with pin modes, levels, voltages and PWM duty, PC/SP/SREG, R0–R31 and
+  flash/RAM use; voltage badges on wires (View › Show Voltages, `V`); Ctrl+B while running
+  flashes the new build into the board without stopping the rest of the circuit.
 - **Electrical checks**: shorts, supply conflicts, unconnected required pins, floating inputs,
   undefined logic levels, pin/supply over-current, LED over-current and reverse bias.
 - **Projects**: versioned `.evlab` files; 20 example projects (Blink, button, PWM, traffic

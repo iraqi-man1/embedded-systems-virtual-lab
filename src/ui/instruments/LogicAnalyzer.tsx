@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { storage } from '../../platform';
 import { captures } from '../../state/captures';
 import { useEditor } from '../../state/editor';
 import { useProject } from '../../state/project';
@@ -116,10 +117,10 @@ export function LogicAnalyzer() {
         .map((c) => ({ name: c.label, capture: captures.probes.get(`logic:${c.id}`) }))
         .filter((c): c is { name: string; capture: NonNullable<typeof c.capture> } => !!c.capture),
     );
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([vcd], { type: 'text/plain' }));
-    a.download = 'capture.vcd';
-    a.click();
+    void storage
+      .exportText(vcd, 'capture.vcd', { name: 'Value Change Dump', extensions: ['vcd'] })
+      .then((path) => path && useEditor.getState().notify(`Saved ${path.split(/[\\/]/).pop()}`, 'success'))
+      .catch((e) => useEditor.getState().notify(`Could not save the capture: ${(e as Error).message ?? e}`, 'error'));
   };
 
   const timeAt = (clientX: number, el: HTMLElement) => {

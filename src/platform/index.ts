@@ -99,6 +99,23 @@ export const storage = {
     }
   },
 
+  /** Saves a text export (serial log, VCD capture) where the user chooses. Returns the path, or null if cancelled. */
+  async exportText(text: string, fileName: string, filter: { name: string; extensions: string[] }): Promise<string | null> {
+    if (isTauri) {
+      const { save } = await import('@tauri-apps/plugin-dialog');
+      const target = await save({ filters: [filter], defaultPath: fileName });
+      if (!target) return null;
+      await invoke('write_text_file', { path: target, contents: text });
+      return target;
+    }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+    a.download = fileName;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    return fileName;
+  },
+
   /** Writes to `path`, or asks for a location when `path` is null. Returns the path used. */
   async saveProject(text: string, path: string | null, suggestedName: string): Promise<string | null> {
     if (isTauri) {

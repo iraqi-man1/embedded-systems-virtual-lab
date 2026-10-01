@@ -16,7 +16,7 @@ import { useErc, useNetlist } from '../../state/derived';
 import { formatEngineering } from '../../core/model/units';
 import { ComponentView } from './ComponentView';
 import { WireLayer, type Overlay } from './WireLayer';
-import { hitPin, insertionPreview, marqueeSelection, nearestSegment, pinIndex, pinPosition, wirePolyline, type IndexedPin } from './geometry';
+import { hitPin, insertionPreview, marqueeSelection, nearestSegment, pinIndex, pinPosition, pointAlong, polylineLength, wirePolyline, type IndexedPin } from './geometry';
 import { addComponentAt, fitView, withCarried, zoomBy } from './actions';
 import { assignProbe, probeMarkers } from '../instruments/probes';
 import { Icon } from '../common/Icon';
@@ -634,6 +634,25 @@ export function Workspace() {
     return out;
   }, [showLevels, index, netlist, voltages, driven]);
 
+  // One voltage badge per net, on the middle of its longest wire (View › Show Voltages).
+  const showVoltages = useEditor((s) => s.showVoltages) && simulating;
+  const voltageBadges = useMemo(() => {
+    if (!showVoltages || !voltages.length) return [];
+    const best = new Map<number, { len: number; at: Point }>();
+    for (const w of circuit.wires) {
+      const net = netlist.netOf(w.from);
+      const pts = net === undefined ? null : wirePolyline(circuit, w);
+      if (net === undefined || !pts) continue;
+      const len = polylineLength(pts);
+      if ((best.get(net)?.len ?? -1) < len) best.set(net, { len, at: pointAlong(pts, len / 2) });
+    }
+    return [...best].map(([net, { at }]) => {
+      const v = voltages[net];
+      const float = !driven[net];
+      return { x: at.x, y: at.y, float, text: float ? 'float' : `${Math.abs(v) < 0.005 ? '0' : v.toFixed(2)} V` };
+    });
+  }, [showVoltages, circuit, netlist, voltages, driven]);
+
   // Where legs will plug in: the part being dropped from the library, or the parts being moved.
   const ghostInst = useMemo(
     () => (ghost ? { id: '__ghost', type: ghost.type, x: ghost.x, y: ghost.y, rotation: 0 as const, label: '', props: defaultProps(registry.get(ghost.type)!) } : null),
@@ -680,6 +699,7 @@ export function Workspace() {
     endDrag: endDragOverlay,
     probes: probeMarkers(circuit, instruments),
     levels,
+    voltages: voltageBadges,
   };
 
   // Pin tooltip with live values.

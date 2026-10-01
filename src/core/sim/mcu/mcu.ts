@@ -31,6 +31,16 @@ export interface SPIDevice {
   selected(): boolean;
 }
 
+/** CPU registers for the MCU debug panel. */
+export interface McuRegisters {
+  /** General-purpose registers R0..R31. */
+  r: number[];
+  sp: number;
+  sreg: number;
+  /** Highest data address (stack pointer value at reset). */
+  ramEnd: number;
+}
+
 export interface McuEmulator {
   readonly family: string;
   readonly clockHz: number;
@@ -65,6 +75,8 @@ export interface McuEmulator {
   spiResolver: (() => SPIDevice | null) | null;
   /** Schedules a callback after `cycles` CPU cycles. */
   schedule(cycles: number, cb: () => void): void;
+  /** Register snapshot for debugging (optional per family). */
+  registers?(): McuRegisters;
 }
 
 export type McuFactory = (def: McuDefinition) => McuEmulator;

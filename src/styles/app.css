@@ -433,3 +433,40 @@ kbd { font-family: var(--font-mono); font-size: 11px; padding: 1px 5px; border: 
 .recent-item:hover { background: var(--bg-hover); color: var(--text); }
 .recent-item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .recent-item .when { color: var(--text-3); font-size: var(--fs-xs); }
+.tb-btn.accent { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.tb-btn.accent:hover { filter: brightness(1.08); }
+
+/* MCU panel. */
+.empty-note { padding: 16px; color: var(--text-3); text-align: center; }
+.mcu-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(280px, 380px) 1fr; }
+.mcu-side { display: flex; flex-direction: column; gap: 10px; padding: 8px 10px; overflow-y: auto; border-right: 1px solid var(--border); }
+.mcu-cpu { display: flex; gap: 14px; flex-wrap: wrap; font-size: var(--fs-sm); }
+.mcu-panel .k { color: var(--text-3); margin-right: 4px; }
+.mcu-sreg { display: flex; align-items: center; gap: 3px; font-size: var(--fs-xs); }
+.mcu-sreg .flag { width: 18px; height: 18px; display: grid; place-items: center; border-radius: 3px; border: 1px solid var(--border); color: var(--text-3); font-family: var(--font-mono); }
+.mcu-sreg .flag.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.mcu-mem { font-size: var(--fs-xs); color: var(--text-2); }
+.mcu-mem-head { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 3px; }
+.mcu-mem-bar { height: 6px; border-radius: 3px; background: var(--bg-hover); overflow: hidden; }
+.mcu-mem-bar > div { height: 100%; background: var(--ok); }
+.mcu-mem-bar > div.warm { background: var(--warn); }
+.mcu-mem-bar > div.hot { background: var(--err); }
+.mcu-regs { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; }
+.mcu-reg { display: flex; flex-direction: column; align-items: center; padding: 2px 0; border-radius: 3px; background: var(--bg-panel-2); font-size: var(--fs-xs); }
+.mcu-reg .name { color: var(--text-3); font-size: 10px; }
+.mcu-reg.changed { background: var(--accent-soft); color: var(--accent); }
+.mcu-pins { overflow: auto; min-height: 0; }
+.mcu-pins table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+.mcu-pins th { position: sticky; top: 0; background: var(--bg-panel); text-align: left; font-weight: 600; color: var(--text-2); padding: 4px 10px; border-bottom: 1px solid var(--border); }
+.mcu-pins td { padding: 2px 10px; border-bottom: 1px solid var(--border-soft, var(--border)); }
+.mcu-pins .num { text-align: right; }
+.mcu-pins tr.unwired { color: var(--text-3); }
+.pin-lvl { display: inline-block; min-width: 40px; padding: 0 5px; border-radius: 3px; font-family: var(--font-mono); font-size: var(--fs-xs); text-align: center; }
+.pin-lvl.high { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
+.pin-lvl.low { background: var(--bg-hover); color: var(--text-2); }
+.pin-lvl.float { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+.wires .volt-badge rect { fill: var(--bg-panel-2); stroke: var(--accent); stroke-width: 0.8; opacity: 0.94; }
+.wires .volt-badge text { font-size: 8.5px; font-family: var(--font-mono); fill: var(--text); }
+.wires .volt-badge.float rect { stroke: var(--text-3); stroke-dasharray: 2 1.5; }
+.wires .volt-badge.float text { fill: var(--text-3); }
+.wires .volt-badge { pointer-events: none; }

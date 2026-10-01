@@ -250,8 +250,11 @@ export class SimulationEngine {
     this.settings = s;
   }
 
-  /** Re-wires the running circuit, preserving model state (incl. MCU state). */
-  updateCircuit(setup: SimSetup) {
+  /**
+   * Re-wires the running circuit, preserving model state (incl. MCU state).
+   * Components in `restart` start over (a board flashed with a new build).
+   */
+  updateCircuit(setup: SimSetup, restart: string[] = []) {
     const oldSetup = this.setup;
     this.setup = setup;
     this.probes = setup.probes;
@@ -269,7 +272,7 @@ export class SimulationEngine {
     for (const comp of setup.components) {
       const holder = this.contexts.get(comp.id);
       const old = oldSetup.components.find((c) => c.id === comp.id);
-      if (holder && old && old.model === comp.model && old.type === comp.type && old.firmware === comp.firmware) {
+      if (holder && old && old.model === comp.model && old.type === comp.type && old.firmware === comp.firmware && !restart.includes(comp.id)) {
         holder.setup = comp;
       } else {
         this.models.get(comp.id)?.dispose?.();
@@ -500,7 +503,7 @@ export class SimulationEngine {
     const mcus: McuStatus[] = this.mcus.map(({ id, mcu }) => {
       const pins: Record<string, string> = {};
       for (const p of mcu.pins) pins[p] = mcu.pinDrive(p);
-      return { componentId: id, cycles: mcu.cycles, pc: mcu.pc, pins, serialBaud: mcu.serialBaud };
+      return { componentId: id, cycles: mcu.cycles, pc: mcu.pc, pins, serialBaud: mcu.serialBaud, debug: this.models.get(id)?.mcuDebug?.() };
     });
     const sol = this.solution;
     const voltages = sol ? Array.from(sol.voltages) : [];

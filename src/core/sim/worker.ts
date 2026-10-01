@@ -21,7 +21,7 @@ ctx.onmessage = (e: MessageEvent<SimCommand>) => {
         engine = new SimulationEngine(cmd.setup, cmd.settings, post);
         break;
       case 'update-circuit':
-        engine?.updateCircuit(cmd.setup);
+        engine?.updateCircuit(cmd.setup, cmd.restart);
         break;
       case 'start':
         engine?.start();

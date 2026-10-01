@@ -179,7 +179,9 @@ export function CodeEditor() {
     compile.status === 'compiling'
       ? 'Compiling…'
       : buildState === 'modified'
-        ? 'Code changed since the last build — Ctrl+B to compile'
+        ? simState !== 'stopped'
+          ? 'The board runs the previous build'
+          : 'Code changed since the last build — Ctrl+B to compile'
         : compile.status === 'success'
           ? `Built · flash ${compile.flashBytes ?? '?'} B · RAM ${compile.ramBytes ?? '?'} B`
           : compile.status === 'error'
@@ -245,8 +247,13 @@ export function CodeEditor() {
             ))}
           </select>
         )}
+        {simState !== 'stopped' && buildState === 'modified' && (
+          <button className="tb-btn accent" onClick={() => void compileFirmware()} title="Compile and flash the running board (Ctrl+B); the rest of the circuit keeps running">
+            <Icon name="reset" />
+            <span className="label">Rebuild &amp; restart board</span>
+          </button>
+        )}
         <span className="info" title={statusText}>
-          {simState !== 'stopped' && compile.status !== 'compiling' ? 'Edits apply after Stop + Run · ' : ''}
           {statusText}
         </span>
       </div>
