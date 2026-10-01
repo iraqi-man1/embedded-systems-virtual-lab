@@ -24,9 +24,13 @@ Built with Tauri 2, React, TypeScript, avr8js, Wokwi Elements, Monaco Editor and
   labels, A* auto-routing.
 - **Breadboards that understand connectivity**: legs dropped on holes connect automatically;
   hover a hole to see every connected hole highlighted.
-- **Component library**: 140 parts across 12 categories; 60 have simulation models (48 full,
-  12 partial). Every part
-  shows whether it is *fully simulated*, *partially simulated* or *visual-only*.
+- **Component library**: 140 parts across 12 categories; 76 have simulation models (54 full,
+  22 partial), including NeoPixels, an SSD1306 OLED, MPU-6050, DS1307, IR remote/receiver,
+  keypad, rotary encoder, DC and stepper motors with L298N/A4988 drivers. Every part shows
+  whether it is *fully simulated*, *partially simulated* or *visual-only*.
+- **Interactive simulation**: drag the obstacle in front of an ultrasonic sensor, tilt an IMU,
+  move a joystick, turn an encoder, press keypad and IR-remote keys, set temperature/light/gas
+  with on-canvas sliders; parts show live feedback (beams, waves, glows, readouts).
 - **Real firmware**: Monaco editor with Arduino completions and hover docs, multi-file sketches,
   automatic library resolution, PlatformIO compilation, compiler errors as editor markers.
 - **Simulation**: run, pause, step (1 ms / instruction), reset, stop, 0.01×–4× or max speed;

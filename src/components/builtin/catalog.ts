@@ -170,6 +170,33 @@ function ic(b: Base & { label?: string; pins: PinSpec[] }): ComponentDefinition 
   });
 }
 
+/** Turns a visual-only definition into a simulated one (keeps visuals, pins and docs). */
+function simulated(def: ComponentDefinition, extra: Partial<ComponentDefinition> & { params?: Record<string, unknown> }): ComponentDefinition {
+  const { params, ...rest } = extra;
+  const sim = { ...(rest.simulation ?? def.simulation), params: params ?? rest.simulation?.params };
+  return { ...def, ...rest, properties: rest.properties ?? def.properties, simulation: sim };
+}
+
+const MM = 3.7795; // px per mm in Wokwi element drawings
+const KEYPAD_LABELS = [
+  ['1', '2', '3', 'A'],
+  ['4', '5', '6', 'B'],
+  ['7', '8', '9', 'C'],
+  ['*', '0', '#', 'D'],
+];
+/** Wokwi IR remote: button id, centre x, centre y (element pixels) and NEC command. */
+const IR_BUTTONS: [string, number, number][] = [
+  ['power', 29.6, 37.9], ['menu', 121.4, 37.9], ['test', 29.6, 75.2], ['plus', 75.5, 75.2], ['back', 121.4, 75.2],
+  ['prev', 29.6, 113], ['play', 75.5, 113], ['next', 121.4, 113], ['0', 29.6, 152], ['minus', 75.5, 152], ['c', 121.4, 152],
+  ['1', 29.6, 190], ['2', 75.5, 190], ['3', 121.4, 190], ['4', 29.6, 228], ['5', 75.5, 228], ['6', 121.4, 228],
+  ['7', 29.6, 266], ['8', 75.5, 266], ['9', 121.4, 266],
+];
+const IR_CODES: Record<string, number> = {
+  power: 0xa2, menu: 0xe2, test: 0x22, plus: 0x02, back: 0xc2, prev: 0xe0, play: 0xa8, next: 0x90, '0': 0x68, minus: 0x98, c: 0xb0,
+  '1': 0x30, '2': 0x18, '3': 0x7a, '4': 0x10, '5': 0x38, '6': 0x5a, '7': 0x42, '8': 0x4a, '9': 0x52,
+};
+const WS2812_NOTES = 'WS2812 bits decoded from DIN pulse widths (>0.6 µs = 1, GRB order, >50 µs low latches). DOUT does not re-transmit to further parts; brightness is shown perceptually (gamma), current draw is not modelled.';
+
 const V: PinSpec = { id: 'VCC', kind: 'passive' };
 const G: PinSpec = { id: 'GND', kind: 'ground' };
 
@@ -202,35 +229,47 @@ export const displays: ComponentDefinition[] = [
     simNotes: 'Ten piecewise-linear LED junctions.',
     params: { segments: Array.from({ length: 10 }, (_, i) => ({ a: `A${i + 1}`, c: `C${i + 1}` })) },
   }, 'passive'),
-  wk('wokwi-neopixel', {
+  wks('wokwi-neopixel', {
     type: 'evlab.neopixel',
     name: 'NeoPixel (WS2812B)',
     category: 'Output',
     subcategory: 'LEDs',
     tags: ['neopixel', 'ws2812', 'addressable', 'rgb', 'led'],
     designator: 'LED',
-    summary: 'Single addressable RGB LED with integrated controller (800 kHz one-wire protocol).',
-    notes: 'WS2812 bit-timing decoder planned (protocol-level fast path).',
+    summary: 'Single addressable RGB LED with integrated controller (800 kHz one-wire protocol). Drive DIN with Adafruit_NeoPixel or FastLED; power VDD/VSS from 5 V.',
+    pins: wokwiPins('wokwi-neopixel', 'io', { VDD: 'passive', VSS: 'ground', DIN: 'input', DOUT: 'output' }),
+    model: 'ws2812',
+    support: 'partial',
+    simNotes: WS2812_NOTES,
+    params: { count: 1, layout: 'single', vcc: 'VDD', gnd: 'VSS' },
   }),
-  wk('wokwi-neopixel-matrix', {
+  wks('wokwi-neopixel-matrix', {
     type: 'evlab.neopixel-matrix',
     name: 'NeoPixel Matrix 8×8',
     category: 'Output',
     subcategory: 'LEDs',
     tags: ['neopixel', 'matrix', 'ws2812', 'led matrix'],
     designator: 'LED',
-    summary: '8×8 addressable RGB LED matrix.',
-    notes: 'WS2812 decoder planned.',
+    summary: '8×8 addressable RGB LED matrix (64 WS2812 pixels, row by row from the top left).',
+    pins: wokwiPins('wokwi-neopixel-matrix', 'io', { VCC: 'passive', GND: 'ground', DIN: 'input', DOUT: 'output' }),
+    model: 'ws2812',
+    support: 'partial',
+    simNotes: WS2812_NOTES,
+    params: { count: 64, layout: 'matrix' },
   }),
-  wk('wokwi-led-ring', {
+  wks('wokwi-led-ring', {
     type: 'evlab.neopixel-ring',
     name: 'NeoPixel Ring (16)',
     category: 'Output',
     subcategory: 'LEDs',
     tags: ['neopixel', 'ring', 'ws2812'],
     designator: 'LED',
-    summary: 'Ring of 16 addressable RGB LEDs.',
-    notes: 'WS2812 decoder planned.',
+    summary: 'Ring of 16 addressable RGB LEDs (WS2812).',
+    pins: wokwiPins('wokwi-led-ring', 'io', { VCC: 'passive', GND: 'ground', DIN: 'input', DOUT: 'output' }),
+    model: 'ws2812',
+    support: 'partial',
+    simNotes: WS2812_NOTES,
+    params: { count: 16, layout: 'ring' },
   }),
   mod({
     type: 'evlab.max7219-matrix',
@@ -295,15 +334,27 @@ export const displays: ComponentDefinition[] = [
     simNotes: "Protocol-level I2C target on the MCU's TWI peripheral (SDA/SCL must be wired to the board's I2C pins). PCF8574 to HD44780 mapping as in LiquidCrystal_I2C (P0=RS, P2=E, P3=backlight, P4-P7=D4-D7). Bus electrical levels and pull-ups are not modelled.",
     params: { cols: 16, rows: 2 },
   }),
-  wk('wokwi-ssd1306', {
+  wks('wokwi-ssd1306', {
     type: 'evlab.ssd1306',
     name: 'OLED 128×64 (SSD1306, I2C)',
     category: 'Output',
     subcategory: 'Displays',
-    tags: ['oled', 'ssd1306', 'i2c', '128x64', 'display', 'adafruit_ssd1306'],
+    tags: ['oled', 'ssd1306', 'i2c', '128x64', 'display', 'adafruit_ssd1306', 'u8g2'],
     designator: 'DS',
-    summary: 'Monochrome 0.96" OLED with SSD1306 controller.',
-    notes: 'SSD1306 I2C command/framebuffer model planned.',
+    summary: 'Monochrome 0.96" OLED with SSD1306 controller (I2C, address 0x3C). Uno: DATA → A4 (SDA), CLK → A5 (SCL), VIN → 5V. Works with Adafruit_SSD1306.',
+    pins: wokwiPins('wokwi-ssd1306', 'nc', { DATA: 'io', CLK: 'io', VIN: 'passive', '3V3': 'passive', GND: 'ground' }, {
+      DATA: { label: 'DATA (SDA)', signals: ['i2c:SDA'], required: true },
+      CLK: { label: 'CLK (SCL)', signals: ['i2c:SCL'], required: true },
+      VIN: { required: true },
+      DC: { description: 'SPI mode only (not simulated)' },
+      CS: { description: 'SPI mode only (not simulated)' },
+      RST: { description: 'Reset (not needed for I2C)' },
+    }),
+    properties: [{ key: 'address', label: 'I2C address', type: 'enum', default: '0x3C', options: [{ value: '0x3C', label: '0x3C' }, { value: '0x3D', label: '0x3D' }] }],
+    model: 'ssd1306',
+    support: 'full',
+    simNotes: "Protocol-level I2C target: SSD1306 command set (horizontal/vertical/page addressing, column/page windows, start line, display offset, segment/COM remap, invert, display on/off) and the 128×64 GDDRAM. Scrolling commands are accepted but not animated; SPI mode (DC/CS) and contrast are not modelled.",
+    params: { sda: 'DATA', scl: 'CLK', vcc: 'VIN' },
   }),
   wk('wokwi-ili9341', {
     type: 'evlab.ili9341',
@@ -335,7 +386,7 @@ export const ics: ComponentDefinition[] = [
   ic({ type: 'evlab.ne555', name: 'NE555 Timer', category: 'Integrated Circuits', subcategory: 'Timers', tags: ['555', 'ne555', 'timer', 'astable', 'monostable', 'oscillator'], summary: 'Classic timer IC for astable/monostable circuits.', pins: [G, 'TRIG', 'OUT', 'RESET', 'CTRL', 'THRES', 'DISCH', V], notes: 'Needs capacitor dynamics (transient engine, planned).' }),
   ic({ type: 'evlab.lm358', name: 'LM358 Dual Op-Amp', category: 'Integrated Circuits', subcategory: 'Op-Amps', tags: ['lm358', 'op-amp', 'opamp', 'amplifier', 'comparator'], summary: 'Dual single-supply operational amplifier.', pins: ['OUT1', 'IN1-', 'IN1+', G, 'IN2+', 'IN2-', 'OUT2', V], notes: 'Op-amp macro-model (VCCS + rails) planned.' }),
   ic({ type: 'evlab.lm393', name: 'LM393 Dual Comparator', category: 'Integrated Circuits', subcategory: 'Op-Amps', tags: ['lm393', 'comparator'], summary: 'Dual open-collector voltage comparator.', pins: ['OUT1', 'IN1-', 'IN1+', G, 'IN2+', 'IN2-', 'OUT2', V] }),
-  ic({ type: 'evlab.uln2003', name: 'ULN2003 Darlington Array', category: 'Integrated Circuits', subcategory: 'Drivers', tags: ['uln2003', 'darlington', 'driver', 'stepper'], summary: 'Seven Darlington pairs with flyback diodes.', pins: ['IN1', 'IN2', 'IN3', 'IN4', 'IN5', 'IN6', 'IN7', G, 'COM', 'OUT7', 'OUT6', 'OUT5', 'OUT4', 'OUT3', 'OUT2', 'OUT1'] }),
+  icSim({ type: 'evlab.uln2003', name: 'ULN2003 Darlington Array', category: 'Integrated Circuits', subcategory: 'Drivers', tags: ['uln2003', 'darlington', 'driver', 'stepper'], summary: 'Seven Darlington switches: a HIGH input pulls its OUT pin to GND (open collector, up to 500 mA). COM goes to the load supply for the flyback diodes.', pins: ['IN1', 'IN2', 'IN3', 'IN4', 'IN5', 'IN6', 'IN7', G, 'COM', 'OUT7', 'OUT6', 'OUT5', 'OUT4', 'OUT3', 'OUT2', 'OUT1'], model: 'darlington-array', params: { channels: 7 }, simNotes: 'Open-collector switches with ≈0.9 V saturation and 2.7 kΩ inputs; flyback diodes and current limits are not modelled.' }),
   ic({ type: 'evlab.l293d', name: 'L293D Motor Driver', category: 'Actuators', subcategory: 'Motor Drivers', tags: ['l293d', 'h-bridge', 'motor driver'], summary: 'Quadruple half-H driver (600 mA per channel).', pins: ['EN1,2', '1A', '1Y', 'GND.1', 'GND.2', '2Y', '2A', 'VCC2', '3A', '3Y', 'GND.3', 'GND.4', '4Y', '4A', 'EN3,4', 'VCC1'] }),
   ic({ type: 'evlab.atmega328p-dip', name: 'ATmega328P (DIP-28)', category: 'Boards', subcategory: 'AVR chips', tags: ['atmega328p', 'avr', 'dip', 'standalone'], summary: 'Bare ATmega328P for standalone Arduino circuits.', pins: ['PC6/RST', 'PD0', 'PD1', 'PD2', 'PD3', 'PD4', { id: 'VCC', kind: 'passive' }, 'GND', 'PB6', 'PB7', 'PD5', 'PD6', 'PD7', 'PB0', 'PB1', 'PB2', 'PB3', 'PB4', 'PB5', 'AVCC', 'AREF', 'GND.2', 'PC0', 'PC1', 'PC2', 'PC3', 'PC4', 'PC5'], notes: 'Standalone-chip support (external clock/power wiring) planned; use the Uno/Nano board meanwhile.' }),
 ];
@@ -456,7 +507,33 @@ export const sensors: ComponentDefinition[] = [
       { kind: 'readout', value: '_active', map: { true: 'OUT HIGH · motion', false: 'OUT LOW · idle' } },
     ],
   }),
-  wk('wokwi-mpu6050', { type: 'evlab.mpu6050', name: 'MPU-6050 Accelerometer/Gyro', category: 'Sensors', subcategory: 'Motion', tags: ['mpu6050', 'imu', 'accelerometer', 'gyroscope', 'i2c'], summary: '6-axis IMU (I2C).', notes: 'I2C register model planned.' }),
+  wks('wokwi-mpu6050', {
+    type: 'evlab.mpu6050',
+    name: 'MPU-6050 Accelerometer/Gyro',
+    category: 'Sensors',
+    subcategory: 'Motion',
+    tags: ['mpu6050', 'imu', 'accelerometer', 'gyroscope', 'i2c', 'gy-521'],
+    summary: '6-axis IMU on a GY-521 board (I2C 0x68, 0x69 with AD0 high). Uno: SDA → A4, SCL → A5. Tilt it with the pad under the part while simulating.',
+    pins: wokwiPins('wokwi-mpu6050', 'nc', { SDA: 'io', SCL: 'io', VCC: 'passive', GND: 'ground', AD0: 'input', INT: 'output' }, {
+      SDA: { signals: ['i2c:SDA'], required: true },
+      SCL: { signals: ['i2c:SCL'], required: true },
+      VCC: { required: true },
+      XDA: { description: 'Auxiliary I2C (not simulated)' },
+      XCL: { description: 'Auxiliary I2C (not simulated)' },
+    }),
+    properties: [
+      live('pitch', 'Pitch', 0, -90, 90, 1, '°'),
+      live('roll', 'Roll', 0, -180, 180, 1, '°'),
+      live('gx', 'Rotation rate X', 0, -250, 250, 1, '°/s'),
+      live('gy', 'Rotation rate Y', 0, -250, 250, 1, '°/s'),
+      live('gz', 'Rotation rate Z', 0, -250, 250, 1, '°/s'),
+      live('temperature', 'Temperature', 25, -40, 85, 0.5, '°C'),
+    ],
+    model: 'mpu6050',
+    support: 'partial',
+    simNotes: 'Accelerometer from gravity and the pitch/roll orientation, gyroscope from the rate properties, die temperature; WHO_AM_I, PWR_MGMT_1 (sleep/reset), accel/gyro full-scale ranges and the 0x3B–0x48 data block. DMP, FIFO, interrupts and the auxiliary bus are not modelled.',
+    controls: [{ kind: 'tilt', pitchProp: 'pitch', rollProp: 'roll', range: 90, label: 'Tilt' }],
+  }),
   wks('wokwi-tilt-switch', {
     type: 'evlab.tilt-switch',
     name: 'Tilt Switch Module',
@@ -487,8 +564,35 @@ export const sensors: ComponentDefinition[] = [
   }),
   mod({ type: 'evlab.vl53l0x', name: 'VL53L0X ToF Sensor', category: 'Sensors', subcategory: 'Distance', tags: ['vl53l0x', 'tof', 'laser', 'distance', 'i2c'], summary: 'Time-of-flight laser distance sensor (I2C).', pins: [V, G, 'SCL', 'SDA', 'XSHUT', 'GPIO1'], pcb: '#6a1b9a' }),
   mod({ type: 'evlab.sharp-gp2y0a21', name: 'Sharp GP2Y0A21 IR Distance', category: 'Sensors', subcategory: 'Distance', tags: ['sharp', 'ir', 'distance', 'analog'], summary: 'Analog infrared distance sensor (10–80 cm).', pins: ['VO', G, V], pcb: '#333' }),
-  wk('wokwi-ir-receiver', { type: 'evlab.ir-receiver', name: 'IR Receiver (38 kHz)', category: 'Sensors', subcategory: 'Infrared', tags: ['ir', 'infrared', 'receiver', 'vs1838', 'remote'], summary: 'Demodulating 38 kHz IR receiver.' }),
-  wk('wokwi-ir-remote', { type: 'evlab.ir-remote', name: 'IR Remote Control', category: 'Sensors', subcategory: 'Infrared', tags: ['ir', 'remote', 'nec'], summary: 'NEC infrared remote control (pairs with the IR receiver).' }),
+  wks('wokwi-ir-receiver', {
+    type: 'evlab.ir-receiver',
+    name: 'IR Receiver (38 kHz)',
+    category: 'Sensors',
+    subcategory: 'Infrared',
+    tags: ['ir', 'infrared', 'receiver', 'vs1838', 'remote', 'irremote'],
+    summary: 'Demodulating 38 kHz IR receiver: DAT is LOW while a burst is received. Use the IRremote library; press buttons on an IR Remote placed in the same circuit.',
+    pins: wokwiPins('wokwi-ir-receiver', 'output', { VCC: 'passive', GND: 'ground' }),
+    model: 'ir-receiver',
+    support: 'full',
+    simNotes: 'Demodulated output with exact NEC timing from the IR Remote part (every powered receiver in the circuit receives it). Range, angle and ambient IR are not modelled.',
+    params: { out: 'DAT' },
+    indicators: [{ kind: 'pulse', value: '_frames', at: { x: 30.5, y: 24 }, color: '#e53935' }],
+  }),
+  wks('wokwi-ir-remote', {
+    type: 'evlab.ir-remote',
+    name: 'IR Remote Control',
+    category: 'Sensors',
+    subcategory: 'Infrared',
+    tags: ['ir', 'remote', 'nec'],
+    summary: 'NEC infrared remote (address 0x00). Click its buttons while simulating; the commands match Wokwi (POWER = 0xA2, 1 = 0x30…).',
+    pins: [],
+    model: 'ir-remote',
+    support: 'full',
+    simNotes: 'Sends NEC frames to every IR receiver in the circuit; a held button sends repeat codes every 108 ms.',
+    params: { address: 0, codes: IR_CODES },
+    controls: [{ kind: 'keys', pressedKey: '_pressed', keys: IR_BUTTONS.map(([id, x, y]) => ({ id, label: id.toUpperCase(), x: x - 15, y: y - 15, w: 30, h: 30, round: true })) }],
+    indicators: [{ kind: 'waves', value: '_sending', at: { x: 75.5, y: 4 }, direction: 'up', color: '#e53935' }],
+  }),
   wks('wokwi-flame-sensor', {
     type: 'evlab.flame-sensor',
     name: 'Flame Sensor',
@@ -550,7 +654,21 @@ export const sensors: ComponentDefinition[] = [
     simNotes: 'Linear potentiometers and an ideal switch.',
     controls: [{ kind: 'stick', xProp: 'x', yProp: 'y', center: { x: 51.4, y: 51.4 }, radius: 36, invertX: true, invertY: true, pressInput: 'pressed' }],
   }),
-  wk('wokwi-ky-040', { type: 'evlab.ky040', name: 'Rotary Encoder (KY-040)', category: 'Input', subcategory: 'Encoders', tags: ['rotary encoder', 'ky-040', 'quadrature', 'encoder'], summary: 'Incremental quadrature rotary encoder with push switch.' }),
+  wks('wokwi-ky-040', {
+    type: 'evlab.ky040',
+    name: 'Rotary Encoder (KY-040)',
+    category: 'Input',
+    subcategory: 'Encoders',
+    tags: ['rotary encoder', 'ky-040', 'quadrature', 'encoder'],
+    summary: 'Incremental quadrature encoder (20 detents) with push switch. CLK/DT/SW pull LOW against 10 kΩ pull-ups; at rest both CLK and DT are HIGH. Drag the knob around (or scroll on it) while simulating; click to press.',
+    pins: wokwiPins('wokwi-ky-040', 'output', { VCC: 'passive', GND: 'ground' }),
+    model: 'rotary-encoder',
+    support: 'full',
+    simNotes: 'Gray-code contact sequence (CLK leads clockwise, DT leads anticlockwise) with ~1 ms between transitions; ideal contacts without bounce.',
+    params: { degreesPerDetent: 18 },
+    controls: [{ kind: 'rotary', input: 'rotate', center: { x: 36.4, y: 28.6 }, radius: 27, detents: 20, pressInput: 'pressed' }],
+    indicators: [{ kind: 'readout', value: '_detents', label: 'position' }],
+  }),
   wks('wokwi-dip-switch-8', {
     type: 'evlab.dip-switch-8',
     name: 'DIP Switch (8)',
@@ -566,9 +684,42 @@ export const sensors: ComponentDefinition[] = [
     params: { pairs: Array.from({ length: 8 }, (_, i) => [`${i + 1}a`, `${i + 1}b`]) },
     controls: [{ kind: 'keys', keys: Array.from({ length: 8 }, (_, i) => ({ id: `${i + 1}`, label: `Switch ${i + 1}`, x: 3.6 + i * 9.6, y: 12, w: 9, h: 30, prop: `sw${i + 1}` })) }],
   }, 'passive'),
-  wk('wokwi-membrane-keypad', { type: 'evlab.keypad-4x4', name: 'Membrane Keypad 4×4', category: 'Input', subcategory: 'Keypads', tags: ['keypad', 'matrix', 'membrane', '4x4'], summary: '16-key matrix keypad (4 rows × 4 columns).' }, 'passive'),
+  wks('wokwi-membrane-keypad', {
+    type: 'evlab.keypad-4x4',
+    name: 'Membrane Keypad 4×4',
+    category: 'Input',
+    subcategory: 'Keypads',
+    tags: ['keypad', 'matrix', 'membrane', '4x4'],
+    summary: '16-key matrix keypad: a key connects its row (R1–R4) to its column (C1–C4). Use the Keypad library. Click keys while simulating.',
+    attrs: { connector: true },
+    size: { width: 265.8, height: 343.9 },
+    model: 'keypad-matrix',
+    support: 'full',
+    simNotes: 'Each key is an ideal contact between its row and column lines (any number of keys at once); bounce is not modelled.',
+    params: { rows: ['R1', 'R2', 'R3', 'R4'], cols: ['C1', 'C2', 'C3', 'C4'], keys: KEYPAD_LABELS },
+    controls: [
+      {
+        kind: 'keys',
+        pressedKey: '_pressed',
+        keys: KEYPAD_LABELS.flatMap((row, r) => row.map((k, c) => ({ id: k, label: `Key ${k}`, x: [7, 22, 37, 52][c] * MM, y: [10.7, 25, 39.3, 53.6][r] * MM, w: 11.2 * MM, h: 11 * MM }))),
+      },
+    ],
+  }, 'passive'),
   wk('wokwi-rotary-dialer', { type: 'evlab.rotary-dialer', name: 'Rotary Dialer', category: 'Input', subcategory: 'Switches', tags: ['rotary', 'dialer', 'telephone', 'pulse'], summary: 'Telephone rotary dial generating pulses.' }),
-  wk('wokwi-ds1307', { type: 'evlab.ds1307', name: 'DS1307 RTC Module', category: 'Communication', subcategory: 'I2C Devices', tags: ['rtc', 'ds1307', 'clock', 'i2c', 'time'], summary: 'Real-time clock with battery backup (I2C 0x68).', notes: 'I2C register model planned.' }),
+  wks('wokwi-ds1307', {
+    type: 'evlab.ds1307',
+    name: 'DS1307 RTC Module',
+    category: 'Communication',
+    subcategory: 'I2C Devices',
+    tags: ['rtc', 'ds1307', 'clock', 'i2c', 'time', 'rtclib'],
+    summary: 'Real-time clock (I2C 0x68) with battery backup. Uno: SDA → A4, SCL → A5. Works with RTClib; time runs with the simulation clock.',
+    pins: wokwiPins('wokwi-ds1307', 'io', { '5V': 'passive', GND: 'ground', SQW: 'output' }, { SDA: { signals: ['i2c:SDA'], required: true }, SCL: { signals: ['i2c:SCL'], required: true }, '5V': { required: true } }),
+    properties: [{ key: 'startTime', label: 'Start time (blank = now)', type: 'string', default: '', description: 'Date and time the clock shows when the simulation starts, e.g. 2025-12-31T23:59:50. Blank: the computer clock.' }],
+    model: 'ds1307',
+    support: 'partial',
+    simNotes: 'BCD time/date registers (12/24-hour, CH halt bit) advance with simulation time; 56 bytes of RAM. The SQW output is not modelled.',
+    indicators: [{ kind: 'readout', value: '_time' }],
+  }),
   wk('wokwi-microsd-card', { type: 'evlab.microsd', name: 'microSD Card Module', category: 'Communication', subcategory: 'SPI Devices', tags: ['sd card', 'microsd', 'spi', 'storage'], summary: 'microSD card in SPI mode.', notes: 'SD SPI protocol + FAT image planned.' }),
 ];
 
@@ -587,12 +738,90 @@ export const actuators: ComponentDefinition[] = [
     simNotes: 'Decodes pulse width to angle (Servo library calibration) and moves at ~600°/s. Load, torque and supply current are not modelled.',
     indicators: [{ kind: 'readout', value: 'angle', unit: '°', digits: 3, anchor: 'top' }],
   }),
-  wk('wokwi-stepper-motor', { type: 'evlab.stepper', name: 'Stepper Motor (NEMA 17)', category: 'Actuators', subcategory: 'Motors', tags: ['stepper', 'nema17', 'bipolar', 'motor'], designator: 'M', summary: 'Bipolar stepper motor, 200 steps/rev.' }),
+  wks('wokwi-stepper-motor', {
+    type: 'evlab.stepper',
+    name: 'Stepper Motor (NEMA 17)',
+    category: 'Actuators',
+    subcategory: 'Motors',
+    tags: ['stepper', 'nema17', 'bipolar', 'motor'],
+    designator: 'M',
+    summary: 'Bipolar stepper motor, 200 steps/rev (1.8°). Drive coil A (A+/A−) and coil B (B+/B−) from an A4988 or an L298N.',
+    pins: wokwiPins('wokwi-stepper-motor', 'passive'),
+    properties: [{ key: 'coilResistance', label: 'Coil resistance', type: 'number', default: 10, unit: 'Ω', min: 0.5, step: 0.5 }],
+    model: 'bipolar-stepper',
+    support: 'partial',
+    simNotes: 'Resistive coils; the rotor follows the electrical angle of the coil voltages (full, half and microsteps). Torque, inertia and missed steps are not modelled.',
+    params: { stepsPerRev: 200 },
+    indicators: [{ kind: 'readout', value: '_steps', label: 'steps' }],
+  }),
   wk('wokwi-biaxial-stepper', { type: 'evlab.biaxial-stepper', name: 'Biaxial Stepper Motor', category: 'Actuators', subcategory: 'Motors', tags: ['stepper', 'biaxial', 'clock'], designator: 'M', summary: 'Two concentric stepper motors (e.g. clock hands).' }),
-  mod({ type: 'evlab.dc-motor', name: 'DC Motor', category: 'Actuators', subcategory: 'Motors', tags: ['dc motor', 'motor', 'brushed'], designator: 'M', summary: 'Brushed DC motor.', pins: ['+', '-'], pcb: '#9e9e9e', notes: 'Electromechanical model (R + back-EMF) planned.' }),
-  mod({ type: 'evlab.28byj48', name: '28BYJ-48 Stepper + ULN2003', category: 'Actuators', subcategory: 'Motors', tags: ['28byj-48', 'stepper', 'uln2003', 'unipolar'], designator: 'M', summary: 'Geared unipolar stepper with ULN2003 driver board.', pins: ['IN1', 'IN2', 'IN3', 'IN4', '-', '+'], pcb: '#1b5e20' }),
-  mod({ type: 'evlab.a4988', name: 'A4988 Stepper Driver', category: 'Actuators', subcategory: 'Motor Drivers', tags: ['a4988', 'stepper driver', 'step', 'dir'], summary: 'Microstepping bipolar stepper driver (STEP/DIR).', pins: ['EN', 'MS1', 'MS2', 'MS3', 'RST', 'SLP', 'STEP', 'DIR'], edge: 'left', pcb: '#2e7d32', height: 10, width: 8 }),
-  mod({ type: 'evlab.l298n', name: 'L298N Motor Driver', category: 'Actuators', subcategory: 'Motor Drivers', tags: ['l298n', 'h-bridge', 'motor driver', 'dual'], summary: 'Dual H-bridge for two DC motors or one stepper.', pins: ['ENA', 'IN1', 'IN2', 'IN3', 'IN4', 'ENB', '12V', G, '5V'], pcb: '#c62828', chip: 'L298N' }),
+  simulated(mod({ type: 'evlab.dc-motor', name: 'DC Motor', category: 'Actuators', subcategory: 'Motors', tags: ['dc motor', 'motor', 'brushed'], designator: 'M', summary: 'Brushed DC motor. Never drive it from an I/O pin directly: use a transistor, MOSFET or an H-bridge such as the L298N.', pins: [{ id: '+', kind: 'passive' }, { id: '-', kind: 'passive' }], pcb: '#9e9e9e', width: 7, height: 7 }), {
+    properties: [
+      { key: 'resistance', label: 'Winding resistance', type: 'number', default: 10, unit: 'Ω', min: 0.5, step: 0.5 },
+      { key: 'rpmPerVolt', label: 'Speed constant', type: 'number', default: 30, unit: 'rpm/V', min: 1, step: 1 },
+    ],
+    simulation: { support: 'partial', model: 'dc-motor', notes: 'Winding resistance; speed follows the average terminal voltage (so PWM controls it) with a 150 ms time constant; reverses with polarity. Back-EMF, load and stall current are not modelled.' },
+    indicators: [
+      { kind: 'rotor', value: '_angle', at: { x: 33.6, y: 30 }, radius: 16 },
+      { kind: 'readout', value: '_rpm', unit: 'rpm' },
+    ],
+  }),
+  simulated(mod({ type: 'evlab.28byj48', name: '28BYJ-48 Stepper + ULN2003', category: 'Actuators', subcategory: 'Motors', tags: ['28byj-48', 'stepper', 'uln2003', 'unipolar'], designator: 'M', summary: 'Geared unipolar stepper (2048 full steps per output turn) on a ULN2003 driver board. IN1–IN4 HIGH energise coils A–D; power + / − from 5 V. Works with the Stepper library (pins 1, 3, 2, 4 order).', pins: ['IN1', 'IN2', 'IN3', 'IN4', { id: '-', kind: 'ground' }, { id: '+', kind: 'passive' }], pcb: '#1b5e20', width: 9, height: 7 }), {
+    simulation: { support: 'partial', model: 'unipolar-stepper', notes: 'The output shaft follows the electrical angle of the energised coils (wave, full and half stepping), 1:64 gearing. Torque and missed steps are not modelled.' },
+    params: { stepsPerRev: 2048 },
+    indicators: [
+      { kind: 'rotor', value: '_angle', at: { x: 43.2, y: 30 }, radius: 16 },
+      { kind: 'readout', value: '_phases', label: 'coils' },
+    ],
+  }),
+  simulated(
+    (() => {
+      const v = headerModule({
+        title: 'A4988',
+        pcb: '#2e7d32',
+        left: ['EN', 'MS1', 'MS2', 'MS3', 'RST', 'SLP', 'STEP', 'DIR'],
+        right: [{ id: 'VMOT', kind: 'passive' }, G, { id: '2B', kind: 'output' }, { id: '2A', kind: 'output' }, { id: '1A', kind: 'output' }, { id: '1B', kind: 'output' }, { id: 'VDD', kind: 'passive' }, { id: 'GND.2', kind: 'ground', label: 'GND' }],
+        chip: { label: 'A4988', w: 22, h: 22 },
+        widthPitches: 8,
+        heightPitches: 10,
+        fallback: 'input',
+      });
+      return visualOnly({ type: 'evlab.a4988', name: 'A4988 Stepper Driver', category: 'Actuators', subcategory: 'Motor Drivers', tags: ['a4988', 'stepper driver', 'step', 'dir', 'microstepping'], designator: 'U', visual: { kind: 'svg', svg: v.svg }, size: v.size, pins: v.pins, internalConnections: [['GND', 'GND.2']], docs: { summary: 'STEP/DIR stepper driver: each STEP rising edge moves one (micro)step in the DIR direction. MS1–MS3 select full…1/16 steps. EN is active LOW; RST and SLP must be HIGH (tie them together). VDD = logic 5 V, VMOT = motor supply.' } });
+    })(),
+    {
+      simulation: { support: 'partial', model: 'stepper-driver', notes: 'Microstep table (full to 1/16) with sine/cosine coil outputs around half the motor supply; current regulation, decay modes and thermal limits are not modelled.' },
+      indicators: [{ kind: 'readout', value: '_microsteps', label: 'microsteps 1/' }],
+    },
+  ),
+  simulated(
+    (() => {
+      const v = headerModule({
+        title: 'L298N',
+        pcb: '#c62828',
+        bottom: ['ENA', 'IN1', 'IN2', 'IN3', 'IN4', 'ENB'],
+        left: [{ id: 'OUT1', kind: 'output' }, { id: 'OUT2', kind: 'output' }],
+        right: [{ id: 'OUT3', kind: 'output' }, { id: 'OUT4', kind: 'output' }],
+        top: [{ id: '12V', kind: 'passive', label: '+12V' }, G, { id: '5V', kind: 'passive', label: '+5V' }],
+        chip: { label: 'L298N', w: 30, h: 20 },
+        widthPitches: 10,
+        heightPitches: 9,
+        fallback: 'input',
+      });
+      return visualOnly({ type: 'evlab.l298n', name: 'L298N Motor Driver', category: 'Actuators', subcategory: 'Motor Drivers', tags: ['l298n', 'h-bridge', 'motor driver', 'dual'], designator: 'U', visual: { kind: 'svg', svg: v.svg }, size: v.size, pins: v.pins, docs: { summary: 'Dual H-bridge for two DC motors or one stepper. IN1/IN2 set OUT1/OUT2 (motor A), IN3/IN4 set OUT3/OUT4 (motor B); PWM on ENA/ENB sets the speed (leave ENA/ENB unconnected = jumper fitted = full speed). The +5V pin outputs 5 V when +12V is above ~7 V.' } });
+    })(),
+    {
+      simulation: { support: 'partial', model: 'h-bridge', notes: 'Outputs switch to the motor supply or GND (≈1 Ω each, approximating the saturation drop) while enabled and float when disabled; the load current is drawn from the motor supply. On-board 5 V regulator. Current limits and heating are not modelled.' },
+      params: {
+        vs: '12V',
+        logic: '5V',
+        bridges: [
+          { en: 'ENA', in: ['IN1', 'IN2'], out: ['OUT1', 'OUT2'] },
+          { en: 'ENB', in: ['IN3', 'IN4'], out: ['OUT3', 'OUT4'] },
+        ],
+      },
+      indicators: [{ kind: 'readout', value: '_outputs', label: 'OUT1–4' }],
+    },
+  ),
   wks('wokwi-buzzer', {
     type: 'evlab.buzzer',
     name: 'Piezo Buzzer',

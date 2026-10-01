@@ -93,7 +93,8 @@ function clearCommands(el: AnyElement) {
   const off = { r: 0, g: 0, b: 0 };
   if (setPixel && el.tagName === 'WOKWI-NEOPIXEL-MATRIX') {
     for (let r = 0; r < Number(el.rows ?? 0); r++) for (let c = 0; c < Number(el.cols ?? 0); c++) setPixel.call(el, r, c, off);
-  } else if (setPixel) for (let i = 0; i < Number(el.pixels ?? 0); i++) setPixel.call(el, i, off);
+  } else if (typeof el.reset === 'function') (el.reset as () => void).call(el);
+  else if (setPixel) for (let i = 0; i < Number(el.pixels ?? 0); i++) setPixel.call(el, i, off);
   const img = el.imageData as ImageData | undefined;
   if (img) {
     img.data.fill(0);

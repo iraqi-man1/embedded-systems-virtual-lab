@@ -4,3 +4,5 @@ import './basic';
 import './semiconductors';
 import './devices';
 import './mcuBoard';
+import './peripherals';
+import './motors';
