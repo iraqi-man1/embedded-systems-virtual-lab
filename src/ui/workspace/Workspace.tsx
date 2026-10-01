@@ -9,14 +9,14 @@ import { GRID } from '../../core/model/component';
 import { componentBounds, rectsIntersect, snap, snapComponentPosition } from '../../core/circuit/geometry';
 import { lookup, registry } from '../../app/registry';
 import { useEditor } from '../../state/editor';
-import { createInstance, createWire, useProject } from '../../state/project';
+import { coalescedEdit, createInstance, createWire, useProject } from '../../state/project';
 import { sendInput, useSim } from '../../state/sim';
 import { useNetlist } from '../../state/derived';
 import { formatEngineering } from '../../core/model/units';
 import { ComponentView } from './ComponentView';
 import { WireLayer, type Overlay } from './WireLayer';
 import { hitPin, nearestSegment, pinIndex, pinPosition, wirePolyline, type IndexedPin } from './geometry';
-import { addComponentAt, fitView, zoomBy } from './actions';
+import { addComponentAt, fitView, withCarried, zoomBy } from './actions';
 import { assignProbe, probeMarkers } from '../instruments/probes';
 import { Icon } from '../common/Icon';
 import { ContextMenu } from '../common/Menu';
@@ -69,6 +69,14 @@ export function Workspace() {
 
   const index = pinIndex(circuit);
   const simulating = simState !== 'stopped';
+  // Breadboards (socket-only parts) are drawn first so parts plugged into them stay visible and clickable.
+  const renderOrder = useMemo(() => {
+    const isBoard = (type: string) => {
+      const def = lookup(type);
+      return !!def && def.pins.length > 0 && def.pins.every((p) => p.kind === 'socket');
+    };
+    return [...circuit.components.filter((c) => isBoard(c.type)), ...circuit.components.filter((c) => !isBoard(c.type))];
+  }, [circuit.components]);
   const selectedSet = useMemo(() => new Set(selectedComponents), [selectedComponents]);
 
   const toWorld = useCallback(
@@ -243,8 +251,10 @@ export function Workspace() {
         sel = [compId];
         ed.select(sel);
       }
+      // Parts plugged into a moved breadboard travel with it.
+      const moving = withCarried(sel);
       const orig = new Map<string, Point>();
-      for (const c of circuit.components) if (sel.includes(c.id)) orig.set(c.id, { x: c.x, y: c.y });
+      for (const c of circuit.components) if (moving.has(c.id)) orig.set(c.id, { x: c.x, y: c.y });
       const wires = new Map<string, Point[]>();
       for (const w of circuit.wires) {
         if (orig.has(w.from.componentId) && orig.has(w.to.componentId)) wires.set(w.id, w.points.map((p) => ({ ...p })));
@@ -444,7 +454,8 @@ export function Workspace() {
           const prop = def.interaction.property ?? 'position';
           const v = Math.max(0, Math.min(1, Number(inst.props[prop] ?? 0.5) - Math.sign(e.deltaY) * 0.02));
           sendInput(inst.id, def.interaction.input ?? 'value', v);
-          useProject.getState().edit((d) => {
+          // A run of wheel ticks is one undo step.
+          coalescedEdit((d) => {
             const i = d.components.find((c) => c.id === inst.id);
             if (i) i.props[prop] = Math.round(v * 1000) / 1000;
           });
@@ -612,7 +623,7 @@ export function Workspace() {
       onDrop={onDrop}
     >
       <div className="world" style={{ transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})` }}>
-        {circuit.components.map((c) => {
+        {renderOrder.map((c) => {
           const def = lookup(c.type);
           return def ? <ComponentView key={c.id} inst={c} def={def} selected={selectedSet.has(c.id)} /> : null;
         })}

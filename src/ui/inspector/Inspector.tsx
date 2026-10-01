@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import type { ComponentInstance, PropValue, Wire } from '../../core/model/circuit';
+import type { CircuitDocument, ComponentInstance, PropValue, Wire } from '../../core/model/circuit';
 import { WIRE_COLORS } from '../../core/model/circuit';
 import type { ComponentDefinition, PropertyDefinition } from '../../core/model/component';
 import { formatEngineering, parseEngineering } from '../../core/model/units';
 import { lookup, registry } from '../../app/registry';
 import { useNetlist, useErc } from '../../state/derived';
 import { useEditor } from '../../state/editor';
-import { useProject } from '../../state/project';
+import { coalescedEdit, useProject } from '../../state/project';
 import { sendInput, useSim } from '../../state/sim';
 import { Icon } from '../common/Icon';
 import { clearWirePoints, deleteSelection, flipSelection, rotateSelection, setNetWireColor, setWireColor, autoRouteWires } from '../workspace/actions';
@@ -19,11 +19,14 @@ function PropertyField({ inst, def, p }: { inst: ComponentInstance; def: Compone
   const simulating = useSim((s) => s.state !== 'stopped');
   const [text, setText] = useState(String(value));
   useEffect(() => setText(String(value)), [value]);
-  const commit = (v: PropValue) => {
-    useProject.getState().edit((c) => {
+  const commit = (v: PropValue, continuous = false) => {
+    const apply = (c: CircuitDocument) => {
       const i = c.components.find((x) => x.id === inst.id);
       if (i) i.props[p.key] = v;
-    });
+    };
+    // Slider steps (drag or arrow keys) coalesce into one undo step.
+    if (continuous) coalescedEdit(apply);
+    else useProject.getState().edit(apply);
     // Interactive props also drive the model input directly for instant feedback.
     if (simulating && def.interaction?.property === p.key) sendInput(inst.id, def.interaction.input ?? 'value', v);
   };
@@ -51,7 +54,7 @@ function PropertyField({ inst, def, p }: { inst: ComponentInstance; def: Compone
           value={Number(value)}
           onPointerDown={() => useProject.getState().begin()}
           onPointerUp={() => useProject.getState().end()}
-          onChange={(e) => commit(Number(e.target.value))}
+          onChange={(e) => commit(Number(e.target.value), true)}
         />
         <span style={{ fontFamily: 'var(--font-mono)', minWidth: 44, textAlign: 'right' }}>
           {Number(value).toFixed(p.step && p.step < 0.1 ? 2 : 1)}

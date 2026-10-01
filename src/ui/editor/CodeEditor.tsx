@@ -4,6 +4,7 @@ import { lookup } from '../../app/registry';
 import { useEditor } from '../../state/editor';
 import { useProject } from '../../state/project';
 import { compileFirmware, findTargetBoard, useSim } from '../../state/sim';
+import { confirmDialog, promptText } from '../common/Dialog';
 import { Icon } from '../common/Icon';
 
 const uriFor = (name: string) => monaco.Uri.parse(`file:///sketch/${name}`);
@@ -113,13 +114,21 @@ export function CodeEditor() {
     }, 0);
   }, [revealLine, files]);
 
-  const addFile = () => {
-    const name = prompt('New file name (e.g. helpers.h, utils.cpp):', 'helpers.h');
+  const addFile = async () => {
+    const existing = new Set(useProject.getState().project.firmware.files.map((f) => f.name));
+    const name = await promptText({
+      title: 'New source file',
+      label: 'File name',
+      initial: 'helpers.h',
+      confirmLabel: 'Add file',
+      validate: (v) =>
+        !/^[A-Za-z0-9_-]+\.(h|hpp|c|cpp)$/.test(v.trim())
+          ? 'Use letters, digits, - or _ and end in .h, .hpp, .c or .cpp'
+          : existing.has(v.trim())
+            ? 'A file with this name already exists'
+            : null,
+    });
     if (!name) return;
-    if (!/^[A-Za-z0-9_-]+\.(h|hpp|c|cpp)$/.test(name)) {
-      useEditor.getState().notify('Use a simple name ending in .h, .hpp, .c or .cpp', 'warning');
-      return;
-    }
     useProject.getState().addFile(name);
     setActive(name);
   };
@@ -147,9 +156,10 @@ export function CodeEditor() {
               <span
                 className="x"
                 title="Remove file"
-                onClick={(e) => {
+                onClick={async (e) => {
                   e.stopPropagation();
-                  if (confirm(`Remove ${f.name}?`)) useProject.getState().removeFile(f.name);
+                  if (await confirmDialog({ title: `Remove ${f.name}?`, message: 'The file and its contents are removed from the project.', confirmLabel: 'Remove', danger: true }))
+                    useProject.getState().removeFile(f.name);
                 }}
               >
                 <Icon name="x" size={12} />
@@ -157,7 +167,7 @@ export function CodeEditor() {
             )}
           </div>
         ))}
-        <button className="icon-btn" style={{ alignSelf: 'center', marginLeft: 4 }} title="Add file" onClick={addFile}>
+        <button className="icon-btn" style={{ alignSelf: 'center', marginLeft: 4 }} title="Add file" onClick={() => void addFile()}>
           <Icon name="plus" />
         </button>
       </div>

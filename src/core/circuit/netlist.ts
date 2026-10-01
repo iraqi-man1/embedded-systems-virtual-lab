@@ -208,3 +208,21 @@ function nameNet(
   }
   return fallback || `N${net.id}`;
 }
+
+/**
+ * Components that travel with `ids` when they are moved: everything plugged
+ * into them (legs inserted into breadboard holes), transitively.
+ */
+export function carriedComponents(netlist: Pick<Netlist, 'insertions'>, ids: Iterable<string>): Set<string> {
+  const out = new Set(ids);
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const ins of netlist.insertions) {
+      if (out.has(ins.socket.componentId) && !out.has(ins.pin.componentId)) {
+        out.add(ins.pin.componentId);
+        grew = true;
+      }
+    }
+  }
+  return out;
+}

@@ -6,6 +6,7 @@ import { nanoid } from 'nanoid';
 import { WIRE_COLORS, type CircuitDocument, type ComponentInstance, type Rotation, type Wire } from '../../core/model/circuit';
 import { GRID } from '../../core/model/component';
 import { componentBounds, snapComponentPosition } from '../../core/circuit/geometry';
+import { carriedComponents } from '../../core/circuit/netlist';
 import { lookup, registry } from '../../app/registry';
 import { getNetlist } from '../../state/derived';
 import { useEditor } from '../../state/editor';
@@ -151,8 +152,17 @@ function pasteDocument(doc: CircuitDocument, at?: { x: number; y: number }) {
   );
 }
 
+/**
+ * The selected components plus everything plugged into them: moving a
+ * breadboard (or any part with sockets) carries the parts inserted into it,
+ * transitively, so they stay connected.
+ */
+export function withCarried(ids: Iterable<string>): Set<string> {
+  return carriedComponents(getNetlist(proj().project.circuit), ids);
+}
+
 export function nudgeSelection(dx: number, dy: number) {
-  const ids = new Set(ed().selectedComponents);
+  const ids = withCarried(ed().selectedComponents);
   if (!ids.size) return;
   proj().edit((c) => {
     for (const inst of c.components) if (ids.has(inst.id)) {
@@ -202,12 +212,34 @@ export function alignSelection(mode: Align) {
       moves.set(inst.id, { dx, dy });
     }
   }
+  // Effective (snapped) moves, then parts plugged into moved boards follow their board.
+  const effective = new Map<string, { dx: number; dy: number }>();
+  for (const inst of c.components) {
+    const m = moves.get(inst.id);
+    if (!m) continue;
+    const p = snapComponentPosition(inst, lookup(inst.type)!, inst.x + m.dx, inst.y + m.dy);
+    effective.set(inst.id, { dx: p.x - inst.x, dy: p.y - inst.y });
+  }
+  for (const id of carriedComponents(getNetlist(c), effective.keys())) {
+    if (effective.has(id)) continue;
+    // Plugged-in parts follow the board they sit in.
+    const board = getNetlist(c).insertions.find((i) => i.pin.componentId === id && effective.has(i.socket.componentId));
+    if (board) effective.set(id, effective.get(board.socket.componentId)!);
+  }
   proj().edit((doc) => {
     for (const inst of doc.components) {
-      const m = moves.get(inst.id);
+      const m = effective.get(inst.id);
       if (!m) continue;
-      const def = lookup(inst.type)!;
-      Object.assign(inst, snapComponentPosition(inst as ComponentInstance, def, inst.x + m.dx, inst.y + m.dy));
+      inst.x += m.dx;
+      inst.y += m.dy;
+    }
+    for (const w of doc.wires) {
+      const a = effective.get(w.from.componentId);
+      const b = effective.get(w.to.componentId);
+      if (a && b && a.dx === b.dx && a.dy === b.dy) for (const p of w.points) {
+        p.x += a.dx;
+        p.y += a.dy;
+      }
     }
   });
 }

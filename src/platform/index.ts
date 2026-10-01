@@ -87,6 +87,48 @@ export const storage = {
   },
 };
 
+// ------------------------------------------------------------------- autosave
+export interface AutosaveMeta {
+  /** File the project was opened from / last saved to (null = never saved). */
+  sourcePath: string | null;
+  /** ISO timestamp. */
+  savedAt: string;
+  name: string;
+}
+
+const LS_AUTOSAVE = 'evlab.autosave.project';
+const LS_AUTOSAVE_META = 'evlab.autosave.meta';
+
+/** Crash-recovery copy of the open project (app-data folder; localStorage in the dev browser). */
+export const autosaveStore = {
+  async write(text: string, meta: AutosaveMeta): Promise<void> {
+    if (isTauri) return invoke('autosave_write', { contents: text, meta: JSON.stringify(meta) });
+    localStorage.setItem(LS_AUTOSAVE, text);
+    localStorage.setItem(LS_AUTOSAVE_META, JSON.stringify(meta));
+  },
+  async read(): Promise<{ text: string; meta: Partial<AutosaveMeta> } | null> {
+    let raw: { contents: string; meta: string } | null;
+    if (isTauri) raw = await invoke<{ contents: string; meta: string } | null>('autosave_read');
+    else {
+      const contents = localStorage.getItem(LS_AUTOSAVE);
+      raw = contents ? { contents, meta: localStorage.getItem(LS_AUTOSAVE_META) ?? '{}' } : null;
+    }
+    if (!raw) return null;
+    let meta: Partial<AutosaveMeta> = {};
+    try {
+      meta = JSON.parse(raw.meta);
+    } catch {
+      /* metadata is optional */
+    }
+    return { text: raw.contents, meta };
+  },
+  async clear(): Promise<void> {
+    if (isTauri) return invoke('autosave_clear');
+    localStorage.removeItem(LS_AUTOSAVE);
+    localStorage.removeItem(LS_AUTOSAVE_META);
+  },
+};
+
 // ------------------------------------------------------------------- packages
 export const packages = {
   async discover(): Promise<{ path: string; manifest: string }[]> {

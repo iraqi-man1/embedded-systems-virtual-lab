@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { useEditor } from '../../state/editor';
 import { useProject } from '../../state/project';
 import { commands } from '../commands';
@@ -68,9 +67,6 @@ export function MenuBar() {
   const name = useProject((s) => s.project.meta.name);
   const dirty = useProject((s) => s.dirty);
   const path = useProject((s) => s.filePath);
-  useEffect(() => {
-    document.title = `${dirty ? '● ' : ''}${name} — Embedded Systems Virtual Lab`;
-  }, [name, dirty]);
   return (
     <div className="menubar">
       <div className="brand">

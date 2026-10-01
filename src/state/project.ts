@@ -123,6 +123,36 @@ export const useProject = create<ProjectState>((set, get) => ({
   },
 }));
 
+// ------------------------------------------------- coalesced interactions
+let coalesce: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Edit from a continuous interaction without discrete start/end (mouse-wheel
+ * knob turns, keyboard slider steps): edits arriving within `ms` of each other
+ * form one undo step.
+ */
+export function coalescedEdit(fn: (c: Draft<CircuitDocument>) => void, ms = 500) {
+  const p = useProject.getState();
+  if (!coalesce) {
+    if (p.txBase) {
+      // Already inside another gesture (e.g. a drag): it owns the undo step.
+      p.edit(fn);
+      return;
+    }
+    p.begin();
+  } else clearTimeout(coalesce);
+  coalesce = setTimeout(flushCoalesced, ms);
+  p.edit(fn);
+}
+
+/** Closes a pending coalesced undo step now (before undo/redo). */
+export function flushCoalesced() {
+  if (!coalesce) return;
+  clearTimeout(coalesce);
+  coalesce = null;
+  useProject.getState().end();
+}
+
 // ---------------------------------------------------------------- helpers
 
 /** Next free reference designator for a prefix (R1, R2, ...). */

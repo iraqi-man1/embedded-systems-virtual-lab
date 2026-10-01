@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
+import { installLifecycle } from '../app/lifecycle';
 import { useEditor } from '../state/editor';
-import { useProject } from '../state/project';
 import { refreshToolchain } from '../state/sim';
 import { installShortcuts } from './commands';
 import { CodeEditor } from './editor/CodeEditor';
 import { Inspector } from './inspector/Inspector';
 import { BottomDock } from './instruments/BottomDock';
 import { LibraryPanel } from './library/LibraryPanel';
+import { DialogHost } from './common/Dialog';
 import { TooltipProvider } from './common/Tooltip';
 import { Dialogs, Toasts } from './shell/Dialogs';
 import { MenuBar } from './shell/MenuBar';
@@ -67,17 +68,11 @@ export function App() {
 
   useEffect(() => {
     const off = installShortcuts();
+    const offLifecycle = installLifecycle();
     void refreshToolchain();
-    const beforeUnload = (e: BeforeUnloadEvent) => {
-      if (useProject.getState().dirty) {
-        e.preventDefault();
-        e.returnValue = '';
-      }
-    };
-    window.addEventListener('beforeunload', beforeUnload);
     return () => {
       off();
-      window.removeEventListener('beforeunload', beforeUnload);
+      offLifecycle();
     };
   }, []);
 
@@ -127,6 +122,7 @@ export function App() {
         </div>
         <StatusBar />
         <Dialogs />
+        <DialogHost />
         <Toasts />
       </div>
     </TooltipProvider>

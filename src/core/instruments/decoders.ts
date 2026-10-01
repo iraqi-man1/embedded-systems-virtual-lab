@@ -3,6 +3,18 @@
  * (interleaved [t, v] samples, v ∈ {0, 1, 0.5 = floating}).
  */
 
+/**
+ * Bytes to text, one character per byte (as `String.fromCharCode(...bytes)`),
+ * in chunks so a large burst (max-speed serial output) cannot overflow the stack.
+ */
+export function bytesToText(bytes: ArrayLike<number>): string {
+  const CHUNK = 8192;
+  if (bytes.length <= CHUNK) return String.fromCharCode.apply(null, Array.from(bytes));
+  const parts: string[] = [];
+  for (let i = 0; i < bytes.length; i += CHUNK) parts.push(String.fromCharCode.apply(null, Array.prototype.slice.call(bytes, i, i + CHUNK)));
+  return parts.join('');
+}
+
 export interface DecodedFrame {
   start: number;
   end: number;

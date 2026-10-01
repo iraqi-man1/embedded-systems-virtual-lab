@@ -5,23 +5,14 @@ import { useEditor } from '../../state/editor';
 import { refreshToolchain, useSim } from '../../state/sim';
 import { registry } from '../../app/registry';
 import { commands } from '../commands';
+import { ModalFrame } from '../common/Dialog';
 import { Icon } from '../common/Icon';
 
 function Modal({ title, small, children, footer }: { title: string; small?: boolean; children: React.ReactNode; footer?: React.ReactNode }) {
-  const close = () => useEditor.getState().set({ dialog: null });
   return (
-    <div className="modal-back" onMouseDown={(e) => e.target === e.currentTarget && close()}>
-      <div className={`modal${small ? ' small' : ''}`}>
-        <div className="modal-head">
-          <h2>{title}</h2>
-          <button className="icon-btn" onClick={close}>
-            <Icon name="x" />
-          </button>
-        </div>
-        <div className="modal-body">{children}</div>
-        {footer && <div className="modal-foot">{footer}</div>}
-      </div>
-    </div>
+    <ModalFrame title={title} small={small} footer={footer} onClose={() => useEditor.getState().set({ dialog: null })}>
+      {children}
+    </ModalFrame>
   );
 }
 

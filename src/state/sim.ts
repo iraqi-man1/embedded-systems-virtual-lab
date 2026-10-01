@@ -8,6 +8,7 @@ import type { ComponentInstance, PropValue } from '../core/model/circuit';
 import type { Project } from '../core/project/schema';
 import { buildSimSetup, type ProbeRequest } from '../core/sim/setup';
 import type { McuStatus, SimCommand, SimEvent, SimRunState, StepKind } from '../core/sim/types';
+import { bytesToText } from '../core/instruments/decoders';
 import { compileRequestFor, type CompileDiagnostic, type ToolchainStatus } from '../core/toolchain/types';
 import { lookup } from '../app/registry';
 import { toolchain } from '../platform';
@@ -87,7 +88,7 @@ function handleEvent(ev: SimEvent) {
       if (ev.serial.length) {
         serial = { ...serial };
         for (const s of ev.serial) {
-          const text = String.fromCharCode(...s.data);
+          const text = bytesToText(s.data);
           let t = (serial[s.componentId] ?? '') + text;
           if (t.length > SERIAL_CAP) t = t.slice(t.length - SERIAL_CAP * 0.8);
           serial[s.componentId] = t;
