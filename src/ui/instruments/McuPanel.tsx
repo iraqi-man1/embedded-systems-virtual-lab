@@ -8,6 +8,7 @@ import type { McuStatus } from '../../core/sim/types';
 import { useNetlist } from '../../state/derived';
 import { useProject } from '../../state/project';
 import { findTargetBoard, useSim } from '../../state/sim';
+import { Tip } from '../common/Tooltip';
 
 const SREG_FLAGS = ['I', 'T', 'H', 'S', 'V', 'N', 'Z', 'C'];
 const SREG_NAMES: Record<string, string> = {
@@ -50,10 +51,12 @@ function Registers({ r }: { r: number[] }) {
   return (
     <div className="mcu-regs">
       {r.map((v, i) => (
-        <div key={i} className={`mcu-reg${changed[i] ? ' changed' : ''}`} title={`R${i} = ${v} (${hex(v, 2)})`}>
-          <span className="name">R{i}</span>
-          <span className="mono">{v.toString(16).toUpperCase().padStart(2, '0')}</span>
-        </div>
+        <Tip key={i} content={`R${i} = ${v} (${hex(v, 2)})`} direct>
+          <div className={`mcu-reg${changed[i] ? ' changed' : ''}`}>
+            <span className="name">R{i}</span>
+            <span className="mono">{v.toString(16).toUpperCase().padStart(2, '0')}</span>
+          </div>
+        </Tip>
       ))}
     </div>
   );
@@ -147,9 +150,9 @@ export function McuPanel() {
               <div className="mcu-sreg" aria-label={`SREG ${hex(dbg.sreg, 2)}`}>
                 <span className="k mono">SREG</span>
                 {SREG_FLAGS.map((f, i) => (
-                  <span key={f} className={`flag${dbg.sreg & (0x80 >> i) ? ' on' : ''}`} title={SREG_NAMES[f]}>
-                    {f}
-                  </span>
+                  <Tip key={f} content={`${f}: ${SREG_NAMES[f]}`} direct>
+                    <span className={`flag${dbg.sreg & (0x80 >> i) ? ' on' : ''}`}>{f}</span>
+                  </Tip>
                 ))}
               </div>
             )}

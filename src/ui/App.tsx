@@ -8,7 +8,7 @@ import { Inspector } from './inspector/Inspector';
 import { BottomDock } from './instruments/BottomDock';
 import { LibraryPanel } from './library/LibraryPanel';
 import { DialogHost } from './common/Dialog';
-import { TooltipProvider } from './common/Tooltip';
+import { Tip, TooltipProvider } from './common/Tooltip';
 import { CommandPalette } from './shell/CommandPalette';
 import { Dialogs, Toasts } from './shell/Dialogs';
 import { MenuBar } from './shell/MenuBar';
@@ -38,14 +38,15 @@ function Splitter({ k, dir, invert, min, max, onCollapse }: { k: SizeKey; dir: '
     window.addEventListener('pointerup', up);
   };
   return (
-    <div
-      className={dir === 'v' ? 'splitter-v' : 'splitter-h'}
-      onPointerDown={onPointerDown}
-      onDoubleClick={onCollapse}
-      title="Drag to resize · double-click to hide"
-      role="separator"
-      aria-orientation={dir === 'v' ? 'vertical' : 'horizontal'}
-    />
+    <Tip content="Drag to resize · double-click to hide" side={dir === 'v' ? 'right' : 'top'} delay={900} direct>
+      <div
+        className={dir === 'v' ? 'splitter-v' : 'splitter-h'}
+        onPointerDown={onPointerDown}
+        onDoubleClick={onCollapse}
+        role="separator"
+        aria-orientation={dir === 'v' ? 'vertical' : 'horizontal'}
+      />
+    </Tip>
   );
 }
 

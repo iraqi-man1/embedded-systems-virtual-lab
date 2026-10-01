@@ -69,9 +69,11 @@ export function SerialMonitor() {
             <span className="label mono">0x</span>
           </button>
         </Tip>
-        <label title="Clear the output each time the simulation starts">
-          <input type="checkbox" checked={clearOnRun} onChange={(e) => useEditor.getState().setPrefs({ serialClearOnRun: e.target.checked })} /> Clear on run
-        </label>
+        <Tip content="Clear the output each time the simulation starts" direct>
+          <label>
+            <input type="checkbox" checked={clearOnRun} onChange={(e) => useEditor.getState().setPrefs({ serialClearOnRun: e.target.checked })} /> Clear on run
+          </label>
+        </Tip>
         <label>
           <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} /> Autoscroll
         </label>
@@ -118,7 +120,7 @@ export function SerialMonitor() {
             }
           }}
         />
-        <select className="tb-select" value={ending} onChange={(e) => setEnding(e.target.value as keyof typeof ENDINGS)} title="Line ending">
+        <select className="tb-select" value={ending} onChange={(e) => setEnding(e.target.value as keyof typeof ENDINGS)} aria-label="Line ending">
           <option value="none">No line ending</option>
           <option value="nl">Newline</option>
           <option value="cr">Carriage return</option>

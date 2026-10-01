@@ -3,6 +3,7 @@ import { useEditor } from '../../state/editor';
 import { useProject } from '../../state/project';
 import { commands } from '../commands';
 import { MenuBarMenu, MenuBarRoot, MenuCheckItem, MenuItem, MenuSeparator, SubMenu } from '../common/Menu';
+import { Tip } from '../common/Tooltip';
 import { setZoom } from '../workspace/actions';
 import { AlignItems, SpeedItems, WireColorItems } from './Toolbar';
 
@@ -10,7 +11,8 @@ type Entry = string | '-' | { sub: string; icon?: string; render: () => React.Re
 
 const ZOOMS = [0.25, 0.5, 0.75, 1, 1.5, 2, 3];
 
-function ZoomItems() {
+/** Zoom presets (View › Zoom and the canvas zoom control). */
+export function ZoomItems() {
   const zoom = useEditor((s) => s.viewport.zoom);
   return (
     <>
@@ -111,11 +113,13 @@ export function MenuBar() {
           </MenuBarMenu>
         ))}
       </MenuBarRoot>
-      <div className="menu-title" title={path ?? 'Not saved yet'}>
-        {name}
-        {dirty ? ' •' : ''}
-        {path ? ` — ${path}` : ' — unsaved'}
-      </div>
+      <Tip content={path ?? 'Not saved yet'} align="end" direct>
+        <div className="menu-title">
+          {name}
+          {dirty ? ' •' : ''}
+          {path ? ` — ${path}` : ' — unsaved'}
+        </div>
+      </Tip>
     </div>
   );
 }

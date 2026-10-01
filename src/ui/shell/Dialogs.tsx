@@ -16,26 +16,66 @@ function Modal({ title, small, children, footer }: { title: string; small?: bool
   );
 }
 
+/** Tags shared by several examples, most common first (the filter chips). */
+const EXAMPLE_TAGS = (() => {
+  const count = new Map<string, number>();
+  for (const ex of EXAMPLES) for (const t of ex.tags) count.set(t, (count.get(t) ?? 0) + 1);
+  return [...count].filter(([, n]) => n > 1).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([t]) => t);
+})();
+
 function ExamplesDialog() {
+  const [query, setQuery] = useState('');
+  const [tag, setTag] = useState<string | null>(null);
+  const q = query.trim().toLowerCase();
+  const shown = EXAMPLES.filter(
+    (ex) => (!tag || ex.tags.includes(tag)) && (!q || [ex.title, ex.summary, ...ex.tags].some((t) => t.toLowerCase().includes(q))),
+  );
   return (
     <Modal title="Examples & Templates">
       <p style={{ marginTop: 0, color: 'var(--text-2)' }}>
         Each example opens a complete project — circuit and firmware. Press <kbd>F5</kbd> to compile and simulate.
       </p>
+      <div className="examples-filter">
+        <div className="search-box">
+          <Icon name="search" />
+          <input autoFocus placeholder="Search examples (e.g. sensor, I2C, PWM)" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search examples" />
+        </div>
+        <span className="count">
+          {shown.length} of {EXAMPLES.length}
+        </span>
+      </div>
+      <div className="chips examples-tags">
+        <button className={`chip${tag === null ? ' active' : ''}`} aria-pressed={tag === null} onClick={() => setTag(null)}>
+          All
+        </button>
+        {EXAMPLE_TAGS.map((t) => (
+          <button key={t} className={`chip${tag === t ? ' active' : ''}`} aria-pressed={tag === t} onClick={() => setTag(tag === t ? null : t)}>
+            {t}
+          </button>
+        ))}
+      </div>
       <div className="examples">
-        {EXAMPLES.map((ex) => (
-          <div key={ex.id} className="example" onClick={() => loadExample(ex.id)}>
+        {shown.map((ex) => (
+          <div
+            key={ex.id}
+            className="example"
+            role="button"
+            tabIndex={0}
+            onClick={() => loadExample(ex.id)}
+            onKeyDown={(e) => e.key === 'Enter' && loadExample(ex.id)}
+          >
             <h4>{ex.title}</h4>
             <p>{ex.summary}</p>
             <div className="tags">
               {ex.tags.map((t) => (
-                <span key={t} className="chip">
+                <span key={t} className={`chip${tag === t ? ' active' : ''}`}>
                   {t}
                 </span>
               ))}
             </div>
           </div>
         ))}
+        {!shown.length && <div className="empty-note">No example matches. Try another word or tag.</div>}
       </div>
     </Modal>
   );

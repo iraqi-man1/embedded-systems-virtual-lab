@@ -107,8 +107,11 @@ const Item = memo(function Item({ def, fav, active }: ItemProps) {
 export function LibraryPanel() {
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
-  const [simOnly, setSimOnly] = useState(false);
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set(['Communication', 'Integrated Circuits', 'Actuators', 'Sensors']));
+  // Category collapse and the simulated-only filter persist between sessions.
+  const simOnly = useEditor((s) => s.librarySimOnly);
+  const setSimOnly = (v: boolean) => useEditor.getState().setPrefs({ librarySimOnly: v });
+  const collapsedList = useEditor((s) => s.libraryCollapsed);
+  const collapsed = useMemo(() => new Set(collapsedList), [collapsedList]);
   const favorites = useEditor((s) => s.favorites);
   const recent = useEditor((s) => s.recent);
   const [, force] = useState(0);
@@ -124,7 +127,7 @@ export function LibraryPanel() {
     const s = new Set(collapsed);
     if (s.has(name)) s.delete(name);
     else s.add(name);
-    setCollapsed(s);
+    useEditor.getState().setPrefs({ libraryCollapsed: [...s] });
   };
   const total = registry.all().length;
   const simulated = registry.all().filter((d) => d.simulation.support !== 'visual-only').length;
@@ -133,9 +136,11 @@ export function LibraryPanel() {
     <div className="panel" style={{ height: '100%' }}>
       <div className="panel-header">
         <span className="title">Components</span>
-        <span style={{ color: 'var(--text-3)', fontSize: 11 }} title={`${simulated} of ${total} parts have simulation models`}>
-          {total} parts · {simulated} simulated
-        </span>
+        <Tip content={`${simulated} of ${total} parts have simulation models`} direct>
+          <span style={{ color: 'var(--text-3)', fontSize: 11 }}>
+            {total} parts · {simulated} simulated
+          </span>
+        </Tip>
       </div>
       <div className="lib-search">
         <div className="search-box">
@@ -164,16 +169,19 @@ export function LibraryPanel() {
             }}
           />
           {query && (
-            <button className="icon-btn" onClick={() => setQuery('')}>
+            <button className="icon-btn" aria-label="Clear search" onClick={() => setQuery('')}>
               <Icon name="x" />
             </button>
           )}
         </div>
         <div className="chips">
-          <button className={`chip${simOnly ? ' active' : ''}`} onClick={() => setSimOnly(!simOnly)} title="Hide visual-only parts">
-            Simulated only
-          </button>
-          <span className="chip" style={{ display: 'flex', gap: 6, alignItems: 'center', cursor: 'default' }}>
+          <Tip content="Hide visual-only parts" direct>
+            <button className={`chip${simOnly ? ' active' : ''}`} aria-pressed={simOnly} onClick={() => setSimOnly(!simOnly)}>
+              Simulated only
+            </button>
+          </Tip>
+          {/* Legend for the dots on each part (text, not a control). */}
+          <span className="lib-legend" aria-label="Simulation support legend">
             <span className="dot full" /> full <span className="dot partial" /> partial <span className="dot visual-only" /> visual
           </span>
         </div>

@@ -17,13 +17,14 @@ import { formatEngineering } from '../../core/model/units';
 import { ComponentView } from './ComponentView';
 import { WireLayer, type Overlay } from './WireLayer';
 import { hitPin, insertionPreview, marqueeSelection, nearestSegment, pinIndex, pinPosition, pointAlong, polylineLength, wirePolyline, type IndexedPin } from './geometry';
-import { addComponentAt, fitView, withCarried, zoomBy } from './actions';
+import { addComponentAt, fitView, withCarried, zoomBy, zoomToSelection } from './actions';
 import { assignProbe, probeMarkers } from '../instruments/probes';
 import { Icon } from '../common/Icon';
-import { ContextMenu } from '../common/Menu';
+import { ContextMenu, DropdownMenu, MenuItem, MenuSeparator } from '../common/Menu';
 import { AnchoredPopover } from '../common/Popover';
 import { Tip } from '../common/Tooltip';
 import { CanvasMenuItems } from '../shell/ContextMenu';
+import { ZoomItems } from '../shell/MenuBar';
 import { loadExample } from '../../examples';
 import { fileTitle, openRecent } from '../../app/fileOps';
 import { SimControlsLayer } from './SimControls';
@@ -55,11 +56,13 @@ function RecentProjects() {
     <div className="recent-projects">
       <h4>Recent projects</h4>
       {recent.slice(0, 5).map((r) => (
-        <button key={r.path} className="recent-item" title={r.path} onClick={() => void openRecent(r.path)}>
-          <Icon name="history" />
-          <span className="name">{fileTitle(r.path)}</span>
-          <span className="when">{new Date(r.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-        </button>
+        <Tip key={r.path} content={r.path} side="right" direct>
+          <button className="recent-item" onClick={() => void openRecent(r.path)}>
+            <Icon name="history" />
+            <span className="name">{fileTitle(r.path)}</span>
+            <span className="when">{new Date(r.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+          </button>
+        </Tip>
       ))}
     </div>
   );
@@ -771,18 +774,21 @@ export function Workspace() {
     return (
       <div key={c.id} className="comp-label" style={{ left: b.x + b.width / 2, top: b.y }}>
         {p && (
-          <span
-            className={`comp-badge ${p.severity}`}
-            title={p.messages.join('\n')}
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              useEditor.getState().select([c.id]);
-              useEditor.getState().set({ dockTab: 'problems' });
-              useEditor.getState().setPrefs({ showDock: true });
-            }}
-          >
-            !
-          </span>
+          <Tip content={<span style={{ whiteSpace: 'pre-line' }}>{p.messages.join('\n')}</span>} side="top" direct>
+            <span
+              className={`comp-badge ${p.severity}`}
+              role="button"
+              aria-label={p.messages.join('; ')}
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                useEditor.getState().select([c.id]);
+                useEditor.getState().set({ dockTab: 'problems' });
+                useEditor.getState().setPrefs({ showDock: true });
+              }}
+            >
+              !
+            </span>
+          </Tip>
         )}
         {c.label}
         {def.simulation.support === 'visual-only' &&
@@ -796,7 +802,17 @@ export function Workspace() {
     <div
       ref={ref}
       tabIndex={0}
-      className={`workspace${showGrid ? ' grid' : ''}${dragging && drag.current?.kind === 'pan' ? ' panning' : ''}${tool !== 'select' || wiring ? ' probe' : ''}`}
+      className={[
+        'workspace',
+        showGrid && 'grid',
+        dragging && drag.current?.kind === 'pan' && 'panning',
+        dragging && drag.current?.kind === 'move' && 'moving',
+        (tool !== 'select' || wiring) && 'probe',
+        hover && !dragging && 'on-pin',
+        simulating && `sim-${simState}`,
+      ]
+        .filter(Boolean)
+        .join(' ')}
       style={showGrid ? { backgroundSize: `${gridSize}px ${gridSize}px`, backgroundPosition: `${viewport.x}px ${viewport.y}px` } : undefined}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -847,14 +863,10 @@ export function Workspace() {
           <RecentProjects />
         </div>
       )}
-      {simulating && (
-        <div className={`sim-banner${simState === 'paused' ? ' paused' : ''}`}>
-          <span className="live" />
-          {simState === 'paused' ? 'Paused' : 'Simulating'} — click buttons and turn knobs to interact · Alt+drag moves parts
-        </div>
-      )}
+      {/* Running/paused: a slim frame around the canvas (details in the status bar). */}
+      {simulating && <div className={`sim-frame ${simState}`} />}
       {wiring && (
-        <div className="sim-banner" style={{ top: simulating ? 40 : 10 }}>
+        <div className="sim-banner">
           Drawing wire — click a pin to finish, click the canvas to add a bend, Esc or right-click to cancel
         </div>
       )}
@@ -864,7 +876,20 @@ export function Workspace() {
             <Icon name="zoom-out" />
           </button>
         </Tip>
-        <span>{Math.round(viewport.zoom * 100)}%</span>
+        <DropdownMenu
+          side="top"
+          align="center"
+          trigger={
+            <button className="zoom-level" aria-label="Zoom presets">
+              {Math.round(viewport.zoom * 100)}%
+            </button>
+          }
+        >
+          <ZoomItems />
+          <MenuSeparator />
+          <MenuItem label="Fit to window" icon="fit" shortcut="F" onSelect={fitView} />
+          <MenuItem label="Zoom to selection" icon="zoom-in" shortcut="Shift+F" onSelect={zoomToSelection} disabled={!selectedComponents.length} />
+        </DropdownMenu>
         <Tip content="Zoom in" shortcut="+" side="top">
           <button className="icon-btn" aria-label="Zoom in" onClick={() => zoomBy(1.2)}>
             <Icon name="zoom-in" />

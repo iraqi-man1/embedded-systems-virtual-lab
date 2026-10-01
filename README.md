@@ -12,7 +12,7 @@ Built with Tauri 2, React, TypeScript, avr8js, Wokwi Elements, Monaco Editor and
 
 ![I²C LCD example running: firmware drives an LCD over the emulated TWI bus while a potentiometer is read on A0](docs/images/screenshot-dark.png)
 
-| Light theme — traffic light running on a breadboard | 20 ready-to-run example projects |
+| Light theme — traffic light running on a breadboard | 23 ready-to-run example projects |
 |---|---|
 | ![Traffic light example in the light theme](docs/images/screenshot-light.png) | ![Examples and templates gallery](docs/images/screenshot-examples.png) |
 
@@ -46,9 +46,10 @@ Built with Tauri 2, React, TypeScript, avr8js, Wokwi Elements, Monaco Editor and
   flashes the new build into the board without stopping the rest of the circuit.
 - **Electrical checks**: shorts, supply conflicts, unconnected required pins, floating inputs,
   undefined logic levels, pin/supply over-current, LED over-current and reverse bias.
-- **Projects**: versioned `.evlab` files; 20 example projects (Blink, button, PWM, traffic
-  light, RGB, UART console, LDR, thermistor, transistor, MOSFET, HC-SR04, DHT22, servo, LCD,
-  I²C LCD, SPI shift register, buzzer, relay, logic half adder…).
+- **Projects**: versioned `.evlab` files with crash-recovery autosave; 23 example projects
+  (Blink, button, PWM, traffic light, RGB, UART console, LDR, thermistor, transistor, MOSFET,
+  HC-SR04, DHT22, servo, LCD, I²C LCD, SPI shift register, buzzer, relay, logic half adder,
+  keypad lock, encoder + NeoPixel ring, MPU-6050 + OLED spirit level…), searchable by tag.
 - **Extensible**: components, behaviour models, MCU emulators and toolchains are registered,
   not hard-coded; JSON component packages load from the user's packages folder.
 

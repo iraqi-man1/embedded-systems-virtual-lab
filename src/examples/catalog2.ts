@@ -40,8 +40,8 @@ export const EXAMPLES_2: ExampleInfo[] = [
   {
     id: 'ultrasonic',
     title: 'Ultrasonic Distance (HC-SR04)',
-    summary: 'Measure distance with an HC-SR04 using pulseIn(). An LED warns when an obstacle is closer than 20 cm. Change the distance in the Inspector.',
-    tags: ['sensor', 'HC-SR04', 'pulseIn', 'timing'],
+    summary: 'Measure distance with an HC-SR04 using pulseIn(). An LED warns when an obstacle is closer than 20 cm. Drag the obstacle in front of the sensor while simulating.',
+    tags: ['sensor', 'HC-SR04', 'pulseIn', 'timing', 'interactive'],
     build: (r) => {
       const { b, uno } = base(r);
       const us = b.add('evlab.hc-sr04', 20, -190, { distance: 80 });
@@ -94,8 +94,8 @@ void loop() {
   {
     id: 'dht22',
     title: 'DHT22 Weather Station',
-    summary: 'Read temperature and humidity from a DHT22 with the Adafruit DHT library and stream them to the Serial Plotter.',
-    tags: ['sensor', 'DHT22', 'library', 'single-wire'],
+    summary: 'Read temperature and humidity from a DHT22 with the Adafruit DHT library and stream them to the Serial Plotter. Drag the sensor’s temperature and humidity sliders while simulating.',
+    tags: ['sensor', 'DHT22', 'library', 'single-wire', 'interactive'],
     build: (r) => {
       const { b, uno } = base(r);
       const dht = b.add('evlab.dht22', 190, -200, { temperature: 22.5, humidity: 48 });
@@ -146,7 +146,7 @@ void loop() {
     id: 'servo',
     title: 'Servo Control with a Knob',
     summary: 'Map a potentiometer to a servo angle with the Servo library. Turn the knob while the simulation runs.',
-    tags: ['servo', 'PWM', 'library', 'actuator', 'analog input'],
+    tags: ['servo', 'PWM', 'library', 'actuator', 'analog input', 'interactive'],
     build: (r) => {
       const { b, uno } = base(r);
       const servo = b.add('evlab.servo', 330, -60);
@@ -430,7 +430,7 @@ void loop() {
     id: 'half-adder',
     title: 'Half Adder (Logic Gates)',
     summary: 'A pure digital-logic circuit with no microcontroller: a 74HC86 XOR gives SUM and a 74HC08 AND gives CARRY. Click the switches while simulating.',
-    tags: ['digital logic', 'gates', 'no MCU', 'education'],
+    tags: ['digital logic', 'gates', 'no MCU', 'education', 'interactive'],
     build: (r) => {
       const b = new CircuitBuilder(r);
       const psu = b.add('evlab.bench-supply', -120, 60, { voltage: 5 });

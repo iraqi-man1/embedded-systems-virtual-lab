@@ -4,6 +4,7 @@ import { useProject } from '../../state/project';
 import { useSim } from '../../state/sim';
 import { zoomToComponents } from '../workspace/actions';
 import { Icon } from '../common/Icon';
+import { Tip } from '../common/Tooltip';
 import { LogicAnalyzer } from './LogicAnalyzer';
 import { McuPanel } from './McuPanel';
 import { Multimeter } from './Multimeter';
@@ -124,9 +125,11 @@ export function BottomDock() {
           </button>
         ))}
         <span className="spacer" />
-        <button className="icon-btn" style={{ alignSelf: 'center', marginRight: 6 }} title="Hide panel" onClick={() => useEditor.getState().setPrefs({ showDock: false })}>
-          <Icon name="panel-bottom" />
-        </button>
+        <Tip content="Hide the instruments panel" side="top" align="end" direct>
+          <button className="icon-btn" style={{ alignSelf: 'center', marginRight: 6 }} aria-label="Hide panel" onClick={() => useEditor.getState().setPrefs({ showDock: false })}>
+            <Icon name="panel-bottom" />
+          </button>
+        </Tip>
       </div>
       {tab === 'serial' && <SerialMonitor />}
       {tab === 'plotter' && <SerialPlotter />}

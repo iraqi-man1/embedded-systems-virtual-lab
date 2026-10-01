@@ -22,6 +22,7 @@ import { coalescedEdit, useProject } from '../../state/project';
 import { sendInput } from '../../state/sim';
 import { visualBus } from '../../state/visualBus';
 import { Icon } from '../common/Icon';
+import { Tip } from '../common/Tooltip';
 
 type ToWorld = (clientX: number, clientY: number) => Point;
 
@@ -186,34 +187,34 @@ function KeyRegions({ inst, def, c }: { inst: ComponentInstance; def: ComponentD
         const on = k.prop ? !!(inst.props[k.prop] ?? propDef(def, k.prop)?.default) : pressed.has(k.id);
         const input = k.input ?? `key:${k.id}`;
         return (
-          <div
-            key={k.id}
-            className={`simctl-key${k.round ? ' round' : ''}${on ? ' on' : ''}`}
-            style={{ left: k.x, top: k.y, width: k.w, height: k.h }}
-            title={k.label ?? k.id}
-            onPointerDown={(e) => {
-              if (e.button !== 0 || e.altKey) return;
-              stop(e);
-              if (k.prop) {
-                editProp(inst.id, k.prop, !on, 'gesture');
-                return;
-              }
-              (e.currentTarget as Element).setPointerCapture(e.pointerId);
-              setHeld(k.id);
-              sendInput(inst.id, input, true);
-            }}
-            onPointerUp={() => {
-              if (k.prop || held !== k.id) return;
-              setHeld(null);
-              sendInput(inst.id, input, false);
-            }}
-            onPointerCancel={() => {
-              if (held === k.id) {
+          <Tip key={k.id} content={k.label ?? k.id} side="top" direct>
+            <div
+              className={`simctl-key${k.round ? ' round' : ''}${on ? ' on' : ''}`}
+              style={{ left: k.x, top: k.y, width: k.w, height: k.h }}
+              onPointerDown={(e) => {
+                if (e.button !== 0 || e.altKey) return;
+                stop(e);
+                if (k.prop) {
+                  editProp(inst.id, k.prop, !on, 'gesture');
+                  return;
+                }
+                (e.currentTarget as Element).setPointerCapture(e.pointerId);
+                setHeld(k.id);
+                sendInput(inst.id, input, true);
+              }}
+              onPointerUp={() => {
+                if (k.prop || held !== k.id) return;
                 setHeld(null);
                 sendInput(inst.id, input, false);
-              }
-            }}
-          />
+              }}
+              onPointerCancel={() => {
+                if (held === k.id) {
+                  setHeld(null);
+                  sendInput(inst.id, input, false);
+                }
+              }}
+            />
+          </Tip>
         );
       })}
     </>
@@ -252,22 +253,23 @@ function Stick({ inst, def, c, toWorld }: { inst: ComponentInstance; def: Compon
     sendInput(inst.id, 'release', true);
   };
   return (
-    <div
-      className="simctl-stick"
-      style={{ left: c.center.x - c.radius, top: c.center.y - c.radius, width: c.radius * 2, height: c.radius * 2 }}
-      title="Drag to move the stick · click to press"
-      onPointerDown={(e) => {
-        if (e.button !== 0 || e.altKey) return;
-        stop(e);
-        (e.currentTarget as Element).setPointerCapture(e.pointerId);
-        start.current = { moved: false };
-      }}
-      onPointerMove={(e) => start.current && update(e)}
-      onPointerUp={release}
-      onPointerCancel={release}
-    >
-      <span className="dot" style={{ left: `${50 + shown.x * 50}%`, top: `${50 + shown.y * 50}%` }} />
-    </div>
+    <Tip content="Drag to move the stick · click to press" side="top" direct>
+      <div
+        className="simctl-stick"
+        style={{ left: c.center.x - c.radius, top: c.center.y - c.radius, width: c.radius * 2, height: c.radius * 2 }}
+        onPointerDown={(e) => {
+          if (e.button !== 0 || e.altKey) return;
+          stop(e);
+          (e.currentTarget as Element).setPointerCapture(e.pointerId);
+          start.current = { moved: false };
+        }}
+        onPointerMove={(e) => start.current && update(e)}
+        onPointerUp={release}
+        onPointerCancel={release}
+      >
+        <span className="dot" style={{ left: `${50 + shown.x * 50}%`, top: `${50 + shown.y * 50}%` }} />
+      </div>
+    </Tip>
   );
 }
 
@@ -290,42 +292,43 @@ function Rotary({ inst, def, c, toWorld }: { inst: ComponentInstance; def: Compo
     return () => el.removeEventListener('wheel', onWheel);
   }, [inst.id, c.input]);
   return (
-    <div
-      ref={ref}
-      className="simctl-rotary"
-      style={{ left: c.center.x - c.radius, top: c.center.y - c.radius, width: c.radius * 2, height: c.radius * 2 }}
-      title="Drag around (or scroll) to turn · click to press"
-      onPointerDown={(e) => {
-        if (e.button !== 0 || e.altKey) return;
-        stop(e);
-        (e.currentTarget as Element).setPointerCapture(e.pointerId);
-        drag.current = { last: angleOf(e), acc: 0, moved: false };
-      }}
-      onPointerMove={(e) => {
-        const d = drag.current;
-        if (!d) return;
-        const a = angleOf(e);
-        let delta = a - d.last;
-        if (delta > 180) delta -= 360;
-        if (delta < -180) delta += 360;
-        d.last = a;
-        d.acc += delta;
-        while (Math.abs(d.acc) >= step) {
-          const dir = Math.sign(d.acc);
-          d.acc -= dir * step;
-          d.moved = true;
-          sendInput(inst.id, c.input, dir); // clockwise = +1
-        }
-      }}
-      onPointerUp={() => {
-        const d = drag.current;
-        drag.current = null;
-        if (d && !d.moved && c.pressInput) {
-          sendInput(inst.id, c.pressInput, true);
-          setTimeout(() => sendInput(inst.id, c.pressInput!, false), 150);
-        }
-      }}
-    />
+    <Tip content="Drag around (or scroll) to turn · click to press" side="top" direct>
+      <div
+        ref={ref}
+        className="simctl-rotary"
+        style={{ left: c.center.x - c.radius, top: c.center.y - c.radius, width: c.radius * 2, height: c.radius * 2 }}
+        onPointerDown={(e) => {
+          if (e.button !== 0 || e.altKey) return;
+          stop(e);
+          (e.currentTarget as Element).setPointerCapture(e.pointerId);
+          drag.current = { last: angleOf(e), acc: 0, moved: false };
+        }}
+        onPointerMove={(e) => {
+          const d = drag.current;
+          if (!d) return;
+          const a = angleOf(e);
+          let delta = a - d.last;
+          if (delta > 180) delta -= 360;
+          if (delta < -180) delta += 360;
+          d.last = a;
+          d.acc += delta;
+          while (Math.abs(d.acc) >= step) {
+            const dir = Math.sign(d.acc);
+            d.acc -= dir * step;
+            d.moved = true;
+            sendInput(inst.id, c.input, dir); // clockwise = +1
+          }
+        }}
+        onPointerUp={() => {
+          const d = drag.current;
+          drag.current = null;
+          if (d && !d.moved && c.pressInput) {
+            sendInput(inst.id, c.pressInput, true);
+            setTimeout(() => sendInput(inst.id, c.pressInput!, false), 150);
+          }
+        }}
+      />
+    </Tip>
   );
 }
 
@@ -427,24 +430,26 @@ function SliderChip({ inst, def, c }: { inst: ComponentInstance; def: ComponentD
   };
   const ref = useWheel((dir) => editProp(inst.id, c.prop, fromPos(Math.max(0, Math.min(1, toPos(value) + dir * 0.02))), 'coalesce'));
   return (
-    <div ref={ref} className="simctl-chip slider" onPointerDown={stop} onDoubleClick={stop} title={`${c.label ?? p?.label ?? c.prop} — drag or scroll`}>
-      {c.icon && <Icon name={c.icon} />}
-      {c.label && <span className="lbl">{c.label}</span>}
-      <input
-        type="range"
-        min={0}
-        max={1000}
-        value={Math.round(toPos(value) * 1000)}
-        aria-label={c.label ?? p?.label ?? c.prop}
-        onPointerDown={() => useProject.getState().begin()}
-        onPointerUp={() => useProject.getState().end()}
-        onChange={(e) => editProp(inst.id, c.prop, fromPos(Number(e.target.value) / 1000), useProject.getState().txBase ? 'gesture' : 'coalesce')}
-      />
-      <span className="val">
-        {formatNumber(value)}
-        {unit ? ` ${unit}` : ''}
-      </span>
-    </div>
+    <Tip content={`${c.label ?? p?.label ?? c.prop} — drag or scroll`} side="top" direct>
+      <div ref={ref} className="simctl-chip slider" onPointerDown={stop} onDoubleClick={stop}>
+        {c.icon && <Icon name={c.icon} />}
+        {c.label && <span className="lbl">{c.label}</span>}
+        <input
+          type="range"
+          min={0}
+          max={1000}
+          value={Math.round(toPos(value) * 1000)}
+          aria-label={c.label ?? p?.label ?? c.prop}
+          onPointerDown={() => useProject.getState().begin()}
+          onPointerUp={() => useProject.getState().end()}
+          onChange={(e) => editProp(inst.id, c.prop, fromPos(Number(e.target.value) / 1000), useProject.getState().txBase ? 'gesture' : 'coalesce')}
+        />
+        <span className="val">
+          {formatNumber(value)}
+          {unit ? ` ${unit}` : ''}
+        </span>
+      </div>
+    </Tip>
   );
 }
 
@@ -480,31 +485,32 @@ function TiltChip({ inst, def, c }: { inst: ComponentInstance; def: ComponentDef
   };
   return (
     <div className="simctl-chip tilt" onPointerDown={stop} onDoubleClick={stop}>
-      <div
-        ref={pad}
-        className="pad"
-        title="Drag to tilt · double-click to level"
-        onPointerDown={(e) => {
-          if (e.button !== 0) return;
-          (e.currentTarget as Element).setPointerCapture(e.pointerId);
-          dragging.current = true;
-          useProject.getState().begin();
-          set(e);
-        }}
-        onPointerMove={(e) => dragging.current && set(e)}
-        onPointerUp={() => {
-          dragging.current = false;
-          useProject.getState().end();
-        }}
-        onDoubleClick={() => {
-          useProject.getState().begin();
-          editProp(inst.id, c.rollProp, 0, 'gesture');
-          editProp(inst.id, c.pitchProp, 0, 'gesture');
-          useProject.getState().end();
-        }}
-      >
-        <span className="dot" style={{ left: `${50 + (roll / c.range) * 50}%`, top: `${50 - (pitch / c.range) * 50}%` }} />
-      </div>
+      <Tip content="Drag to tilt · double-click to level" side="top" direct>
+        <div
+          ref={pad}
+          className="pad"
+          onPointerDown={(e) => {
+            if (e.button !== 0) return;
+            (e.currentTarget as Element).setPointerCapture(e.pointerId);
+            dragging.current = true;
+            useProject.getState().begin();
+            set(e);
+          }}
+          onPointerMove={(e) => dragging.current && set(e)}
+          onPointerUp={() => {
+            dragging.current = false;
+            useProject.getState().end();
+          }}
+          onDoubleClick={() => {
+            useProject.getState().begin();
+            editProp(inst.id, c.rollProp, 0, 'gesture');
+            editProp(inst.id, c.pitchProp, 0, 'gesture');
+            useProject.getState().end();
+          }}
+        >
+          <span className="dot" style={{ left: `${50 + (roll / c.range) * 50}%`, top: `${50 - (pitch / c.range) * 50}%` }} />
+        </div>
+      </Tip>
       <span className="val">
         {c.label ?? 'Tilt'}
         <br />

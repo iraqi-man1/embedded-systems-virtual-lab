@@ -87,7 +87,7 @@ function PartList({ query, at }: { query: string; at?: { x: number; y: number } 
             {d.category}
             {d.subcategory ? ` › ${d.subcategory}` : ''}
           </span>
-          <span className={`dot ${d.simulation.support}`} title={SUPPORT[d.simulation.support]} />
+          <span className={`dot ${d.simulation.support}`} role="img" aria-label={SUPPORT[d.simulation.support]} />
         </Command.Item>
       ))}
     </>

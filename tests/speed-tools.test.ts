@@ -74,3 +74,13 @@ describe('recent projects', () => {
     expect(useEditor.getState().recentProjects.some((r) => r.path === 'C:/p/5.evlab')).toBe(false);
   });
 });
+
+describe('toolchain libraries', () => {
+  it('the installer pre-fetches every library the include map can request', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { LIBRARY_MAP } = await import('../src/core/toolchain/libraries');
+    const rust = readFileSync(new URL('../src-tauri/src/toolchain.rs', import.meta.url), 'utf8');
+    const curated = rust.slice(rust.indexOf('CURATED_LIBRARIES'), rust.indexOf('];', rust.indexOf('CURATED_LIBRARIES')));
+    for (const lib of new Set(Object.values(LIBRARY_MAP).flat())) expect(curated, lib).toContain(`"${lib}"`);
+  });
+});

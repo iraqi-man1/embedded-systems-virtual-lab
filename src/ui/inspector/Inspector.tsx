@@ -9,6 +9,7 @@ import { useEditor } from '../../state/editor';
 import { coalescedEdit, useProject } from '../../state/project';
 import { sendInput, useSim } from '../../state/sim';
 import { Icon } from '../common/Icon';
+import { Tip } from '../common/Tooltip';
 import { clearWirePoints, deleteSelection, flipSelection, rotateSelection, setNetWireColor, setWireColor, autoRouteWires } from '../workspace/actions';
 import { pinLabel } from '../instruments/probes';
 
@@ -82,7 +83,6 @@ function PropertyField({ inst, def, p }: { inst: ComponentInstance; def: Compone
             if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
             if (e.key === 'Escape') setText(String(value));
           }}
-          title={p.description}
         />
         {p.unit && <span className="unit">{p.engineering && !invalid ? '' : p.unit}</span>}
       </div>
@@ -98,7 +98,13 @@ function PropertyField({ inst, def, p }: { inst: ComponentInstance; def: Compone
   }
   return (
     <div className="field">
-      <label title={p.description ?? p.label}>{p.label}</label>
+      {p.description ? (
+        <Tip content={p.description} side="left" direct>
+          <label className="has-tip">{p.label}</label>
+        </Tip>
+      ) : (
+        <label>{p.label}</label>
+      )}
       {control}
     </div>
   );
@@ -142,15 +148,21 @@ function ComponentInspector({ inst, def }: { inst: ComponentInstance; def: Compo
           <PropertyField key={p.key} inst={inst} def={def} p={p} />
         ))}
         <div className="btn-row" style={{ marginTop: 8 }}>
-          <button className="btn" onClick={() => rotateSelection(90)} title="Rotate (R)">
-            <Icon name="rotate" /> Rotate
-          </button>
-          <button className="btn" onClick={flipSelection} title="Flip (H)">
-            <Icon name="flip" /> Flip
-          </button>
-          <button className="btn danger" onClick={deleteSelection} title="Delete (Del)">
-            <Icon name="trash" />
-          </button>
+          <Tip content="Rotate 90° clockwise" shortcut="R" direct>
+            <button className="btn" onClick={() => rotateSelection(90)}>
+              <Icon name="rotate" /> Rotate
+            </button>
+          </Tip>
+          <Tip content="Flip horizontally" shortcut="H" direct>
+            <button className="btn" onClick={flipSelection}>
+              <Icon name="flip" /> Flip
+            </button>
+          </Tip>
+          <Tip content="Delete" shortcut="Del" direct>
+            <button className="btn danger" onClick={deleteSelection} aria-label="Delete">
+              <Icon name="trash" />
+            </button>
+          </Tip>
         </div>
       </div>
       {(erc.length > 0 || simDiags.length > 0) && (
@@ -182,8 +194,14 @@ function ComponentInspector({ inst, def }: { inst: ComponentInstance; def: Compo
                 const v = net !== undefined && driven[net] ? voltages[net] : undefined;
                 const connected = n && n.activePinCount > 1;
                 return (
-                  <tr key={p.id} title={p.description}>
-                    <td className="mono">{p.label ?? p.id}</td>
+                  <tr key={p.id}>
+                    {p.description ? (
+                      <Tip content={p.description} side="left" direct>
+                        <td className="mono has-tip">{p.label ?? p.id}</td>
+                      </Tip>
+                    ) : (
+                      <td className="mono">{p.label ?? p.id}</td>
+                    )}
                     <td style={{ color: connected ? 'var(--text-2)' : 'var(--text-3)' }}>{connected ? n!.name : '—'}</td>
                     <td className="mono" style={{ color: 'var(--text-3)' }}>{mcu?.pins[p.id] ?? ''}</td>
                     <td className="v">{simulating ? (v !== undefined ? formatEngineering(v, 'V', 3) : connected ? 'float' : '') : ''}</td>
@@ -243,9 +261,11 @@ function WireInspector({ wire }: { wire: Wire }) {
           />
         </div>
         <div className="btn-row" style={{ marginTop: 8 }}>
-          <button className="btn" onClick={() => autoRouteWires([wire.id])} title="Route around parts">
-            <Icon name="route" /> Auto-route
-          </button>
+          <Tip content="Route the wire around parts" direct>
+            <button className="btn" onClick={() => autoRouteWires([wire.id])}>
+              <Icon name="route" /> Auto-route
+            </button>
+          </Tip>
           <button className="btn" onClick={() => clearWirePoints([wire.id])} disabled={!wire.points.length}>
             Straighten
           </button>
@@ -289,14 +309,9 @@ function WireSwatches({ active, onPick }: { active?: string; onPick: (c: string)
   return (
     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
       {WIRE_COLORS.map((c, i) => (
-        <button
-          key={c.value}
-          className={`swatch${active === c.value ? ' active' : ''}`}
-          style={{ background: c.value }}
-          aria-label={c.label}
-          title={`${c.label}${i < 9 ? ` (${i + 1})` : ''}`}
-          onClick={() => onPick(c.value)}
-        />
+        <Tip key={c.value} content={c.label} shortcut={i < 9 ? String(i + 1) : undefined} direct>
+          <button className={`swatch${active === c.value ? ' active' : ''}`} style={{ background: c.value }} aria-label={c.label} onClick={() => onPick(c.value)} />
+        </Tip>
       ))}
     </div>
   );
@@ -313,53 +328,48 @@ function ProjectInspector() {
   }, [project.meta.name, project.meta.description]);
   const comps = project.circuit.components;
   const simulated = comps.filter((c) => (lookup(c.type)?.simulation.support ?? 'visual-only') !== 'visual-only').length;
+  const stats: [string, number][] = [
+    ['parts', comps.length],
+    ['simulated', simulated],
+    ['wires', project.circuit.wires.length],
+    ['nets', netlist.nets.filter((n) => n.activePinCount > 1).length],
+    ['on breadboards', netlist.insertions.length],
+  ];
   return (
-    <>
-      <div className="insp-head">
-        <h3>Project</h3>
-        <div className="sub">Nothing selected — showing project properties</div>
-      </div>
+    <div className="insp-empty">
       <div className="insp-sec">
+        <div className="sub">Nothing selected — select a part or wire to edit it.</div>
         <div className="field">
-          <label>Name</label>
+          <label>Project</label>
           <input
             className="input"
             value={name}
+            aria-label="Project name"
             onChange={(e) => setName(e.target.value)}
             onBlur={() => useProject.getState().updateProject((p) => void (p.meta.name = name || 'Untitled'))}
           />
         </div>
-        <div style={{ marginTop: 6 }}>
-          <label style={{ color: 'var(--text-2)' }}>Description</label>
-          <textarea
-            className="input"
-            style={{ height: 70, padding: 6, resize: 'vertical', marginTop: 4 }}
-            value={desc}
-            onChange={(e) => setDesc(e.target.value)}
-            onBlur={() => useProject.getState().updateProject((p) => void (p.meta.description = desc))}
-          />
+        <textarea
+          className="input insp-desc"
+          rows={2}
+          placeholder="Description"
+          aria-label="Project description"
+          value={desc}
+          onChange={(e) => setDesc(e.target.value)}
+          onBlur={() => useProject.getState().updateProject((p) => void (p.meta.description = desc))}
+        />
+        <div className="insp-stats">
+          {stats.map(([k, v]) => (
+            <span key={k}>
+              <b>{v.toLocaleString('en-US')}</b> {k}
+            </span>
+          ))}
         </div>
       </div>
-      <div className="insp-sec">
-        <div className="h">Circuit</div>
-        <table className="pin-table">
-          <tbody>
-            <tr><td>Components</td><td className="v">{comps.length}</td></tr>
-            <tr><td>Simulated parts</td><td className="v">{simulated}</td></tr>
-            <tr><td>Wires</td><td className="v">{project.circuit.wires.length}</td></tr>
-            <tr><td>Nets (connected)</td><td className="v">{netlist.nets.filter((n) => n.activePinCount > 1).length}</td></tr>
-            <tr><td>Breadboard insertions</td><td className="v">{netlist.insertions.length}</td></tr>
-          </tbody>
-        </table>
+      <div className="insp-sec insp-tips">
+        <kbd>Ctrl+K</kbd> add a part · <kbd>F5</kbd> run · <kbd>Ctrl+Shift+P</kbd> commands · <kbd>?</kbd> shortcuts
       </div>
-      <div className="insp-sec">
-        <div className="h">Tips</div>
-        <p className="doc-text" style={{ fontSize: 11.5 }}>
-          Drag parts from the library. Click a pin to start a wire. Drop legs onto breadboard holes to connect them — hover a hole to
-          see which holes are connected. Press <kbd>F5</kbd> to compile and run, <kbd>?</kbd> for all shortcuts.
-        </p>
-      </div>
-    </>
+    </div>
   );
 }
 
@@ -394,9 +404,11 @@ export function Inspector() {
       <div className="panel-header">
         <span className="title">Properties</span>
         <div className="actions">
-          <button className="icon-btn" title="Hide properties" onClick={() => useEditor.getState().setPrefs({ showInspector: false })}>
-            <Icon name="x" />
-          </button>
+          <Tip content="Hide the Properties panel" direct>
+            <button className="icon-btn" aria-label="Hide properties" onClick={() => useEditor.getState().setPrefs({ showInspector: false })}>
+              <Icon name="x" />
+            </button>
+          </Tip>
         </div>
       </div>
       <div className="insp">{content ?? <ProjectInspector />}</div>

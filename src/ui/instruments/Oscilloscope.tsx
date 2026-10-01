@@ -6,6 +6,7 @@ import { useSim } from '../../state/sim';
 import { indexAtOrAfter } from '../../core/instruments/decoders';
 import { formatEngineering } from '../../core/model/units';
 import { Icon } from '../common/Icon';
+import { Tip } from '../common/Tooltip';
 import { cssVar, formatTime, TIME_DIVS, useCanvas } from './useCanvas';
 import { removeChannel } from './probes';
 
@@ -199,10 +200,12 @@ export function Oscilloscope() {
   return (
     <div className="dock-body">
       <div className="inst-bar">
-        <button className="tb-btn" onClick={() => useEditor.getState().set({ tool: 'probe-scope' })} title="Click a pin on the canvas to attach a channel">
-          <Icon name="probe" />
-          <span className="label">Add probe</span>
-        </button>
+        <Tip content="Then click a pin on the canvas to attach a channel" direct>
+          <button className="tb-btn" onClick={() => useEditor.getState().set({ tool: 'probe-scope' })}>
+            <Icon name="probe" />
+            <span className="label">Add probe</span>
+          </button>
+        </Tip>
         <label>
           Time
           <select className="tb-select" value={timeDiv} onChange={(e) => setTimeDiv(Number(e.target.value))}>
@@ -248,12 +251,16 @@ export function Oscilloscope() {
               <div key={c.id} className="chan" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 3 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span className="probe-dot" style={{ background: c.color }} />
-                  <span className="nm" title={c.label}>
-                    CH{i + 1} {c.label}
-                  </span>
-                  <button className="icon-btn" title="Remove" onClick={() => removeChannel('scope', c.id)}>
-                    <Icon name="x" size={12} />
-                  </button>
+                  <Tip content={c.label} direct>
+                    <span className="nm">
+                      CH{i + 1} {c.label}
+                    </span>
+                  </Tip>
+                  <Tip content="Remove channel" direct>
+                    <button className="icon-btn" aria-label="Remove channel" onClick={() => removeChannel('scope', c.id)}>
+                      <Icon name="x" size={12} />
+                    </button>
+                  </Tip>
                 </div>
                 <select className="tb-select" value={vDiv[i] ?? 1} onChange={(e) => setVDiv(vDiv.map((v, k) => (k === i ? Number(e.target.value) : v)))}>
                   {V_DIVS.map((v) => (

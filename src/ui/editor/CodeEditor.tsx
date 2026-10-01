@@ -6,6 +6,7 @@ import { useProject } from '../../state/project';
 import { compileFirmware, findTargetBoard, useBuildState, useSim } from '../../state/sim';
 import { confirmDialog } from '../common/Dialog';
 import { Icon } from '../common/Icon';
+import { Tip } from '../common/Tooltip';
 
 /** Why a file name can't be used, or null when it can. */
 function fileNameError(name: string, others: string[]): string | null {
@@ -25,24 +26,28 @@ function FileNameInput({ initial, others, onDone }: { initial: string; others: s
     onDone(name);
   };
   return (
-    <div className={`code-tab editing${error ? ' invalid' : ''}`} title={error ?? 'Enter to apply · Esc to cancel'}>
-      <Icon name="code" size={13} />
-      <input
-        className="tab-input"
-        value={value}
-        autoFocus
-        spellCheck={false}
-        size={Math.max(8, value.length + 1)}
-        onFocus={(e) => e.currentTarget.setSelectionRange(0, value.lastIndexOf('.') > 0 ? value.lastIndexOf('.') : value.length)}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={(e) => {
-          e.stopPropagation();
-          if (e.key === 'Enter' && !error) finish(value.trim());
-          else if (e.key === 'Escape') finish(null);
-        }}
-        onBlur={() => finish(error ? null : value.trim())}
-      />
-    </div>
+    <Tip content={error ?? 'Enter to apply · Esc to cancel'} direct>
+      <div className={`code-tab editing${error ? ' invalid' : ''}`}>
+        <Icon name="code" size={13} />
+        <input
+          className="tab-input"
+          value={value}
+          autoFocus
+          spellCheck={false}
+          aria-label="File name"
+          aria-invalid={!!error}
+          size={Math.max(8, value.length + 1)}
+          onFocus={(e) => e.currentTarget.setSelectionRange(0, value.lastIndexOf('.') > 0 ? value.lastIndexOf('.') : value.length)}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key === 'Enter' && !error) finish(value.trim());
+            else if (e.key === 'Escape') finish(null);
+          }}
+          onBlur={() => finish(error ? null : value.trim())}
+        />
+      </div>
+    </Tip>
   );
 }
 
@@ -197,48 +202,57 @@ export function CodeEditor() {
           naming?.from === f.name ? (
             <FileNameInput key={f.name} initial={f.name} others={names.filter((n) => n !== f.name)} onDone={finishNaming} />
           ) : (
-            <div
+            <Tip
               key={f.name}
-              className={`code-tab${f.name === active ? ' active' : ''}`}
-              onClick={() => setActive(f.name)}
-              onDoubleClick={() => f.name !== 'sketch.ino' && setNaming({ from: f.name })}
-              title={f.name === 'sketch.ino' ? 'Main sketch' : 'Double-click to rename'}
+              direct
+              content={`${f.name === 'sketch.ino' ? 'Main sketch' : 'Double-click to rename'}${compile.built && compile.built[f.name] !== f.content ? ' · changed since the last build' : ''}`}
             >
-              <Icon name="code" size={13} />
-              {f.name}
-              {compile.built && compile.built[f.name] !== f.content && <span className="mod-dot" title="Changed since the last build" />}
-              {f.name !== 'sketch.ino' && (
-                <span
-                  className="x"
-                  title="Remove file"
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    if (await confirmDialog({ title: `Remove ${f.name}?`, message: 'The file and its contents are removed from the project.', confirmLabel: 'Remove', danger: true }))
-                      useProject.getState().removeFile(f.name);
-                  }}
-                >
-                  <Icon name="x" size={12} />
-                </span>
-              )}
-            </div>
+              <div
+                className={`code-tab${f.name === active ? ' active' : ''}`}
+                onClick={() => setActive(f.name)}
+                onDoubleClick={() => f.name !== 'sketch.ino' && setNaming({ from: f.name })}
+              >
+                <Icon name="code" size={13} />
+                {f.name}
+                {compile.built && compile.built[f.name] !== f.content && <span className="mod-dot" aria-label="Changed since the last build" />}
+                {f.name !== 'sketch.ino' && (
+                  <span
+                    className="x"
+                    role="button"
+                    aria-label={`Remove ${f.name}`}
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (await confirmDialog({ title: `Remove ${f.name}?`, message: 'The file and its contents are removed from the project.', confirmLabel: 'Remove', danger: true }))
+                        useProject.getState().removeFile(f.name);
+                    }}
+                  >
+                    <Icon name="x" size={12} />
+                  </span>
+                )}
+              </div>
+            </Tip>
           ),
         )}
         {naming && naming.from === null && <FileNameInput initial={newFileName()} others={names} onDone={finishNaming} />}
-        <button className="icon-btn" style={{ alignSelf: 'center', marginLeft: 4 }} title="Add file" onClick={() => setNaming({ from: null })} disabled={!!naming}>
-          <Icon name="plus" />
-        </button>
+        <Tip content="Add a source file (.h, .c, .cpp)" direct>
+          <button className="icon-btn" style={{ alignSelf: 'center', marginLeft: 4 }} aria-label="Add file" onClick={() => setNaming({ from: null })} disabled={!!naming}>
+            <Icon name="plus" />
+          </button>
+        </Tip>
       </div>
       <div className="code-toolbar">
-        <button className="tb-btn" onClick={() => void compileFirmware()} disabled={compile.status === 'compiling'} title="Compile (Ctrl+B)">
-          <Icon name="build" />
-          <span className="label">Compile</span>
-        </button>
+        <Tip content={simState !== 'stopped' ? 'Compile and flash the running board' : 'Compile the firmware'} shortcut="Ctrl+B">
+          <button className="tb-btn" onClick={() => void compileFirmware()} disabled={compile.status === 'compiling'}>
+            <Icon name="build" />
+            <span className="label">Compile</span>
+          </button>
+        </Tip>
         {boards.length > 1 && (
           <select
             className="tb-select"
             value={target?.id ?? ''}
             onChange={(e) => useProject.getState().updateProject((p) => void (p.firmware.target = e.target.value))}
-            title="Board that runs this firmware"
+            aria-label="Board that runs this firmware"
           >
             {boards.map((b) => (
               <option key={b.id} value={b.id}>
@@ -248,14 +262,16 @@ export function CodeEditor() {
           </select>
         )}
         {simState !== 'stopped' && buildState === 'modified' && (
-          <button className="tb-btn accent" onClick={() => void compileFirmware()} title="Compile and flash the running board (Ctrl+B); the rest of the circuit keeps running">
-            <Icon name="reset" />
-            <span className="label">Rebuild &amp; restart board</span>
-          </button>
+          <Tip content="Compile and flash the running board; the rest of the circuit keeps running" shortcut="Ctrl+B">
+            <button className="tb-btn accent" onClick={() => void compileFirmware()}>
+              <Icon name="reset" />
+              <span className="label">Rebuild &amp; restart board</span>
+            </button>
+          </Tip>
         )}
-        <span className="info" title={statusText}>
-          {statusText}
-        </span>
+        <Tip content={statusText} direct>
+          <span className="info">{statusText}</span>
+        </Tip>
       </div>
       <div ref={host} className="editor-host" />
     </div>

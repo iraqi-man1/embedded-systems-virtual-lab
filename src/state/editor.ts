@@ -53,6 +53,10 @@ interface Prefs {
   serialTimestamps: boolean;
   /** Serial monitor: text or hex dump. */
   serialView: 'text' | 'hex';
+  /** Collapsed library categories ('__fav', '__recent' for the pinned sections). */
+  libraryCollapsed: string[];
+  /** Library shows simulated parts only. */
+  librarySimOnly: boolean;
 }
 
 const PREFS_KEY = 'evlab.prefs.v1';
@@ -81,6 +85,8 @@ function loadPrefs(): Prefs {
     serialClearOnRun: true,
     serialTimestamps: false,
     serialView: 'text',
+    libraryCollapsed: ['Communication', 'Integrated Circuits', 'Actuators', 'Sensors'],
+    librarySimOnly: false,
   };
   try {
     const raw = localStorage.getItem(PREFS_KEY);
@@ -169,6 +175,8 @@ export const useEditor = create<EditorState>((set, get) => ({
       serialClearOnRun: s.serialClearOnRun,
       serialTimestamps: s.serialTimestamps,
       serialView: s.serialView,
+      libraryCollapsed: s.libraryCollapsed,
+      librarySimOnly: s.librarySimOnly,
     };
     try {
       localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));

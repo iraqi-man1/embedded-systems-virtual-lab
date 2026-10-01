@@ -33,14 +33,9 @@ export function WireToolbar({ anchor, ids }: { anchor: ScreenRect; ids: string[]
     <AnchoredPopover anchor={anchor} side="top" className="float-bar" sideOffset={10}>
       <div className="float-swatches" role="group" aria-label="Wire colour">
         {WIRE_COLORS.map((c, i) => (
-          <button
-            key={c.value}
-            className={`swatch${current === c.value ? ' active' : ''}`}
-            style={{ background: c.value }}
-            aria-label={c.label}
-            title={`${c.label} (${i < 9 ? i + 1 : 'C cycles'})`}
-            onClick={() => setWireColor(ids, c.value)}
-          />
+          <Tip key={c.value} content={c.label} shortcut={i < 9 ? String(i + 1) : undefined} side="top" direct>
+            <button className={`swatch${current === c.value ? ' active' : ''}`} style={{ background: c.value }} aria-label={c.label} onClick={() => setWireColor(ids, c.value)} />
+          </Tip>
         ))}
       </div>
       <div className="divider" />

@@ -35,7 +35,15 @@ const CURATED_LIBRARIES: &[&str] = &[
     "adafruit/DHT sensor library@^1.4.6",
     "adafruit/Adafruit Unified Sensor@^1.1.14",
     "adafruit/Adafruit NeoPixel@^1.12.3",
+    "adafruit/RTClib@^2.1.4",
+    "adafruit/Adafruit SSD1306@^2.5.13",
+    "adafruit/Adafruit GFX Library@^1.11.11",
+    "adafruit/Adafruit MPU6050@^2.2.6",
     "arduino-libraries/Stepper@^1.1.3",
+    "z3t0/IRremote@^4.4.1",
+    "chris--a/Keypad@^3.1.1",
+    "paulstoffregen/OneWire@^2.3.8",
+    "milesburton/DallasTemperature@^3.11.0",
 ];
 
 pub fn toolchain_root(app: &AppHandle) -> Result<PathBuf, String> {

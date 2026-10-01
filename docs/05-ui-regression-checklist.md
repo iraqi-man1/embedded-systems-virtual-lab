@@ -63,3 +63,9 @@ menu and palette in a narrow window — in both themes — and fails if any of t
   and flash/RAM bars. `V` toggles voltage badges on wires.
 - Serial monitor: *Time* prefixes lines with the simulation time, *0x* shows a hex dump,
   *Clear on run* keeps or clears the output between runs, the save button writes the log.
+- Polish: controls show styled tooltips (with shortcuts) instead of native ones; Tab shows a
+  focus ring, mouse clicks don't; numbers use en-US digits; while running the canvas has a slim
+  green frame (amber when paused) and the status bar shows how to interact; parts show a grab
+  cursor, pins a crosshair, hovered wires a halo; the zoom % on the canvas opens zoom presets;
+  the Examples dialog filters by text and tag; library category collapse and "Simulated only"
+  persist across sessions; toasts slide in.
