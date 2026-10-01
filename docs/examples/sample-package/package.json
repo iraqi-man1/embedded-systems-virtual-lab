@@ -1,0 +1,77 @@
+{
+  "id": "sample.extras",
+  "name": "Sample Extras Pack",
+  "version": "1.0.0",
+  "author": "Embedded Systems Virtual Lab",
+  "license": "MIT",
+  "description": "Demonstrates a JSON component package: a 3 mm LED and a quad NOR gate built from generic models.",
+  "components": [
+    {
+      "type": "sample.led-3mm-blue",
+      "name": "LED 3 mm (blue)",
+      "category": "Output",
+      "subcategory": "LEDs",
+      "tags": ["led", "3mm", "blue", "sample"],
+      "designator": "LED",
+      "visual": {
+        "kind": "svg",
+        "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"19.2\" height=\"28.8\" viewBox=\"0 0 19.2 28.8\"><line x1=\"4.8\" y1=\"14\" x2=\"4.8\" y2=\"28.8\" stroke=\"#aaa\" stroke-width=\"1.4\"/><line x1=\"14.4\" y1=\"14\" x2=\"14.4\" y2=\"28.8\" stroke=\"#aaa\" stroke-width=\"1.4\"/><circle cx=\"9.6\" cy=\"9\" r=\"7.5\" fill=\"#4aa3ff\" stroke=\"#2a6fd1\"/><text x=\"9.6\" y=\"11.5\" font-size=\"6\" text-anchor=\"middle\" fill=\"#fff\">3</text></svg>"
+      },
+      "size": { "width": 19.2, "height": 28.8 },
+      "pins": [
+        { "id": "A", "label": "A (+)", "x": 14.4, "y": 28.8, "kind": "passive", "required": true },
+        { "id": "C", "label": "C (−)", "x": 4.8, "y": 28.8, "kind": "passive", "required": true }
+      ],
+      "properties": [
+        { "key": "color", "label": "Color", "type": "enum", "default": "blue", "options": [{ "value": "blue", "label": "Blue" }] },
+        { "key": "maxCurrent", "label": "Rated current", "type": "number", "default": 0.02, "unit": "A" }
+      ],
+      "simulation": { "support": "full", "model": "led", "notes": "Uses the built-in LED model (Vf by colour)." },
+      "docs": { "summary": "A 3 mm blue LED defined entirely in JSON." }
+    },
+    {
+      "type": "sample.cd4001",
+      "name": "CD4001 Quad NOR (CMOS)",
+      "category": "Integrated Circuits",
+      "subcategory": "Logic Gates",
+      "tags": ["4001", "nor", "cmos", "sample"],
+      "designator": "U",
+      "visual": {
+        "kind": "svg",
+        "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"67.2\" height=\"38.4\" viewBox=\"0 0 67.2 38.4\"><rect x=\"1\" y=\"8.8\" width=\"65.2\" height=\"20.8\" rx=\"1.5\" fill=\"#262626\"/><text x=\"33.6\" y=\"21.5\" font-size=\"7\" fill=\"#eee\" text-anchor=\"middle\">CD4001</text></svg>"
+      },
+      "size": { "width": 67.2, "height": 38.4 },
+      "pins": [
+        { "id": "1A", "x": 4.8, "y": 33.6, "kind": "input" },
+        { "id": "1B", "x": 14.4, "y": 33.6, "kind": "input" },
+        { "id": "1Y", "x": 24, "y": 33.6, "kind": "output" },
+        { "id": "2Y", "x": 33.6, "y": 33.6, "kind": "output" },
+        { "id": "2A", "x": 43.2, "y": 33.6, "kind": "input" },
+        { "id": "2B", "x": 52.8, "y": 33.6, "kind": "input" },
+        { "id": "GND", "x": 62.4, "y": 33.6, "kind": "ground" },
+        { "id": "3A", "x": 62.4, "y": 4.8, "kind": "input" },
+        { "id": "3B", "x": 52.8, "y": 4.8, "kind": "input" },
+        { "id": "3Y", "x": 43.2, "y": 4.8, "kind": "output" },
+        { "id": "4Y", "x": 33.6, "y": 4.8, "kind": "output" },
+        { "id": "4A", "x": 24, "y": 4.8, "kind": "input" },
+        { "id": "4B", "x": 14.4, "y": 4.8, "kind": "input" },
+        { "id": "VCC", "x": 4.8, "y": 4.8, "kind": "passive", "required": true }
+      ],
+      "properties": [],
+      "simulation": {
+        "support": "full",
+        "model": "logic-gates",
+        "params": {
+          "gates": [
+            { "inputs": ["1A", "1B"], "output": "1Y", "fn": "nor" },
+            { "inputs": ["2A", "2B"], "output": "2Y", "fn": "nor" },
+            { "inputs": ["3A", "3B"], "output": "3Y", "fn": "nor" },
+            { "inputs": ["4A", "4B"], "output": "4Y", "fn": "nor" }
+          ]
+        },
+        "notes": "Generic CMOS gate model parameterised from JSON."
+      },
+      "docs": { "summary": "CMOS quad 2-input NOR gate (3–15 V)." }
+    }
+  ]
+}

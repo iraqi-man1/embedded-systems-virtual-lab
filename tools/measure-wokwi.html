@@ -1,0 +1,30 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Measure Wokwi elements</title></head>
+<body style="margin:0;background:#fff">
+<pre id="out">measuring…</pre>
+<script type="module">
+  import '@wokwi/elements';
+  const tags = [...document.createElement('div').ownerDocument.defaultView.customElements ? [] : []];
+  const all = Object.keys(await import('@wokwi/elements')).filter((k) => k.endsWith('Element'));
+  const result = {};
+  const names = [];
+  for (const k of all) {
+    const ctor = (await import('@wokwi/elements'))[k];
+    const tag = customElements.getName ? customElements.getName(ctor) : null;
+    if (tag) names.push(tag);
+  }
+  for (const tag of names.sort()) {
+    const el = document.createElement(tag);
+    el.style.position = 'absolute'; el.style.left = '0'; el.style.top = '0';
+    document.body.appendChild(el);
+    await el.updateComplete;
+    await new Promise((r) => requestAnimationFrame(r));
+    const r = el.getBoundingClientRect();
+    const pins = (el.pinInfo || []).map((p) => ({ name: p.name, x: p.x, y: p.y, signals: (p.signals || []).map((s) => s.type + (s.signal ? ':' + s.signal : '') + (s.channel !== undefined ? ':' + s.channel : '') + (s.bus ? ':' + s.bus : '')), description: p.description }));
+    result[tag] = { width: +r.width.toFixed(2), height: +r.height.toFixed(2), pins };
+    el.remove();
+  }
+  window.__result = result;
+  document.getElementById('out').textContent = JSON.stringify(result).length + ' bytes, ' + names.length + ' elements';
+</script>
+</body></html>

@@ -1,0 +1,207 @@
+import { useEffect, useState } from 'react';
+import { EXAMPLES, loadExample } from '../../examples';
+import { isTauri, toolchain } from '../../platform';
+import { useEditor } from '../../state/editor';
+import { refreshToolchain, useSim } from '../../state/sim';
+import { registry } from '../../app/registry';
+import { commands } from '../commands';
+import { Icon } from '../common/Icon';
+
+function Modal({ title, small, children, footer }: { title: string; small?: boolean; children: React.ReactNode; footer?: React.ReactNode }) {
+  const close = () => useEditor.getState().set({ dialog: null });
+  return (
+    <div className="modal-back" onMouseDown={(e) => e.target === e.currentTarget && close()}>
+      <div className={`modal${small ? ' small' : ''}`}>
+        <div className="modal-head">
+          <h2>{title}</h2>
+          <button className="icon-btn" onClick={close}>
+            <Icon name="x" />
+          </button>
+        </div>
+        <div className="modal-body">{children}</div>
+        {footer && <div className="modal-foot">{footer}</div>}
+      </div>
+    </div>
+  );
+}
+
+function ExamplesDialog() {
+  return (
+    <Modal title="Examples & Templates">
+      <p style={{ marginTop: 0, color: 'var(--text-2)' }}>
+        Each example opens a complete project — circuit and firmware. Press <kbd>F5</kbd> to compile and simulate.
+      </p>
+      <div className="examples">
+        {EXAMPLES.map((ex) => (
+          <div key={ex.id} className="example" onClick={() => loadExample(ex.id)}>
+            <h4>{ex.title}</h4>
+            <p>{ex.summary}</p>
+            <div className="tags">
+              {ex.tags.map((t) => (
+                <span key={t} className="chip">
+                  {t}
+                </span>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Modal>
+  );
+}
+
+function ToolchainDialog() {
+  const status = useSim((s) => s.toolchain);
+  const [log, setLog] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    void refreshToolchain();
+  }, []);
+  const install = async () => {
+    setBusy(true);
+    setLog('');
+    try {
+      await toolchain.install((line) => setLog((l) => (l + line + '\n').slice(-40000)));
+      await refreshToolchain();
+      useEditor.getState().notify('Firmware toolchain installed.', 'success');
+    } catch (e) {
+      setLog((l) => l + `\nERROR: ${(e as Error).message ?? e}\n`);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Modal
+      title="Firmware Toolchain"
+      small
+      footer={
+        <>
+          <button className="btn" onClick={() => void refreshToolchain()} disabled={busy}>
+            <Icon name="reset" /> Re-check
+          </button>
+          {isTauri && (
+            <button className="btn primary" onClick={install} disabled={busy}>
+              <Icon name="package" /> {status?.installed ? 'Reinstall / update' : 'Install toolchain'}
+            </button>
+          )}
+        </>
+      }
+    >
+      <p style={{ marginTop: 0 }}>
+        Firmware is compiled locally by <b>PlatformIO Core</b> (Apache-2.0) with the official AVR GCC toolchain and Arduino core. After a
+        one-time installation (internet required), compilation works fully offline.
+      </p>
+      <table className="kbd-table">
+        <tbody>
+          <tr>
+            <td>Status</td>
+            <td style={{ color: status?.installed ? 'var(--ok)' : 'var(--warn)' }}>{status ? (status.installed ? 'Installed' : 'Not installed') : 'Unknown'}</td>
+          </tr>
+          <tr>
+            <td>PlatformIO</td>
+            <td>{status?.pioVersion ?? '—'}</td>
+          </tr>
+          <tr>
+            <td>Platforms</td>
+            <td>{status?.platforms.join(', ') || '—'}</td>
+          </tr>
+          <tr>
+            <td>Location</td>
+            <td style={{ fontFamily: 'var(--font-mono)', fontSize: 11, wordBreak: 'break-all' }}>{status?.root ?? '—'}</td>
+          </tr>
+        </tbody>
+      </table>
+      {!isTauri && <p className="note" style={{ marginTop: 10 }}>Running in development (browser) mode: the dev server's local toolchain is used.</p>}
+      {isTauri && <p style={{ fontSize: 11.5, color: 'var(--text-3)' }}>Installation needs Python 3.9+ on the PATH. It creates a private environment; nothing is installed system-wide.</p>}
+      {(busy || log) && <div className="log-box">{log || 'Starting…'}</div>}
+    </Modal>
+  );
+}
+
+function ShortcutsDialog() {
+  const rows: [string, string][] = [
+    ['Run / resume (compiles if needed)', 'F5'],
+    ['Pause', 'F6'],
+    ['Stop', 'Shift+F5'],
+    ['Reset board', 'Ctrl+F5'],
+    ['Step 1 ms / one instruction', 'F10 / F11'],
+    ['Compile', 'Ctrl+B'],
+    ['New / Open / Save', 'Ctrl+N / Ctrl+O / Ctrl+S'],
+    ['Undo / Redo', 'Ctrl+Z / Ctrl+Y'],
+    ['Copy / Cut / Paste / Duplicate', 'Ctrl+C / X / V / D'],
+    ['Delete selection', 'Del'],
+    ['Rotate CW / CCW', 'R / Shift+R'],
+    ['Flip horizontally', 'H'],
+    ['Nudge (×5 with Shift)', 'Arrow keys'],
+    ['Zoom in / out / 100%', '+ / − / 0'],
+    ['Fit circuit to window', 'F'],
+    ['Toggle grid', 'G'],
+    ['Pan', 'Middle-drag, or Space + drag'],
+    ['Zoom at cursor', 'Mouse wheel'],
+    ['Start a wire', 'Click a pin (or drag from it)'],
+    ['Add a bend while wiring', 'Click empty canvas'],
+    ['Cancel wire / probe / selection', 'Esc or right-click'],
+    ['Junction on a wire', 'Finish a wire on another wire'],
+    ['Add bend to a wire', 'Double-click or drag the selected wire'],
+    ['Multi-select', 'Shift+click or drag a box'],
+    ['Interact while simulating', 'Click buttons, drag/scroll knobs'],
+    ['Move a part while simulating', 'Alt + drag'],
+  ];
+  return (
+    <Modal title="Keyboard & Mouse" small>
+      <table className="kbd-table">
+        <tbody>
+          {rows.map(([a, b]) => (
+            <tr key={a}>
+              <td>{a}</td>
+              <td style={{ textAlign: 'right' }}>
+                <kbd>{b}</kbd>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Modal>
+  );
+}
+
+function AboutDialog() {
+  const all = registry.all();
+  return (
+    <Modal title="Embedded Systems Virtual Lab" small footer={<button className="btn" onClick={commands.shortcuts.run}>Shortcuts</button>}>
+      <p style={{ marginTop: 0 }}>Version 0.1.0 — an offline desktop laboratory for designing, programming and simulating embedded systems.</p>
+      <p>
+        Component library: {all.length} parts ({all.filter((d) => d.simulation.support === 'full').length} fully simulated,{' '}
+        {all.filter((d) => d.simulation.support === 'partial').length} partially, {all.filter((d) => d.simulation.support === 'visual-only').length}{' '}
+        visual-only).
+      </p>
+      <p style={{ fontSize: 12, color: 'var(--text-2)' }}>
+        Built on open-source technology: Tauri, React, avr8js and @wokwi/elements (Wokwi, MIT), Monaco Editor (MIT), PlatformIO Core (Apache-2.0),
+        AVR GCC (GPL with runtime exception, invoked as a separate program). See docs/01-technology-research.md for the full licence survey.
+      </p>
+    </Modal>
+  );
+}
+
+export function Dialogs() {
+  const dialog = useEditor((s) => s.dialog);
+  if (dialog === 'examples') return <ExamplesDialog />;
+  if (dialog === 'toolchain') return <ToolchainDialog />;
+  if (dialog === 'shortcuts') return <ShortcutsDialog />;
+  if (dialog === 'about') return <AboutDialog />;
+  return null;
+}
+
+export function Toasts() {
+  const toasts = useEditor((s) => s.toasts);
+  return (
+    <div className="toasts">
+      {toasts.map((t) => (
+        <div key={t.id} className={`toast ${t.kind}`} onClick={() => useEditor.getState().dismissToast(t.id)}>
+          <Icon name={t.kind === 'error' ? 'error' : t.kind === 'warning' ? 'warning' : t.kind === 'success' ? 'ok' : 'info'} />
+          <span>{t.message}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
