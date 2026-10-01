@@ -4,6 +4,7 @@ import { registry } from '../../app/registry';
 import { useEditor } from '../../state/editor';
 import { addComponentAtCenter } from '../workspace/actions';
 import { Icon } from '../common/Icon';
+import { Tip } from '../common/Tooltip';
 
 const SUPPORT_LABEL = { full: 'Simulated', partial: 'Partial', 'visual-only': 'Visual only' } as const;
 
@@ -53,38 +54,35 @@ const Thumb = memo(function Thumb({ def }: { def: ComponentDefinition }) {
 interface ItemProps {
   def: ComponentDefinition;
   fav: boolean;
-  onHover: (def: ComponentDefinition | null, rect?: DOMRect) => void;
 }
 
-const Item = memo(function Item({ def, fav, onHover }: ItemProps) {
+const Item = memo(function Item({ def, fav }: ItemProps) {
   return (
-    <div
-      className="lib-item"
-      draggable
-      title={`${def.name} — drag onto the canvas or double-click to add`}
-      onDragStart={(e) => {
-        e.dataTransfer.setData('application/x-evlab-component', def.type);
-        e.dataTransfer.effectAllowed = 'copy';
-        onHover(null);
-      }}
-      onDoubleClick={() => addComponentAtCenter(def.type)}
-      onMouseEnter={(e) => onHover(def, e.currentTarget.getBoundingClientRect())}
-      onMouseLeave={() => onHover(null)}
-    >
-      <Thumb def={def} />
-      <span className="name">{def.name}</span>
-      <span className={`dot ${def.simulation.support}`} title={SUPPORT_LABEL[def.simulation.support]} />
-      <button
-        className={`icon-btn star${fav ? ' on' : ''}`}
-        title={fav ? 'Remove from favourites' : 'Add to favourites'}
-        onClick={(e) => {
-          e.stopPropagation();
-          useEditor.getState().toggleFavorite(def.type);
+    <Tip content={<InfoCard def={def} />} card side="right" align="start" delay={500} direct>
+      <div
+        className="lib-item"
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.setData('application/x-evlab-component', def.type);
+          e.dataTransfer.effectAllowed = 'copy';
         }}
+        onDoubleClick={() => addComponentAtCenter(def.type)}
       >
-        <Icon name="star" size={13} fill={fav ? 'currentColor' : 'none'} />
-      </button>
-    </div>
+        <Thumb def={def} />
+        <span className="name">{def.name}</span>
+        <span className={`dot ${def.simulation.support}`} aria-label={SUPPORT_LABEL[def.simulation.support]} />
+        <button
+          className={`icon-btn star${fav ? ' on' : ''}`}
+          aria-label={fav ? 'Remove from favourites' : 'Add to favourites'}
+          onClick={(e) => {
+            e.stopPropagation();
+            useEditor.getState().toggleFavorite(def.type);
+          }}
+        >
+          <Icon name="star" size={13} fill={fav ? 'currentColor' : 'none'} />
+        </button>
+      </div>
+    </Tip>
   );
 });
 
@@ -92,7 +90,6 @@ export function LibraryPanel() {
   const [query, setQuery] = useState('');
   const [simOnly, setSimOnly] = useState(false);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set(['Communication', 'Integrated Circuits', 'Actuators', 'Sensors']));
-  const [hover, setHover] = useState<{ def: ComponentDefinition; rect: DOMRect } | null>(null);
   const favorites = useEditor((s) => s.favorites);
   const recent = useEditor((s) => s.recent);
   const [, force] = useState(0);
@@ -104,7 +101,6 @@ export function LibraryPanel() {
   const cats = registry.categories();
   const order = ['Boards', 'Prototyping', 'Power', 'Passive', 'Semiconductors', 'Input', 'Output', 'Sensors', 'Actuators', 'Integrated Circuits', 'Communication'];
   cats.sort((a, b) => (order.indexOf(a.name) + 1 || 99) - (order.indexOf(b.name) + 1 || 99));
-  const onHover = (def: ComponentDefinition | null, rect?: DOMRect) => setHover(def && rect ? { def, rect } : null);
   const toggle = (name: string) => {
     const s = new Set(collapsed);
     if (s.has(name)) s.delete(name);
@@ -148,7 +144,7 @@ export function LibraryPanel() {
               Results <span className="count">{results.length}</span>
             </div>
             {results.map((d) => (
-              <Item key={d.type} def={d} fav={favSet.has(d.type)} onHover={onHover} />
+              <Item key={d.type} def={d} fav={favSet.has(d.type)} />
             ))}
             {!results.length && <div className="lib-sub">No parts match “{query}”.</div>}
           </>
@@ -163,7 +159,7 @@ export function LibraryPanel() {
                   favorites
                     .map((t) => registry.get(t))
                     .filter((d): d is ComponentDefinition => !!d && filter(d))
-                    .map((d) => <Item key={d.type} def={d} fav onHover={onHover} />)}
+                    .map((d) => <Item key={d.type} def={d} fav />)}
               </>
             )}
             {recent.length > 0 && (
@@ -176,7 +172,7 @@ export function LibraryPanel() {
                     .slice(0, 6)
                     .map((t) => registry.get(t))
                     .filter((d): d is ComponentDefinition => !!d && filter(d))
-                    .map((d) => <Item key={`r-${d.type}`} def={d} fav={favSet.has(d.type)} onHover={onHover} />)}
+                    .map((d) => <Item key={`r-${d.type}`} def={d} fav={favSet.has(d.type)} />)}
               </>
             )}
             {cats.map((cat) => {
@@ -194,7 +190,7 @@ export function LibraryPanel() {
                         <div key={sub}>
                           {cat.subcategories.size > 1 && <div className="lib-sub">{sub}</div>}
                           {shown.map((d) => (
-                            <Item key={d.type} def={d} fav={favSet.has(d.type)} onHover={onHover} />
+                            <Item key={d.type} def={d} fav={favSet.has(d.type)} />
                           ))}
                         </div>
                       );
@@ -205,16 +201,14 @@ export function LibraryPanel() {
           </>
         )}
       </div>
-      {hover && <InfoCard def={hover.def} rect={hover.rect} />}
     </div>
   );
 }
 
-function InfoCard({ def, rect }: { def: ComponentDefinition; rect: DOMRect }) {
-  const top = Math.min(rect.top, window.innerHeight - 260);
+function InfoCard({ def }: { def: ComponentDefinition }) {
   const pins = def.pins.filter((p) => p.kind !== 'socket');
   return (
-    <div className="lib-tooltip" style={{ left: rect.right + 8, top }}>
+    <div className="lib-tooltip">
       <h4>{def.name}</h4>
       <span className={`badge ${def.simulation.support}`}>{SUPPORT_LABEL[def.simulation.support]}</span>
       <p>{def.docs.summary}</p>
@@ -226,6 +220,7 @@ function InfoCard({ def, rect }: { def: ComponentDefinition; rect: DOMRect }) {
         </div>
       )}
       {def.pins.some((p) => p.kind === 'socket') && <div className="pins">{def.pins.length} holes</div>}
+      <div className="hint">Drag onto the canvas or double-click to add</div>
     </div>
   );
 }

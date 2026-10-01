@@ -19,7 +19,12 @@ import { hitPin, nearestSegment, pinIndex, pinPosition, wirePolyline, type Index
 import { addComponentAt, fitView, zoomBy } from './actions';
 import { assignProbe, probeMarkers } from '../instruments/probes';
 import { Icon } from '../common/Icon';
+import { ContextMenu } from '../common/Menu';
+import { AnchoredPopover } from '../common/Popover';
+import { Tip } from '../common/Tooltip';
+import { CanvasMenuItems } from '../shell/ContextMenu';
 import { loadExample } from '../../examples';
+import { useWireToolbarVisible, WireToolbar } from './WireToolbar';
 
 type Drag =
   | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number }
@@ -137,7 +142,6 @@ export function Workspace() {
     if ((e.target as Element).closest('button, .canvas-hint .btns')) return;
     const el = ref.current!;
     el.focus();
-    useEditor.getState().set({ contextMenu: null });
     const ed = useEditor.getState();
     if (e.button === 1 || (e.button === 0 && space.current)) {
       drag.current = { kind: 'pan', sx: e.clientX, sy: e.clientY, vx: ed.viewport.x, vy: ed.viewport.y };
@@ -382,24 +386,30 @@ export function Workspace() {
     }
   };
 
+  // Records what was right-clicked; the context menu (a portal) then opens at the pointer.
   const onContextMenu = (e: React.MouseEvent) => {
-    e.preventDefault();
     const ed = useEditor.getState();
-    if (ed.wiring) {
-      ed.set({ wiring: null });
+    if (ed.wiring || ed.tool !== 'select') {
+      // Right-click cancels wiring/probing instead of opening the menu.
+      e.preventDefault();
+      ed.set({ wiring: null, tool: 'select' });
       return;
     }
     const target = e.target as Element;
+    if (target.closest('.zoom-ctl, .canvas-hint .btns')) {
+      e.preventDefault();
+      return;
+    }
     const wireId = target.closest('[data-wire]')?.getAttribute('data-wire');
     const compId = target.closest('[data-comp]')?.getAttribute('data-comp');
     if (wireId) {
       if (!ed.selectedWires.includes(wireId)) ed.select([], [wireId]);
-      ed.set({ contextMenu: { x: e.clientX, y: e.clientY, target: { kind: 'wire', id: wireId } } });
+      ed.set({ contextMenu: { kind: 'wire', id: wireId } });
     } else if (compId) {
       if (!ed.selectedComponents.includes(compId)) ed.select([compId]);
-      ed.set({ contextMenu: { x: e.clientX, y: e.clientY, target: { kind: 'component', id: compId } } });
+      ed.set({ contextMenu: { kind: 'component', id: compId } });
     } else {
-      ed.set({ contextMenu: { x: e.clientX, y: e.clientY, target: { kind: 'canvas', world: toWorld(e.clientX, e.clientY) } } });
+      ed.set({ contextMenu: { kind: 'canvas', world: toWorld(e.clientX, e.clientY) } });
     }
   };
 
@@ -519,10 +529,12 @@ export function Workspace() {
     const v = hoverNet !== undefined && driven[hoverNet] ? voltages[hoverNet] : undefined;
     const mcu = mcus.find((m) => m.componentId === hover.ref.componentId);
     const drive = mcu?.pins[hover.ref.pinId];
-    const sx = hover.x * viewport.zoom + viewport.x;
-    const sy = hover.y * viewport.zoom + viewport.y;
+    const r = ref.current?.getBoundingClientRect();
+    const sx = (r?.left ?? 0) + hover.x * viewport.zoom + viewport.x;
+    const sy = (r?.top ?? 0) + hover.y * viewport.zoom + viewport.y;
+    const pad = 6 * Math.max(1, viewport.zoom);
     tip = (
-      <div className="pin-tip" style={{ left: sx + 12, top: sy - 34 }}>
+      <AnchoredPopover anchor={{ x: sx - pad, y: sy - pad, width: pad * 2, height: pad * 2 }} side="top" align="start" sideOffset={6} className="pin-tip" passive>
         <b>
           {hover.inst.label}.{hover.pin.label ?? hover.pin.id}
         </b>
@@ -535,8 +547,39 @@ export function Workspace() {
             {drive ? ` (${drive})` : ''}
           </span>
         )}
-      </div>
+      </AnchoredPopover>
     );
+  }
+
+  // Floating wire toolbar anchored above the selected wires.
+  const wireBarVisible = useWireToolbarVisible() && !dragging && !marquee;
+  let wireBar: React.ReactNode = null;
+  if (wireBarVisible && ref.current) {
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const id of selectedWires) {
+      const w = circuit.wires.find((x) => x.id === id);
+      for (const p of (w && wirePolyline(circuit, w)) ?? []) {
+        minX = Math.min(minX, p.x);
+        minY = Math.min(minY, p.y);
+        maxX = Math.max(maxX, p.x);
+        maxY = Math.max(maxY, p.y);
+      }
+    }
+    if (Number.isFinite(minX)) {
+      const r = ref.current.getBoundingClientRect();
+      const toScreen = (x: number, y: number) => ({ x: r.left + x * viewport.zoom + viewport.x, y: r.top + y * viewport.zoom + viewport.y });
+      const a = toScreen(minX, minY);
+      const b = toScreen(maxX, maxY);
+      // Keep the anchor inside the visible canvas so the bar never floats over other panels.
+      const x1 = Math.max(r.left, Math.min(r.right, a.x));
+      const x2 = Math.max(r.left, Math.min(r.right, b.x));
+      const y1 = Math.max(r.top, Math.min(r.bottom, a.y));
+      const y2 = Math.max(r.top, Math.min(r.bottom, b.y));
+      wireBar = <WireToolbar anchor={{ x: x1, y: y1, width: x2 - x1, height: y2 - y1 }} ids={selectedWires} />;
+    }
   }
 
   const labels = circuit.components.map((c) => {
@@ -553,7 +596,7 @@ export function Workspace() {
   });
 
   const gridSize = GRID * viewport.zoom * (viewport.zoom < 0.5 ? 5 : 1);
-  return (
+  const canvas = (
     <div
       ref={ref}
       tabIndex={0}
@@ -576,7 +619,6 @@ export function Workspace() {
         {labels}
         <WireLayer circuit={circuit} selectedWires={selectedWires} zoom={viewport.zoom} overlay={overlay} />
       </div>
-      {tip}
       {!circuit.components.length && (
         <div className="canvas-hint">
           <h3>Start building your circuit</h3>
@@ -604,17 +646,32 @@ export function Workspace() {
         </div>
       )}
       <div className="zoom-ctl" onPointerDown={(e) => e.stopPropagation()}>
-        <button className="icon-btn" title="Zoom out (−)" onClick={() => zoomBy(1 / 1.2)}>
-          <Icon name="zoom-out" />
-        </button>
+        <Tip content="Zoom out" shortcut="−" side="top">
+          <button className="icon-btn" aria-label="Zoom out" onClick={() => zoomBy(1 / 1.2)}>
+            <Icon name="zoom-out" />
+          </button>
+        </Tip>
         <span>{Math.round(viewport.zoom * 100)}%</span>
-        <button className="icon-btn" title="Zoom in (+)" onClick={() => zoomBy(1.2)}>
-          <Icon name="zoom-in" />
-        </button>
-        <button className="icon-btn" title="Fit to view (F)" onClick={fitView}>
-          <Icon name="fit" />
-        </button>
+        <Tip content="Zoom in" shortcut="+" side="top">
+          <button className="icon-btn" aria-label="Zoom in" onClick={() => zoomBy(1.2)}>
+            <Icon name="zoom-in" />
+          </button>
+        </Tip>
+        <Tip content="Fit to view" shortcut="F" side="top">
+          <button className="icon-btn" aria-label="Fit to view" onClick={fitView}>
+            <Icon name="fit" />
+          </button>
+        </Tip>
       </div>
     </div>
+  );
+  return (
+    <>
+      <ContextMenu trigger={canvas} onOpenChange={(open) => !open && useEditor.getState().set({ contextMenu: null })}>
+        <CanvasMenuItems />
+      </ContextMenu>
+      {tip}
+      {wireBar}
+    </>
   );
 }

@@ -1,130 +1,81 @@
-import { useEffect, useRef } from 'react';
+/** Items of the canvas context menu (the menu itself is opened by the workspace). */
 import { WIRE_COLORS } from '../../core/model/circuit';
 import { lookup } from '../../app/registry';
 import { useEditor } from '../../state/editor';
 import { useProject } from '../../state/project';
 import { commands } from '../commands';
-import { Icon } from '../common/Icon';
+import { MenuItem, MenuLabel, MenuSeparator, MenuSwatches, SubMenu } from '../common/Menu';
 import { assignProbe } from '../instruments/probes';
-import { autoRouteWires, bringToFront, clearWirePoints, paste, setWireColor } from '../workspace/actions';
+import { autoRouteWires, bringToFront, clearWirePoints, paste, setNetWireColor, setWireColor } from '../workspace/actions';
 
-function Item({ id, close }: { id: string; close: () => void }) {
+function Cmd({ id }: { id: string }) {
   const c = commands[id];
-  return (
-    <button className="item" disabled={c.enabled && !c.enabled()} onClick={() => (close(), c.run())}>
-      {c.icon ? <Icon name={c.icon} /> : <span style={{ width: 14 }} />} {c.label}
-      {c.shortcut && <span className="kbd">{c.shortcut}</span>}
-    </button>
-  );
+  return <MenuItem label={c.label} icon={c.icon} shortcut={c.shortcut} disabled={c.enabled && !c.enabled()} onSelect={c.run} />;
 }
 
-export function ContextMenu() {
+export function CanvasMenuItems() {
   const menu = useEditor((s) => s.contextMenu);
   const selectedWires = useEditor((s) => s.selectedWires);
   const circuit = useProject((s) => s.project.circuit);
-  const ref = useRef<HTMLDivElement>(null);
-  const close = () => useEditor.getState().set({ contextMenu: null });
-
-  useEffect(() => {
-    if (!menu) return;
-    const onDown = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && close();
-    window.addEventListener('mousedown', onDown);
-    return () => window.removeEventListener('mousedown', onDown);
-  }, [menu]);
-
   if (!menu) return null;
-  const left = Math.min(menu.x, window.innerWidth - 240);
-  const top = Math.min(menu.y, window.innerHeight - 360);
-  let body: React.ReactNode;
-  if (menu.target.kind === 'component') {
-    const inst = circuit.components.find((c) => c.id === (menu.target as { id: string }).id);
+
+  if (menu.kind === 'component') {
+    const inst = circuit.components.find((c) => c.id === menu.id);
     const def = inst && lookup(inst.type);
-    body = (
+    return (
       <>
-        <div className="label">
+        <MenuLabel>
           {inst?.label} · {def?.name}
-        </div>
-        <Item id="rotate" close={close} />
-        <Item id="rotateCcw" close={close} />
-        <Item id="flip" close={close} />
-        <div className="sep" />
-        <Item id="copy" close={close} />
-        <Item id="cut" close={close} />
-        <Item id="duplicate" close={close} />
-        <div className="sep" />
-        <button className="item" onClick={() => (close(), inst && bringToFront(inst.id, true))}>
-          <Icon name="front" /> Bring to Front
-        </button>
-        <button className="item" onClick={() => (close(), inst && bringToFront(inst.id, false))}>
-          <Icon name="back" /> Send to Back
-        </button>
-        <div className="sep" />
-        <button className="item" onClick={() => (close(), useEditor.getState().setPrefs({ showInspector: true }))}>
-          <Icon name="settings" /> Properties…
-        </button>
-        <Item id="delete" close={close} />
-      </>
-    );
-  } else if (menu.target.kind === 'wire') {
-    const ids = selectedWires.length ? selectedWires : [menu.target.id];
-    body = (
-      <>
-        <div className="label">Wire colour</div>
-        <div className="swatches">
-          {WIRE_COLORS.map((c) => (
-            <button key={c.value} className="swatch" style={{ background: c.value }} title={c.label} onClick={() => (close(), setWireColor(ids, c.value))} />
-          ))}
-        </div>
-        <div className="sep" />
-        <button className="item" onClick={() => (close(), autoRouteWires(ids))}>
-          <Icon name="route" /> Auto-route around parts
-        </button>
-        <button className="item" onClick={() => (close(), clearWirePoints(ids))}>
-          <Icon name="minus" /> Remove bends
-        </button>
-        <button
-          className="item"
-          onClick={() => {
-            close();
-            const w = circuit.wires.find((x) => x.id === ids[0]);
-            if (w) assignProbe('probe-logic', w.from);
-          }}
-        >
-          <Icon name="activity" /> Probe with logic analyzer
-        </button>
-        <button
-          className="item"
-          onClick={() => {
-            close();
-            const w = circuit.wires.find((x) => x.id === ids[0]);
-            if (w) assignProbe('probe-scope', w.from);
-          }}
-        >
-          <Icon name="waves" /> Probe with oscilloscope
-        </button>
-        <div className="sep" />
-        <Item id="delete" close={close} />
-      </>
-    );
-  } else {
-    const world = menu.target.world;
-    body = (
-      <>
-        <button className="item" disabled={!useEditor.getState().clipboard} onClick={() => (close(), paste(world))}>
-          <Icon name="paste" /> Paste here
-        </button>
-        <Item id="selectAll" close={close} />
-        <div className="sep" />
-        <Item id="fit" close={close} />
-        <Item id="grid" close={close} />
-        <div className="sep" />
-        <Item id="examples" close={close} />
+        </MenuLabel>
+        <Cmd id="rotate" />
+        <Cmd id="rotateCcw" />
+        <Cmd id="flip" />
+        <MenuSeparator />
+        <Cmd id="copy" />
+        <Cmd id="cut" />
+        <Cmd id="duplicate" />
+        <MenuSeparator />
+        <MenuItem label="Bring to Front" icon="front" onSelect={() => inst && bringToFront(inst.id, true)} />
+        <MenuItem label="Send to Back" icon="back" onSelect={() => inst && bringToFront(inst.id, false)} />
+        <MenuSeparator />
+        <MenuItem label="Properties…" icon="settings" onSelect={() => useEditor.getState().setPrefs({ showInspector: true })} />
+        <Cmd id="delete" />
       </>
     );
   }
+
+  if (menu.kind === 'wire') {
+    const ids = selectedWires.length ? selectedWires : [menu.id];
+    const wire = circuit.wires.find((x) => x.id === menu.id);
+    return (
+      <>
+        <MenuLabel>{ids.length > 1 ? `Colour of ${ids.length} wires` : 'Wire colour'}</MenuLabel>
+        <MenuSwatches colors={WIRE_COLORS} active={ids.length === 1 ? wire?.color : undefined} onPick={(c) => setWireColor(ids, c)} />
+        <SubMenu label="Colour whole net" icon="cable">
+          <MenuLabel>Every wire on this net</MenuLabel>
+          <MenuSwatches colors={WIRE_COLORS} onPick={(c) => setNetWireColor(menu.id, c)} />
+        </SubMenu>
+        <MenuSeparator />
+        <MenuItem label="Auto-route around parts" icon="route" onSelect={() => autoRouteWires(ids)} />
+        <MenuItem label="Remove bends" icon="minus" onSelect={() => clearWirePoints(ids)} />
+        <MenuItem label="Probe with logic analyzer" icon="activity" onSelect={() => wire && assignProbe('probe-logic', wire.from)} />
+        <MenuItem label="Probe with oscilloscope" icon="waves" onSelect={() => wire && assignProbe('probe-scope', wire.from)} />
+        <MenuSeparator />
+        <Cmd id="delete" />
+      </>
+    );
+  }
+
+  const world = menu.world;
   return (
-    <div ref={ref} className="ctxmenu" style={{ left, top }} onContextMenu={(e) => e.preventDefault()}>
-      {body}
-    </div>
+    <>
+      <MenuItem label="Paste here" icon="paste" disabled={!useEditor.getState().clipboard} onSelect={() => paste(world)} />
+      <Cmd id="selectAll" />
+      <MenuSeparator />
+      <Cmd id="fit" />
+      <Cmd id="grid" />
+      <MenuSeparator />
+      <Cmd id="examples" />
+    </>
   );
 }

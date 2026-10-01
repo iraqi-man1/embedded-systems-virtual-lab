@@ -7,7 +7,7 @@ import { CodeEditor } from './editor/CodeEditor';
 import { Inspector } from './inspector/Inspector';
 import { BottomDock } from './instruments/BottomDock';
 import { LibraryPanel } from './library/LibraryPanel';
-import { ContextMenu } from './shell/ContextMenu';
+import { TooltipProvider } from './common/Tooltip';
 import { Dialogs, Toasts } from './shell/Dialogs';
 import { MenuBar } from './shell/MenuBar';
 import { StatusBar } from './shell/StatusBar';
@@ -82,52 +82,53 @@ export function App() {
   }, []);
 
   return (
-    <div className="app">
-      <MenuBar />
-      <Toolbar />
-      <div className="main">
-        {showLibrary && (
-          <>
-            <div style={{ width: libW, flex: 'none', minHeight: 0 }}>
-              <LibraryPanel />
+    <TooltipProvider>
+      <div className="app">
+        <MenuBar />
+        <Toolbar />
+        <div className="main">
+          {showLibrary && (
+            <>
+              <div style={{ width: libW, flex: 'none', minHeight: 0 }}>
+                <LibraryPanel />
+              </div>
+              <Splitter k="libraryWidth" dir="v" min={200} max={460} />
+            </>
+          )}
+          <div className="center">
+            <div className="center-top">
+              <Workspace />
+              {showCode && (
+                <>
+                  <Splitter k="codeWidth" dir="v" invert min={320} max={1100} />
+                  <div style={{ width: codeW, flex: 'none', display: 'flex', minHeight: 0 }}>
+                    <CodeEditor />
+                  </div>
+                </>
+              )}
             </div>
-            <Splitter k="libraryWidth" dir="v" min={200} max={460} />
-          </>
-        )}
-        <div className="center">
-          <div className="center-top">
-            <Workspace />
-            {showCode && (
+            {showDock && (
               <>
-                <Splitter k="codeWidth" dir="v" invert min={320} max={1100} />
-                <div style={{ width: codeW, flex: 'none', display: 'flex', minHeight: 0 }}>
-                  <CodeEditor />
+                <Splitter k="dockHeight" dir="h" invert min={120} max={700} />
+                <div className="dock" style={{ height: dockH }}>
+                  <BottomDock />
                 </div>
               </>
             )}
           </div>
-          {showDock && (
+          {showInspector && (
             <>
-              <Splitter k="dockHeight" dir="h" invert min={120} max={700} />
-              <div className="dock" style={{ height: dockH }}>
-                <BottomDock />
+              <Splitter k="inspectorWidth" dir="v" invert min={240} max={520} />
+              <div style={{ width: inspW, flex: 'none', minHeight: 0 }}>
+                <Inspector />
               </div>
             </>
           )}
         </div>
-        {showInspector && (
-          <>
-            <Splitter k="inspectorWidth" dir="v" invert min={240} max={520} />
-            <div style={{ width: inspW, flex: 'none', minHeight: 0 }}>
-              <Inspector />
-            </div>
-          </>
-        )}
+        <StatusBar />
+        <Dialogs />
+        <Toasts />
       </div>
-      <StatusBar />
-      <ContextMenu />
-      <Dialogs />
-      <Toasts />
-    </div>
+    </TooltipProvider>
   );
 }

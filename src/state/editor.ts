@@ -12,11 +12,8 @@ export interface Toast {
   message: string;
 }
 
-export interface ContextMenuState {
-  x: number;
-  y: number;
-  target: { kind: 'component'; id: string } | { kind: 'wire'; id: string } | { kind: 'canvas'; world: { x: number; y: number } };
-}
+/** What the canvas context menu was opened on (the menu positions itself at the pointer). */
+export type ContextMenuState = { kind: 'component'; id: string } | { kind: 'wire'; id: string } | { kind: 'canvas'; world: { x: number; y: number } };
 
 interface Prefs {
   theme: Theme;

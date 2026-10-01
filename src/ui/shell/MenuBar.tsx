@@ -1,70 +1,78 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect } from 'react';
 import { useEditor } from '../../state/editor';
 import { useProject } from '../../state/project';
 import { commands } from '../commands';
-import { Icon } from '../common/Icon';
+import { MenuBarMenu, MenuBarRoot, MenuCheckItem, MenuItem, MenuSeparator, SubMenu } from '../common/Menu';
+import { setZoom } from '../workspace/actions';
+import { AlignItems, SpeedItems, WireColorItems } from './Toolbar';
 
-type Entry = string | '-' | { label: string; items: string[] };
+type Entry = string | '-' | { sub: string; icon?: string; render: () => React.ReactNode };
+
+const ZOOMS = [0.25, 0.5, 0.75, 1, 1.5, 2, 3];
+
+function ZoomItems() {
+  const zoom = useEditor((s) => s.viewport.zoom);
+  return (
+    <>
+      {ZOOMS.map((z) => (
+        <MenuCheckItem key={z} label={`${z * 100}%`} checked={Math.abs(zoom - z) < 1e-3} onSelect={() => setZoom(z)} />
+      ))}
+    </>
+  );
+}
 
 const MENUS: { name: string; items: Entry[] }[] = [
   { name: 'File', items: ['new', 'open', '-', 'save', 'saveAs', '-', 'examples'] },
   { name: 'Edit', items: ['undo', 'redo', '-', 'cut', 'copy', 'paste', 'duplicate', 'delete', '-', 'selectAll', '-', 'rotate', 'rotateCcw', 'flip'] },
-  { name: 'Arrange', items: ['alignLeft', 'alignCenter', 'alignRight', '-', 'alignTop', 'alignMiddle', 'alignBottom', '-', 'distH', 'distV'] },
-  { name: 'View', items: ['zoomIn', 'zoomOut', 'zoomReset', 'fit', '-', 'grid', 'snap', '-', 'toggleLibrary', 'toggleCode', 'toggleInspector', 'toggleDock', '-', 'sound', 'theme'] },
-  { name: 'Simulation', items: ['compile', '-', 'run', 'pause', 'step', 'stepInstr', 'reset', 'stop', '-', 'probeLogic', 'probeScope', '-', 'toolchain'] },
+  {
+    name: 'Arrange',
+    items: [
+      { sub: 'Align & distribute', icon: 'align-left', render: () => <AlignItems /> },
+      '-',
+      { sub: 'Wire colour', icon: 'cable', render: () => <WireColorItems /> },
+      'cycleWireColor',
+    ],
+  },
+  {
+    name: 'View',
+    items: ['zoomIn', 'zoomOut', 'zoomReset', 'fit', { sub: 'Zoom', render: () => <ZoomItems /> }, '-', 'grid', 'snap', '-', 'toggleLibrary', 'toggleCode', 'toggleInspector', 'toggleDock', '-', 'sound', 'theme'],
+  },
+  {
+    name: 'Simulation',
+    items: ['compile', '-', 'run', 'pause', 'step', 'stepInstr', 'reset', 'stop', '-', { sub: 'Speed', icon: 'gauge', render: () => <SpeedItems /> }, '-', 'probeLogic', 'probeScope', '-', 'toolchain'],
+  },
   { name: 'Help', items: ['examples', 'shortcuts', '-', 'about'] },
 ];
 
-function MenuItem({ id, close }: { id: string; close: () => void }) {
+const TOGGLES: Record<string, () => boolean> = {
+  grid: () => useEditor.getState().showGrid,
+  snap: () => useEditor.getState().snap,
+  theme: () => useEditor.getState().theme === 'dark',
+  sound: () => useEditor.getState().sound,
+  toggleLibrary: () => useEditor.getState().showLibrary,
+  toggleInspector: () => useEditor.getState().showInspector,
+  toggleCode: () => useEditor.getState().showCode,
+  toggleDock: () => useEditor.getState().showDock,
+};
+
+function CommandEntry({ id }: { id: string }) {
   const c = commands[id];
-  const showGrid = useEditor((s) => s.showGrid);
-  const snap = useEditor((s) => s.snap);
-  const editor = useEditor();
-  const enabled = !c.enabled || c.enabled();
-  const checked =
-    (id === 'grid' && showGrid) ||
-    (id === 'snap' && snap) ||
-    (id === 'theme' && editor.theme === 'dark') ||
-    (id === 'sound' && editor.sound) ||
-    (id === 'toggleLibrary' && editor.showLibrary) ||
-    (id === 'toggleInspector' && editor.showInspector) ||
-    (id === 'toggleCode' && editor.showCode) ||
-    (id === 'toggleDock' && editor.showDock);
-  const isToggle = ['grid', 'snap', 'sound', 'theme', 'toggleLibrary', 'toggleInspector', 'toggleCode', 'toggleDock'].includes(id);
-  return (
-    <button
-      className="item"
-      disabled={!enabled}
-      onClick={() => {
-        close();
-        c.run();
-      }}
-    >
-      {isToggle ? <span style={{ width: 14, textAlign: 'center' }}>{checked ? '✓' : ''}</span> : c.icon ? <Icon name={c.icon} /> : <span style={{ width: 14 }} />}
-      {c.label}
-      {c.shortcut && <span className="kbd">{c.shortcut}</span>}
-    </button>
-  );
+  // Toggles reflect the current preferences.
+  useEditor((s) => [s.showGrid, s.snap, s.theme, s.sound, s.showLibrary, s.showInspector, s.showCode, s.showDock].join());
+  const disabled = !!c.enabled && !c.enabled();
+  if (TOGGLES[id]) return <MenuCheckItem label={c.label} checked={TOGGLES[id]()} shortcut={c.shortcut} disabled={disabled} onSelect={c.run} />;
+  return <MenuItem label={c.label} icon={c.icon} shortcut={c.shortcut} disabled={disabled} onSelect={c.run} />;
 }
 
 export function MenuBar() {
-  const [open, setOpen] = useState<string | null>(null);
-  const ref = useRef<HTMLDivElement>(null);
   const name = useProject((s) => s.project.meta.name);
   const dirty = useProject((s) => s.dirty);
   const path = useProject((s) => s.filePath);
   useEffect(() => {
-    const close = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(null);
-    };
-    window.addEventListener('mousedown', close);
-    return () => window.removeEventListener('mousedown', close);
-  }, []);
-  useEffect(() => {
     document.title = `${dirty ? '● ' : ''}${name} — Embedded Systems Virtual Lab`;
   }, [name, dirty]);
   return (
-    <div className="menubar" ref={ref}>
+    <div className="menubar">
       <div className="brand">
         <svg viewBox="0 0 512 512">
           <rect width="512" height="512" rx="96" fill="#0f2a3d" />
@@ -73,20 +81,23 @@ export function MenuBar() {
         </svg>
         Virtual Lab
       </div>
-      {MENUS.map((m) => (
-        <div key={m.name} className={`menu-root${open === m.name ? ' open' : ''}`}>
-          <button onMouseDown={() => setOpen(open === m.name ? null : m.name)} onMouseEnter={() => open && setOpen(m.name)}>
-            {m.name}
-          </button>
-          {open === m.name && (
-            <div className="dropdown">
-              {m.items.map((it, i) =>
-                it === '-' ? <div key={i} className="sep" /> : typeof it === 'string' ? <MenuItem key={it} id={it} close={() => setOpen(null)} /> : null,
-              )}
-            </div>
-          )}
-        </div>
-      ))}
+      <MenuBarRoot>
+        {MENUS.map((m) => (
+          <MenuBarMenu key={m.name} label={m.name}>
+            {m.items.map((it, i) =>
+              it === '-' ? (
+                <MenuSeparator key={i} />
+              ) : typeof it === 'string' ? (
+                <CommandEntry key={it} id={it} />
+              ) : (
+                <SubMenu key={it.sub} label={it.sub} icon={it.icon}>
+                  {it.render()}
+                </SubMenu>
+              ),
+            )}
+          </MenuBarMenu>
+        ))}
+      </MenuBarRoot>
       <div className="menu-title" title={path ?? 'Not saved yet'}>
         {name}
         {dirty ? ' •' : ''}

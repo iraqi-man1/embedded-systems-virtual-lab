@@ -3,10 +3,11 @@
  * shortcuts. They operate on the project/editor stores.
  */
 import { nanoid } from 'nanoid';
-import type { CircuitDocument, ComponentInstance, Rotation, Wire } from '../../core/model/circuit';
+import { WIRE_COLORS, type CircuitDocument, type ComponentInstance, type Rotation, type Wire } from '../../core/model/circuit';
 import { GRID } from '../../core/model/component';
 import { componentBounds, snapComponentPosition } from '../../core/circuit/geometry';
 import { lookup, registry } from '../../app/registry';
+import { getNetlist } from '../../state/derived';
 import { useEditor } from '../../state/editor';
 import { createInstance, nextLabel, useProject } from '../../state/project';
 import { autoRoute, selectionBounds } from './geometry';
@@ -211,11 +212,51 @@ export function alignSelection(mode: Align) {
   });
 }
 
+/** Recolours existing wires (one undo step). The default for new wires is unchanged. */
 export function setWireColor(ids: string[], color: string) {
+  const set = new Set(ids);
   proj().edit((c) => {
-    for (const w of c.wires) if (ids.includes(w.id)) w.color = color;
+    for (const w of c.wires) if (set.has(w.id)) w.color = color;
   });
-  ed().setPrefs({ wireColor: color });
+}
+
+/** Wires electrically connected to `wireId` (same net, including through breadboard strips). */
+export function netWireIds(wireId: string): string[] {
+  const circuit = proj().project.circuit;
+  const w = circuit.wires.find((x) => x.id === wireId);
+  if (!w) return [];
+  const netlist = getNetlist(circuit);
+  const net = netlist.netOf(w.from);
+  if (net === undefined) return [wireId];
+  return circuit.wires.filter((x) => netlist.netOf(x.from) === net || netlist.netOf(x.to) === net).map((x) => x.id);
+}
+
+/** Recolours every wire of the net the given wire belongs to (e.g. all GND wires black). */
+export function setNetWireColor(wireId: string, color: string) {
+  const ids = netWireIds(wireId);
+  setWireColor(ids, color);
+  if (ids.length > 1) ed().notify(`Recoloured ${ids.length} wires on this net.`, 'info');
+}
+
+/**
+ * Keyboard colour picking: applies to the selected wires, or to the wire being
+ * drawn (and later new wires) when nothing is selected.
+ */
+export function pickWireColor(index: number) {
+  const c = WIRE_COLORS[index];
+  if (!c) return;
+  const { selectedWires, wiring } = ed();
+  if (selectedWires.length && !wiring) setWireColor(selectedWires, c.value);
+  else ed().setPrefs({ wireColor: c.value });
+}
+
+/** Cycles the colour of the selected wires (or the default for new wires) through the palette. */
+export function cycleWireColor() {
+  const { selectedWires, wiring, wireColor } = ed();
+  const wires = proj().project.circuit.wires;
+  const current = selectedWires.length && !wiring ? (wires.find((w) => w.id === selectedWires[0])?.color ?? wireColor) : wireColor;
+  const i = WIRE_COLORS.findIndex((c) => c.value === current);
+  pickWireColor((i + 1) % WIRE_COLORS.length);
 }
 
 export function clearWirePoints(ids: string[]) {
@@ -274,11 +315,16 @@ export function fitView() {
   });
 }
 
-export function zoomBy(factor: number) {
+/** Sets the zoom level, keeping the centre of the canvas in place. */
+export function setZoom(level: number) {
   const el = document.querySelector('.workspace') as HTMLElement | null;
   const { viewport } = ed();
   const cx = (el?.clientWidth ?? 800) / 2;
   const cy = (el?.clientHeight ?? 600) / 2;
-  const zoom = Math.max(0.1, Math.min(6, viewport.zoom * factor));
+  const zoom = Math.max(0.1, Math.min(6, level));
   ed().set({ viewport: { zoom, x: cx - (cx - viewport.x) * (zoom / viewport.zoom), y: cy - (cy - viewport.y) * (zoom / viewport.zoom) } });
+}
+
+export function zoomBy(factor: number) {
+  setZoom(ed().viewport.zoom * factor);
 }

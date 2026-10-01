@@ -9,7 +9,7 @@ import { useEditor } from '../../state/editor';
 import { useProject } from '../../state/project';
 import { sendInput, useSim } from '../../state/sim';
 import { Icon } from '../common/Icon';
-import { clearWirePoints, deleteSelection, flipSelection, rotateSelection, setWireColor, autoRouteWires } from '../workspace/actions';
+import { clearWirePoints, deleteSelection, flipSelection, rotateSelection, setNetWireColor, setWireColor, autoRouteWires } from '../workspace/actions';
 import { pinLabel } from '../instruments/probes';
 
 const SUPPORT_LABEL = { full: 'Simulated', partial: 'Partially simulated', 'visual-only': 'Visual only' } as const;
@@ -224,17 +224,10 @@ function WireInspector({ wire }: { wire: Wire }) {
       </div>
       <div className="insp-sec">
         <div className="h">Colour</div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {WIRE_COLORS.map((c) => (
-            <button
-              key={c.value}
-              className={`swatch${wire.color === c.value ? ' active' : ''}`}
-              style={{ background: c.value }}
-              title={c.label}
-              onClick={() => setWireColor([wire.id], c.value)}
-            />
-          ))}
-        </div>
+        <WireSwatches active={wire.color} onPick={(c) => setWireColor([wire.id], c)} />
+        <button className="btn" style={{ marginTop: 8 }} onClick={() => setNetWireColor(wire.id, wire.color)}>
+          <Icon name="palette" /> Apply to whole net
+        </button>
         <div className="field" style={{ marginTop: 10 }}>
           <label>Label</label>
           <input
@@ -258,10 +251,51 @@ function WireInspector({ wire }: { wire: Wire }) {
           </button>
         </div>
         <p className="doc-text" style={{ fontSize: 11, marginTop: 8 }}>
-          Drag the wire to add a bend; drag the square handles to move bends. Double-click adds a bend.
+          Drag the wire to add a bend; drag the square handles to move bends. Double-click adds a bend. Keys <kbd>1</kbd>–<kbd>9</kbd>{' '}
+          pick a colour, <kbd>C</kbd> cycles.
         </p>
       </div>
     </>
+  );
+}
+
+/** Bulk wire editing for multi-selections. */
+function MultiWireSection({ ids }: { ids: string[] }) {
+  const wires = useProject((s) => s.project.circuit.wires);
+  const colors = new Set(wires.filter((w) => ids.includes(w.id)).map((w) => w.color));
+  const current = colors.size === 1 ? [...colors][0] : undefined;
+  return (
+    <div className="insp-sec">
+      <div className="h">
+        Wire colour <span className="r">{ids.length} wires</span>
+      </div>
+      <WireSwatches active={current} onPick={(c) => setWireColor(ids, c)} />
+      <div className="btn-row" style={{ marginTop: 8 }}>
+        <button className="btn" onClick={() => autoRouteWires(ids)}>
+          <Icon name="route" /> Auto-route
+        </button>
+        <button className="btn" onClick={() => clearWirePoints(ids)}>
+          Straighten
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function WireSwatches({ active, onPick }: { active?: string; onPick: (c: string) => void }) {
+  return (
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      {WIRE_COLORS.map((c, i) => (
+        <button
+          key={c.value}
+          className={`swatch${active === c.value ? ' active' : ''}`}
+          style={{ background: c.value }}
+          aria-label={c.label}
+          title={`${c.label}${i < 9 ? ` (${i + 1})` : ''}`}
+          onClick={() => onPick(c.value)}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -337,10 +371,16 @@ export function Inspector() {
     content = inst && def ? <ComponentInspector key={inst.id} inst={inst} def={def} /> : null;
   } else if (selectedComponents.length > 1 || (selectedWires.length > 1 && !selectedComponents.length)) {
     content = (
-      <div className="insp-head">
-        <h3>{selectedComponents.length + selectedWires.length} items selected</h3>
-        <div className="sub">Use the toolbar to align, rotate or delete. Ctrl+D duplicates.</div>
-      </div>
+      <>
+        <div className="insp-head">
+          <h3>{selectedComponents.length + selectedWires.length} items selected</h3>
+          <div className="sub">
+            {selectedComponents.length} part{selectedComponents.length === 1 ? '' : 's'} · {selectedWires.length} wire{selectedWires.length === 1 ? '' : 's'} — use the
+            toolbar to align, rotate or delete. Ctrl+D duplicates.
+          </div>
+        </div>
+        {selectedWires.length > 0 && <MultiWireSection ids={selectedWires} />}
+      </>
     );
   } else if (selectedWires.length === 1) {
     const w = circuit.wires.find((x) => x.id === selectedWires[0]);

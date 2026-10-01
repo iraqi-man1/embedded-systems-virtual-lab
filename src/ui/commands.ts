@@ -14,6 +14,9 @@ import {
 import {
   alignSelection,
   copySelection,
+  cycleWireColor,
+  pickWireColor,
+  setZoom,
   cutSelection,
   deleteSelection,
   duplicateSelection,
@@ -57,6 +60,7 @@ export const commands: Record<string, Command> = {
   rotate: { id: 'rotate', label: 'Rotate 90° CW', icon: 'rotate', shortcut: 'R', run: () => rotateSelection(90), enabled: () => ed().selectedComponents.length > 0 },
   rotateCcw: { id: 'rotateCcw', label: 'Rotate 90° CCW', icon: 'rotate-ccw', shortcut: 'Shift+R', run: () => rotateSelection(-90), enabled: () => ed().selectedComponents.length > 0 },
   flip: { id: 'flip', label: 'Flip Horizontal', icon: 'flip', shortcut: 'H', run: flipSelection, enabled: () => ed().selectedComponents.length > 0 },
+  cycleWireColor: { id: 'cycleWireColor', label: 'Cycle Wire Colour', icon: 'palette', shortcut: 'C', run: cycleWireColor },
   alignLeft: { id: 'alignLeft', label: 'Align Left', icon: 'align-left', run: () => alignSelection('left'), enabled: () => ed().selectedComponents.length > 1 },
   alignCenter: { id: 'alignCenter', label: 'Align Centers', icon: 'align-center', run: () => alignSelection('center'), enabled: () => ed().selectedComponents.length > 1 },
   alignRight: { id: 'alignRight', label: 'Align Right', icon: 'align-right', run: () => alignSelection('right'), enabled: () => ed().selectedComponents.length > 1 },
@@ -67,7 +71,7 @@ export const commands: Record<string, Command> = {
   distV: { id: 'distV', label: 'Distribute Vertically', icon: 'dist-v', run: () => alignSelection('vdist'), enabled: () => ed().selectedComponents.length > 2 },
   zoomIn: { id: 'zoomIn', label: 'Zoom In', icon: 'zoom-in', shortcut: '+', run: () => zoomBy(1.2) },
   zoomOut: { id: 'zoomOut', label: 'Zoom Out', icon: 'zoom-out', shortcut: '−', run: () => zoomBy(1 / 1.2) },
-  zoomReset: { id: 'zoomReset', label: 'Actual Size (100%)', shortcut: '0', run: () => ed().set({ viewport: { ...ed().viewport, zoom: 1 } }) },
+  zoomReset: { id: 'zoomReset', label: 'Actual Size (100%)', shortcut: '0', run: () => setZoom(1) },
   fit: { id: 'fit', label: 'Fit to Window', icon: 'fit', shortcut: 'F', run: fitView },
   grid: { id: 'grid', label: 'Show Grid', icon: 'grid', shortcut: 'G', run: () => ed().setPrefs({ showGrid: !ed().showGrid }) },
   snap: { id: 'snap', label: 'Snap to Grid', icon: 'magnet', run: () => ed().setPrefs({ snap: !ed().snap }) },
@@ -103,6 +107,9 @@ const isTyping = (e: KeyboardEvent) => {
   return !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable || !!t.closest('.monaco-editor'));
 };
 
+/** Focus is inside a menu, menu bar or dialog: let it handle plain keys. */
+const inMenu = (e: KeyboardEvent) => !!(e.target as Element | null)?.closest?.('[role="menu"],[role="menubar"],[role="dialog"]');
+
 /** Global keyboard handling. Returns a cleanup function. */
 export function installShortcuts(): () => void {
   const handler = (e: KeyboardEvent) => {
@@ -124,7 +131,7 @@ export function installShortcuts(): () => void {
     if (k === 'F11') return run('stepInstr');
     // Block browser reload/print shortcuts inside the desktop app.
     if (ctrl && (k.toLowerCase() === 'r' || k.toLowerCase() === 'p')) return e.preventDefault();
-    if (isTyping(e)) return;
+    if (isTyping(e) || inMenu(e)) return;
     if (ctrl && !e.shiftKey && k.toLowerCase() === 'z') return run('undo');
     if (ctrl && (k.toLowerCase() === 'y' || (e.shiftKey && k.toLowerCase() === 'z'))) return run('redo');
     if (ctrl && k.toLowerCase() === 'c') return run('copy');
@@ -141,7 +148,6 @@ export function installShortcuts(): () => void {
       case 'Escape':
         if (editor.wiring) editor.set({ wiring: null });
         else if (editor.tool !== 'select') editor.set({ tool: 'select' });
-        else if (editor.contextMenu) editor.set({ contextMenu: null });
         else if (editor.dialog) editor.set({ dialog: null });
         else editor.clearSelection();
         return e.preventDefault();
@@ -167,6 +173,21 @@ export function installShortcuts(): () => void {
         return run('zoomReset');
       case '?':
         return run('shortcuts');
+      case 'c':
+      case 'C':
+        return run('cycleWireColor');
+      case '1':
+      case '2':
+      case '3':
+      case '4':
+      case '5':
+      case '6':
+      case '7':
+      case '8':
+      case '9':
+        if (!editor.selectedWires.length && !editor.wiring) return;
+        pickWireColor(Number(k) - 1);
+        return e.preventDefault();
       case 'ArrowLeft':
       case 'ArrowRight':
       case 'ArrowUp':

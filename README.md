@@ -111,6 +111,7 @@ cargo test --manifest-path src-tauri/Cargo.toml -- --include-ignored
 - [Architecture](docs/02-architecture.md)
 - [Component packages (extending the library)](docs/03-component-packages.md)
 - [Simulation fidelity & limitations](docs/04-simulation-fidelity.md)
+- [UI regression checklist (floating UI, layering)](docs/05-ui-regression-checklist.md)
 - Architecture decisions: [desktop shell](docs/adr/ADR-001-desktop-shell.md),
   [MCU emulation](docs/adr/ADR-002-mcu-emulation.md),
   [real-time solver](docs/adr/ADR-003-realtime-circuit-solver.md),
