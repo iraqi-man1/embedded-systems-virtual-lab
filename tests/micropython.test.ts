@@ -195,6 +195,27 @@ describe('MicroPython on the Raspberry Pi Pico', () => {
     expect(out).toContain("accel b'\\x00\\x00\\x00\\x00@\\x00'");
   }, 60_000);
 
+  it('hardware SPI shifts a byte into a 74HC595', () => {
+    const b = new CircuitBuilder(registry);
+    const pico = b.add('evlab.rpi-pico', 0, 0);
+    const sr = b.add('evlab.74hc595', 300, 200);
+    for (const [from, to] of [['GP19', 'SER'], ['GP18', 'SRCLK'], ['GP17', 'RCLK'], ['3V3', 'VCC'], ['3V3', 'SRCLR'], ['GND.b2', 'GND'], ['GND.b7', 'OE']])
+      b.wire(pico, from, sr, to, WIRE.blue);
+    const p = newProject('SPI');
+    p.circuit = b.doc;
+    p.firmware.files = [
+      { name: 'main.py', content: "from machine import SPI, Pin\nspi = SPI(0, baudrate=1000000, sck=Pin(18), mosi=Pin(19))\nlatch = Pin(17, Pin.OUT, value=0)\nspi.write(bytes([0b10100101]))\nlatch.value(1)\nlatch.value(0)\nprint('sent')\n" },
+    ];
+    const h = runProject(p);
+    h.run(3, () => h.serial().includes('sent'));
+    h.run(0.02);
+    const nl = buildNetlist(p.circuit, lookup);
+    const f = h.frames().at(-1)!;
+    const level = (pin: string) => (f.voltages[nl.netOf({ componentId: sr.id, pinId: pin })!] > 1.65 ? 1 : 0);
+    // MSB first: QH holds the first bit sent, QA the last.
+    expect(['QH', 'QG', 'QF', 'QE', 'QD', 'QC', 'QB', 'QA'].map(level).join('')).toBe('10100101');
+  }, 60_000);
+
   it('imports other .py files of the project and reports errors with a traceback', () => {
     const p = example('pico-blink');
     p.firmware.files = [

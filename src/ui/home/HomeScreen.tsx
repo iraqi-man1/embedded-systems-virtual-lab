@@ -227,7 +227,7 @@ function LearnTab() {
   const steps: { icon: string; title: string; text: string }[] = [
     { icon: 'box', title: t('Place parts'), text: t('Drag parts from the library onto the canvas, or double-click the canvas and type a name.') },
     { icon: 'cable', title: t('Wire them'), text: t('Click a pin, then another pin. Legs dropped into breadboard holes connect by themselves.') },
-    { icon: 'code', title: t('Write the code'), text: t('Program the board in the code editor: Arduino C++ for the Uno and Nano.') },
+    { icon: 'code', title: t('Write the code'), text: t('Program the board in the code editor: Arduino C++ for the Uno and Nano, Python (MicroPython) for the Raspberry Pi Pico.') },
     { icon: 'play', title: t('Run and interact'), text: t('Press F5. Click buttons, turn knobs and watch the serial monitor and instruments.') },
   ];
   const keys: [string, string][] = [
@@ -273,6 +273,9 @@ function LearnTab() {
           <h3>{t('Try it')}</h3>
           <button className="btn primary" onClick={() => void loadExample('blink')}>
             <Icon name="sparkles" /> {t('Open the Blink example')}
+          </button>
+          <button className="btn" onClick={() => void loadExample('pico-blink')}>
+            <Icon name="code" /> {t('Try Python on a Raspberry Pi Pico')}
           </button>
           <button className="btn" onClick={() => openGuide()}>
             <Icon name="book" /> {t('Parts guide: what each part does and how to wire it')}
