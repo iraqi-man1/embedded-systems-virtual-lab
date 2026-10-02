@@ -11,6 +11,8 @@ import { confirmDialog } from '../common/Dialog';
 import { Icon } from '../common/Icon';
 import { Tip } from '../common/Tooltip';
 import { dockCode, floatCode, onCodeBarDoubleClick, startCodeBarDrag } from './codeDock';
+import { snippetsFor, type Snippet } from '../../examples/snippets';
+import { DropdownMenu, MenuItem } from '../common/Menu';
 
 /** Why a file name can't be used, or null when it can. */
 function fileNameError(language: FirmwareLanguage, name: string, others: string[]): string | null {
@@ -237,6 +239,22 @@ export function CodeEditor() {
               ? `${targetDef.mcu?.chip ?? ''} · PlatformIO ${targetDef.mcu?.toolchain.board ?? ''}`
               : t('No programmable board in the circuit');
 
+  /** Inserts a snippet at the cursor (on its own lines), as one undo step. */
+  const insertSnippet = (sn: Snippet) => {
+    const ed = editorRef.current;
+    const model = ed?.getModel();
+    const sel = ed?.getSelection();
+    if (!ed || !model || !sel) return;
+    const line = model.getLineContent(sel.positionLineNumber);
+    // A cursor inside a line of code: the snippet goes on the next line.
+    const range = sel.isEmpty() && line.trim() ? new monaco.Range(sel.positionLineNumber, line.length + 1, sel.positionLineNumber, line.length + 1) : sel;
+    const text = sel.isEmpty() && line.trim() ? `\n${sn.code}\n` : `${sn.code}\n`;
+    ed.pushUndoStop();
+    ed.executeEdits('snippet', [{ range, text, forceMoveMarkers: true }]);
+    ed.pushUndoStop();
+    ed.focus();
+  };
+
   return (
     <div className="panel code-panel" style={{ flex: 1 }}>
       <div className="code-tabs" onPointerDown={startCodeBarDrag} onDoubleClick={onCodeBarDoubleClick}>
@@ -362,6 +380,32 @@ export function CodeEditor() {
             </button>
           </Tip>
         )}
+        <DropdownMenu
+          className="snippets"
+          trigger={
+            <button className="tb-btn" aria-label={t('Insert a code snippet')}>
+              <Icon name="snippet" />
+              <span className="label">{t('Snippets')}</span>
+            </button>
+          }
+        >
+          {snippetsFor(language).map((sn) => (
+            <MenuItem
+              key={sn.id}
+              icon="snippet"
+              label={
+                <span className="snip">
+                  <span className="snip-title">{t(sn.title)}</span>
+                  <span className="snip-desc">
+                    {t(sn.description)}
+                    {sn.where === 'loop' && !python && <span className="snip-where"> · {t('goes inside loop()')}</span>}
+                  </span>
+                </span>
+              }
+              onSelect={() => insertSnippet(sn)}
+            />
+          ))}
+        </DropdownMenu>
         <Tip content={statusText} direct>
           <span className="info">{statusText}</span>
         </Tip>

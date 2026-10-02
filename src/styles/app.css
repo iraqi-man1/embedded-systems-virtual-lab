@@ -695,3 +695,13 @@ body.panel-resizing, body.panel-resizing * { user-select: none !important; }
 
 /* Locked parts: a padlock at their corner. */
 .lock-badge { position: absolute; display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; transform: translate(-60%, -40%); border-radius: 50%; background: var(--bg-panel-2); border: 1px solid var(--border-strong); color: var(--text-2); box-shadow: var(--shadow); pointer-events: auto; cursor: default; z-index: 2; }
+
+/* Code editor › Snippets: a title and what it does. */
+.dropdown.snippets { max-width: 380px; }
+.dropdown.snippets .item { height: auto; align-items: flex-start; padding-block: 6px; }
+.dropdown.snippets .item > svg { margin-top: 2px; }
+.snip { display: flex; flex-direction: column; gap: 1px; white-space: normal; }
+.snip-title { font-weight: 600; }
+.snip-desc { color: var(--text-3); font-size: var(--fs-xs); line-height: 1.35; }
+.snip-where { color: var(--accent); }
+.dropdown.snippets .item[data-highlighted] .snip-desc, .dropdown.snippets .item[data-highlighted] .snip-where { color: inherit; opacity: 0.85; }
