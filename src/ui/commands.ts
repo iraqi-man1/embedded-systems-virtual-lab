@@ -1,4 +1,5 @@
 /** Application commands shared by menus, toolbar and keyboard shortcuts. */
+import { exportCode, importCode } from '../app/codeFiles';
 import { openDocument, saveDocument } from '../app/fileOps';
 import { newFromTemplate } from '../examples';
 import { t, type MessageKey } from '../i18n';
@@ -127,6 +128,14 @@ export const commands: Record<string, Command> = {
   home: cmd('home', 'Start Screen', 'Recent projects, templates, examples and getting started.', { icon: 'home', run: () => ed().set({ page: 'home', wiring: null }) }),
   new: cmd('new', 'New Project', 'Start a new project from the template you used last (at first, an empty project). Asks to save the current one.', { icon: 'new', shortcut: 'Ctrl+N', run: () => void newFromTemplate() }),
   open: cmd('open', 'Open Project…', 'Open a .evlab project file.', { icon: 'open', shortcut: 'Ctrl+O', run: () => void openDocument() }),
+  exportCode: cmd('exportCode', 'Export Code…', 'Save the code (.ino and its files, or main.py and its modules) to continue in the Arduino IDE or Thonny.', {
+    icon: 'file-down',
+    run: () => void exportCode(),
+  }),
+  importCode: cmd('importCode', 'Import Code…', 'Add .ino, .h, .cpp or .py files to the project; a sketch or main.py replaces the main file.', {
+    icon: 'file-up',
+    run: () => void importCode(),
+  }),
   save: cmd('save', 'Save', 'Save the project (circuit, code and instrument setup).', { icon: 'save', shortcut: 'Ctrl+S', run: () => void saveDocument() }),
   saveAs: cmd('saveAs', 'Save As…', 'Save the project under a new name or folder.', { shortcut: 'Ctrl+Shift+S', run: () => void saveDocument(true) }),
   examples: cmd('examples', 'Examples & Templates…', 'Open a ready-made project: circuit and code that run as they are.', { icon: 'book', run: () => ed().set({ dialog: 'examples' }) }),
