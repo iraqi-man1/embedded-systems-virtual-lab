@@ -5,11 +5,22 @@
  */
 import type { McuDefinition } from '../../model/component';
 
-export type PinDrive = 'low' | 'high' | 'input' | 'input-pullup';
+export type PinDrive = 'low' | 'high' | 'input' | 'input-pullup' | 'input-pulldown';
+
+/** Program counter as a byte address: AVR counts 16-bit words, ARM counts bytes. */
+export const pcAddress = (core: string | undefined, pc: number) => (core === 'rp2040' ? pc >>> 0 : pc * 2);
 
 export interface FirmwareImage {
   format: 'ihex';
   data: string;
+}
+
+/** A program run by an interpreter on the board (MicroPython): the interpreter image and the user's files. */
+export interface ScriptProgram {
+  kind: 'micropython';
+  /** UF2 image of the interpreter. */
+  image: Uint8Array;
+  files: { name: string; content: string }[];
 }
 
 /** Protocol-level I2C target attached to an MCU's hardware TWI peripheral. */
@@ -33,12 +44,17 @@ export interface SPIDevice {
 
 /** CPU registers for the MCU debug panel. */
 export interface McuRegisters {
-  /** General-purpose registers R0..R31. */
+  /** Register file layout: AVR R0..R31 with SREG, or ARM R0..R15 with xPSR. */
+  arch?: 'avr' | 'arm';
+  /** General-purpose registers (R0..R31 on AVR, R0..R12 on ARM). */
   r: number[];
   sp: number;
+  /** AVR SREG, or ARM xPSR. */
   sreg: number;
   /** Highest data address (stack pointer value at reset). */
   ramEnd: number;
+  /** ARM link register. */
+  lr?: number;
 }
 
 export interface McuEmulator {
@@ -47,6 +63,8 @@ export interface McuEmulator {
   readonly cycles: number;
   readonly pc: number;
   load(firmware: FirmwareImage): void;
+  /** Interpreter-based boards: loads the interpreter and the user's files (instead of `load`). */
+  loadProgram?(program: ScriptProgram): void;
   reset(): void;
   /** Executes instructions until `cycles >= target`. */
   runUntil(targetCycles: number): void;

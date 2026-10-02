@@ -2,6 +2,7 @@ import type { CircuitDocument, PinRef, PropValue } from '../model/circuit';
 import type { ComponentDefinition } from '../model/component';
 import type { DefinitionLookup, Netlist } from '../circuit/netlist';
 import type { ProbeSetup, SimComponentSetup, SimSetup } from './types';
+import type { ScriptProgram } from './mcu/mcu';
 
 export interface ProbeRequest {
   id: string;
@@ -25,6 +26,7 @@ export function buildSimSetup(
   netlist: Netlist,
   firmware: Record<string, string | undefined>,
   probes: ProbeRequest[] = [],
+  programs: Record<string, ScriptProgram | undefined> = {},
 ): SimSetup {
   const components: SimComponentSetup[] = [];
   for (const inst of doc.components) {
@@ -50,6 +52,7 @@ export function buildSimSetup(
       params: def.simulation.params ?? {},
       mcu: def.mcu,
       firmware: def.mcu ? firmware[inst.id] : undefined,
+      program: def.mcu?.runtime ? programs[inst.id] : undefined,
     });
   }
   const probeSetups: ProbeSetup[] = probes.map((p) => ({ id: p.id, net: netlist.netOf(p.target) ?? -1, kind: p.kind }));

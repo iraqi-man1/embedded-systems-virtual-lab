@@ -1,7 +1,8 @@
 // DEVELOPMENT ONLY. Floating-UI regression check: opens every menu, submenu,
-// popover and context menu (incl. near each window edge, both themes, narrow
-// window) against the running dev server and asserts that each one is fully
-// inside the window. Screenshots go to .toolchain/ui-check/.
+// popover, context menu and dialog (incl. near each window edge, a light and a
+// dark theme, Arabic right-to-left, narrow window) against the running dev
+// server and asserts that each one is fully inside the window and on top.
+// Screenshots go to .toolchain/ui-check/.
 //
 //   npm run dev                      # in another terminal
 //   node tools/ui-floating-check.mjs [url]
@@ -26,7 +27,7 @@ const out = resolve(import.meta.dirname, '..', '.toolchain', 'ui-check');
 mkdirSync(out, { recursive: true });
 
 const browser = await chromium.launch(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {});
-const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+const page = await browser.newPage({ viewport: { width: 1600, height: 900 }, locale: 'en-US' });
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
 let failures = 0;
@@ -36,7 +37,8 @@ function check(name, ok, detail = '') {
   if (!ok) failures++;
 }
 
-async function visible(selector, name) {
+/** `passive`: the element ignores the mouse on purpose (hover cards); stacking is checked with it made hit-testable. */
+async function visible(selector, name, { passive = false } = {}) {
   const loc = page.locator(selector).last();
   const box = await loc.boundingBox({ timeout: 2000 }).catch(() => null);
   const vp = page.viewportSize();
@@ -45,11 +47,17 @@ async function visible(selector, name) {
   const onTop =
     !!box &&
     (await page.evaluate(
-      ([x, y, sel]) => {
+      ([x, y, sel, passive]) => {
+        const all = [...document.querySelectorAll(sel)];
+        // Passive overlays (and their positioning wrapper) ignore the pointer with !important.
+        const hit = passive ? all.flatMap((m) => [m, m.closest('[data-radix-popper-content-wrapper]')]).filter(Boolean) : [];
+        const saved = hit.map((m) => [m, m.style.getPropertyValue('pointer-events'), m.style.getPropertyPriority('pointer-events')]);
+        for (const m of hit) m.style.setProperty('pointer-events', 'auto', 'important');
         const el = document.elementFromPoint(x, y);
-        return !!el && [...document.querySelectorAll(sel)].some((m) => m.contains(el));
+        for (const [m, v, prio] of saved) m.style.setProperty('pointer-events', v, prio);
+        return !!el && all.some((m) => m.contains(el));
       },
-      [box.x + box.width / 2, box.y + Math.min(box.height / 2, 14), selector],
+      [box.x + box.width / 2, box.y + Math.min(box.height / 2, 14), selector, passive],
     ));
   check(name, inside && onTop, box ? `${Math.round(box.x)},${Math.round(box.y)} ${Math.round(box.width)}×${Math.round(box.height)}${onTop ? '' : ' (covered)'}` : 'not shown');
   return box;
@@ -61,24 +69,50 @@ const closeAll = async () => {
   await page.waitForTimeout(120);
 };
 
+/** A UI string in the interface's current language (the app's own `t()`). */
+const label = (key) =>
+  page.evaluate(async (key) => {
+    const src = performance.getEntriesByType('resource').map((e) => e.name).find((n) => n.includes('/src/i18n/index.ts')) ?? '/src/i18n/index.ts';
+    return (await import(src)).t(key);
+  }, key);
+
 await page.goto(url);
-await page.waitForSelector('.toolbar');
 await page.evaluate(() => localStorage.clear());
 await page.reload();
+// The start screen opens first.
+await page.waitForSelector('.home');
+await visible('.home', 'start screen');
+await page.click('text=Go to the editor');
 await page.click('text=Load the Blink example');
 await page.waitForTimeout(700);
 
-for (const theme of ['light', 'dark']) {
-  await page.evaluate((t) => (document.documentElement.dataset.theme = t), theme);
+const passes = [
+  { name: 'light', theme: 'light', arabic: false },
+  { name: 'dark', theme: 'dark', arabic: false },
+  { name: 'arabic', theme: 'midnight', arabic: true },
+];
+
+for (const pass of passes) {
+  const p = pass.name;
   await page.setViewportSize({ width: 1600, height: 900 });
+  if (pass.arabic) {
+    await page.click(`[aria-label="${await label('Interface language: English / العربية')}"]`);
+    await page.waitForTimeout(300);
+    check(`[${p}] layout is right-to-left`, (await page.evaluate(() => document.documentElement.dir)) === 'rtl');
+  }
+  // Through the app's settings, so the code editor and instruments follow the theme too.
+  await page.evaluate(async (theme) => {
+    const src = performance.getEntriesByType('resource').map((e) => e.name).find((n) => n.includes('/src/state/editor.ts')) ?? '/src/state/editor.ts';
+    (await import(src)).useEditor.getState().setPrefs({ theme });
+  }, pass.theme);
   await page.waitForTimeout(200);
 
   // Toolbar menus.
-  for (const label of ['Align & distribute', 'Wire colour (selected and new wires)']) {
-    await page.click(`[aria-label="${label}"]`);
+  for (const key of ['Align & distribute', 'Wire colour (selected and new wires)']) {
+    await page.click(`[aria-label="${await label(key)}"]`);
     await page.waitForTimeout(150);
-    await visible('.dropdown', `[${theme}] toolbar menu: ${label}`);
-    await shot(`${theme}-toolbar-${label.split(' ')[0].toLowerCase()}`);
+    await visible('.dropdown', `[${p}] toolbar menu: ${key}`);
+    await shot(`${p}-toolbar-${key.split(' ')[0].toLowerCase()}`);
     await closeAll();
   }
 
@@ -87,13 +121,13 @@ for (const theme of ['light', 'dark']) {
   for (const m of menus) {
     await page.click(`.menu-trigger:has-text("${m}")`);
     await page.waitForTimeout(150);
-    await visible('.dropdown', `[${theme}] menu ${m}`);
+    await visible('.dropdown', `[${p}] menu ${m}`);
     const subs = await page.locator('.dropdown [aria-haspopup="menu"]').allTextContents();
     for (const s of subs) {
       await page.hover(`.dropdown [aria-haspopup="menu"]:has-text("${s}")`);
       await page.waitForTimeout(350);
-      await visible('.dropdown', `[${theme}] menu ${m} › ${s}`);
-      await shot(`${theme}-menu-${m}-${s.replace(/\W+/g, '_')}`);
+      await visible('.dropdown', `[${p}] menu ${m} › ${s}`);
+      await shot(`${p}-menu-${m}-${s.replace(/\W+/g, '_')}`);
     }
     await closeAll();
   }
@@ -109,7 +143,7 @@ for (const theme of ['light', 'dark']) {
   for (const [name, [x, y]] of Object.entries(spots)) {
     await page.mouse.click(x, y, { button: 'right' });
     await page.waitForTimeout(200);
-    await visible('.ctxmenu', `[${theme}] canvas context menu ${name}`);
+    await visible('.ctxmenu', `[${p}] canvas context menu ${name}`);
     await closeAll();
   }
 
@@ -117,26 +151,48 @@ for (const theme of ['light', 'dark']) {
   const wire = await page.locator('.wires path.wire-hit').first().boundingBox();
   await page.mouse.click(wire.x + wire.width / 2, wire.y + wire.height / 2);
   await page.waitForTimeout(200);
-  await visible('.float-bar', `[${theme}] floating wire toolbar`);
+  await visible('.float-bar', `[${p}] floating wire toolbar`);
   await page.mouse.click(wire.x + wire.width / 2, wire.y + wire.height / 2, { button: 'right' });
   await page.waitForTimeout(200);
-  await visible('.ctxmenu', `[${theme}] wire context menu`);
+  await visible('.ctxmenu', `[${p}] wire context menu`);
   await page.hover('.ctxmenu [aria-haspopup="menu"]');
   await page.waitForTimeout(350);
-  await visible('.dropdown, .ctxmenu', `[${theme}] wire context submenu`);
-  await shot(`${theme}-wire-context`);
+  await visible('.dropdown, .ctxmenu', `[${p}] wire context submenu`);
+  await shot(`${p}-wire-context`);
   await closeAll();
   await page.keyboard.press('Escape');
 
-  // Command palette and quick-add (modal layer, above everything else).
+  // Hover card of a part (rest the mouse on the LED).
+  const part = await page.locator('.workspace .comp').last().boundingBox();
+  if (part) {
+    await page.mouse.move(part.x + part.width / 2, part.y + part.height / 2);
+    await page.waitForTimeout(1100);
+    await visible('.part-card', `[${p}] part hover card`, { passive: true });
+    await shot(`${p}-part-card`);
+    await page.mouse.move(ws.x + 20, ws.y + ws.height / 2);
+    await page.waitForTimeout(200);
+  } else check(`[${p}] part hover card`, false, 'no part on the canvas');
+
+  // Command palette, quick-add and Find (modal layer, above everything else).
   await page.keyboard.press('Control+Shift+P');
   await page.waitForTimeout(200);
-  await visible('.cmdk-dialog', `[${theme}] command palette`);
-  await shot(`${theme}-palette`);
+  await visible('.cmdk-dialog', `[${p}] command palette`);
+  await shot(`${p}-palette`);
   await closeAll();
   await page.keyboard.press('Control+k');
   await page.waitForTimeout(200);
-  await visible('.cmdk-dialog', `[${theme}] quick add`);
+  await visible('.cmdk-dialog', `[${p}] quick add`);
+  await closeAll();
+  await page.keyboard.press('Control+f');
+  await page.waitForTimeout(200);
+  await visible('.cmdk-dialog', `[${p}] find`);
+  await closeAll();
+
+  // Export dialog.
+  await page.keyboard.press('Control+Shift+E');
+  await page.waitForTimeout(600);
+  await visible('.export', `[${p}] export dialog`);
+  await shot(`${p}-export`);
   await closeAll();
 
   // Library info card for an item at the bottom of the window.
@@ -150,7 +206,7 @@ for (const theme of ['light', 'dark']) {
     }
   }
   await page.waitForTimeout(800);
-  await visible('.lib-tooltip', `[${theme}] library info card near the bottom`);
+  await visible('.lib-tooltip', `[${p}] library info card near the bottom`);
   await page.mouse.move(800, 400);
 
   // Narrow window: overflow menu.
@@ -160,15 +216,15 @@ for (const theme of ['light', 'dark']) {
     const t = document.querySelector('.toolbar');
     return t.scrollWidth <= t.clientWidth;
   });
-  check(`[${theme}] toolbar fits a narrow window`, fits);
-  await page.click('[aria-label="More tools"]');
+  check(`[${p}] toolbar fits a narrow window`, fits);
+  await page.click(`[aria-label="${await label('More tools')}"]`);
   await page.waitForTimeout(200);
-  await visible('.dropdown', `[${theme}] overflow menu`);
-  await shot(`${theme}-overflow`);
+  await visible('.dropdown', `[${p}] overflow menu`);
+  await shot(`${p}-overflow`);
   await closeAll();
   await page.keyboard.press('Control+Shift+P');
   await page.waitForTimeout(200);
-  await visible('.cmdk-dialog', `[${theme}] command palette in a narrow window`);
+  await visible('.cmdk-dialog', `[${p}] command palette in a narrow window`);
   await closeAll();
 }
 

@@ -73,6 +73,14 @@ export function hitPin(index: PinIndex, p: Point, radius: number): IndexedPin | 
   return best;
 }
 
+/**
+ * A breadboard hole under another part (a resistor body lying across a row) is hidden by
+ * it: the pointer is on that part, not on the hole. `overComp` is the part under the pointer.
+ */
+export function uncoveredPin(hit: IndexedPin | null, overComp: string | null): IndexedPin | null {
+  return hit && hit.pin.kind === 'socket' && overComp && overComp !== hit.ref.componentId ? null : hit;
+}
+
 export function pinPosition(circuit: CircuitDocument, ref: PinRef): Point | null {
   const ip = pinIndex(circuit).byKey.get(`${ref.componentId}:${ref.pinId}`);
   return ip ? { x: ip.x, y: ip.y } : null;

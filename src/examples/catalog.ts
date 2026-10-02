@@ -31,7 +31,7 @@ function base(r: ComponentRegistry) {
 }
 
 /** LED (cathode at f<c>, anode f<c+1>) + resistor h<c+1>→h<c+7>, cathode strip to GND rail. */
-function ledOnBoard(b: CircuitBuilder, bb: ReturnType<CircuitBuilder['add']>, c: number, color: string, ohms = '220') {
+export function ledOnBoard(b: CircuitBuilder, bb: ReturnType<CircuitBuilder['add']>, c: number, color: string, ohms = '220') {
   const led = b.add('evlab.led', 0, 0, { color });
   b.insert(led, 'C', bb, `f${c}`);
   const res = b.add('evlab.resistor', 0, 0, { resistance: ohms });

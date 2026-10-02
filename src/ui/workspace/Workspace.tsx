@@ -4,7 +4,9 @@
  * with simulated parts.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { PinRef, Point, Wire } from '../../core/model/circuit';
+import type { Annotation, PinRef, Point, Wire } from '../../core/model/circuit';
+import { annotationsIn, dragHandle, movedFrom, newArrow, newFrame, newText, type NoteHandle } from '../../core/circuit/annotations';
+import { nanoid } from 'nanoid';
 import { GRID } from '../../core/model/component';
 import { componentBounds, pinWorld, snap, snapComponentPosition } from '../../core/circuit/geometry';
 import { defaultProps } from '../../core/sim/setup';
@@ -14,10 +16,13 @@ import { coalescedEdit, createInstance, createWire, useProject } from '../../sta
 import { sendInput, useSim } from '../../state/sim';
 import { useErc, useNetlist } from '../../state/derived';
 import { formatEngineering } from '../../core/model/units';
+import { formatShortDate } from '../../i18n';
+import { useT } from '../../i18n/react';
 import { ComponentView } from './ComponentView';
 import { WireLayer, type Overlay } from './WireLayer';
-import { hitPin, insertionPreview, marqueeSelection, nearestSegment, pinIndex, pinPosition, pointAlong, polylineLength, wirePolyline, type IndexedPin } from './geometry';
-import { addComponentAt, fitView, withCarried, zoomBy, zoomToSelection } from './actions';
+import { hitPin, insertionPreview, uncoveredPin, marqueeSelection, nearestSegment, pinIndex, pinPosition, pointAlong, polylineLength, wirePolyline, type IndexedPin } from './geometry';
+import { addComponentAt, addNote, editTextNote, fitView, withCarried, zoomBy, zoomToSelection } from './actions';
+import { FrameLayer, NoteLayer } from './AnnotationLayer';
 import { assignProbe, probeMarkers } from '../instruments/probes';
 import { Icon } from '../common/Icon';
 import { ContextMenu, DropdownMenu, MenuItem, MenuSeparator } from '../common/Menu';
@@ -29,17 +34,32 @@ import { loadExample } from '../../examples';
 import { fileTitle, openRecent } from '../../app/fileOps';
 import { SimControlsLayer } from './SimControls';
 import { useWireToolbarVisible, WireToolbar } from './WireToolbar';
+import { ContextMenuGate, type HeldMenu } from './contextMenuGate';
+import { PartHoverCard, usePartHover } from './PartHoverCard';
+import { Minimap } from './Minimap';
 
 type Drag =
-  | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number }
-  | { kind: 'move'; start: Point; orig: Map<string, Point>; wires: Map<string, Point[]>; anchor: string; moved: boolean }
-  | { kind: 'marquee'; start: Point; base: string[]; baseWires: string[] }
+  /** `button` 2: right-button pan, which only starts once the pointer moved past the threshold. */
+  | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number; button: number }
+  /** `anchor`: the part grabbed (its legs snap to the grid); null when a note was grabbed. */
+  | { kind: 'move'; start: Point; orig: Map<string, Point>; wires: Map<string, Point[]>; notes: Map<string, Annotation>; anchor: string | null; moved: boolean }
+  | { kind: 'marquee'; start: Point; base: string[]; baseWires: string[]; baseNotes: string[] }
+  | { kind: 'note-handle'; id: string; handle: NoteHandle; orig: Annotation }
+  | { kind: 'note-create'; tool: 'arrow' | 'rect'; start: Point }
   | { kind: 'handle'; wireId: string; index: number }
   | { kind: 'interact'; id: string; mode: 'momentary' | 'slider'; input: string; prop?: string; sx: number; sy: number; v0: number }
   | { kind: 'pin'; pin: IndexedPin; sx: number; sy: number; dragging: boolean }
   | { kind: 'wire-end'; wireId: string; end: 'from' | 'to' };
 
 const DRAG_THRESHOLD = 4;
+
+/** Drags that scroll the canvas when the pointer nears its edge. */
+const AUTO_PAN = new Set<Drag['kind']>(['move', 'marquee', 'handle', 'wire-end', 'pin', 'note-handle', 'note-create']);
+/** Width of the edge band (px) and the fastest scroll (px per frame). */
+const EDGE = 32;
+const EDGE_SPEED = 14;
+
+type PointerSnapshot = Pick<React.PointerEvent, 'clientX' | 'clientY' | 'buttons' | 'pointerId' | 'target'>;
 
 function wireColorFor(a: IndexedPin | undefined, b: IndexedPin | undefined, fallback: string) {
   const kinds = [a?.pin.kind, b?.pin.kind];
@@ -50,17 +70,18 @@ function wireColorFor(a: IndexedPin | undefined, b: IndexedPin | undefined, fall
 
 /** Recently opened projects on the empty canvas. */
 function RecentProjects() {
+  const t = useT();
   const recent = useEditor((s) => s.recentProjects);
   if (!recent.length) return null;
   return (
     <div className="recent-projects">
-      <h4>Recent projects</h4>
+      <h4>{t('Recent projects')}</h4>
       {recent.slice(0, 5).map((r) => (
         <Tip key={r.path} content={r.path} side="right" direct>
           <button className="recent-item" onClick={() => void openRecent(r.path)}>
             <Icon name="history" />
             <span className="name">{fileTitle(r.path)}</span>
-            <span className="when">{new Date(r.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+            <span className="when">{formatShortDate(r.at)}</span>
           </button>
         </Tip>
       ))}
@@ -69,6 +90,7 @@ function RecentProjects() {
 }
 
 export function Workspace() {
+  const t = useT();
   const circuit = useProject((s) => s.project.circuit);
   const instruments = useProject((s) => s.project.instruments);
   const viewport = useEditor((s) => s.viewport);
@@ -103,7 +125,13 @@ export function Workspace() {
   const ref = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag | null>(null);
   const space = useRef(false);
+  // Right button: drag pans, click opens the context menu.
+  const [gate] = useState(() => new ContextMenuGate(DRAG_THRESHOLD));
   const [hover, setHover] = useState<IndexedPin | null>(null);
+  const partHover = usePartHover();
+  const [noteDraft, setNoteDraft] = useState<Annotation | null>(null);
+  const selectedAnnotations = useEditor((s) => s.selectedAnnotations);
+  const showMinimap = useEditor((s) => s.showMinimap);
   const [cursor, setCursor] = useState<Point>({ x: 0, y: 0 });
   const [marquee, setMarquee] = useState<Overlay['marquee']>(null);
   const [dragging, setDragging] = useState(false);
@@ -124,6 +152,8 @@ export function Workspace() {
     return [...circuit.components.filter((c) => isBoard(c.type)), ...circuit.components.filter((c) => !isBoard(c.type))];
   }, [circuit.components]);
   const selectedSet = useMemo(() => new Set(selectedComponents), [selectedComponents]);
+  const notes = useMemo(() => circuit.annotations ?? [], [circuit.annotations]);
+  const noteSet = useMemo(() => new Set(selectedAnnotations), [selectedAnnotations]);
 
   const toWorld = useCallback(
     (clientX: number, clientY: number): Point => {
@@ -189,32 +219,98 @@ export function Workspace() {
     ed.set({ wiring: null });
   }, []);
 
+  /** Starts moving the selected parts and notes (parts plugged into a moved breadboard travel with it). */
+  const startMove = (world: Point, _noteId: string | null, anchor: string | null, pointerId: number) => {
+    const sel = useEditor.getState();
+    const moving = withCarried(sel.selectedComponents);
+    const orig = new Map<string, Point>();
+    for (const c of circuit.components) if (moving.has(c.id)) orig.set(c.id, { x: c.x, y: c.y });
+    const wires = new Map<string, Point[]>();
+    for (const w of circuit.wires) {
+      if (orig.has(w.from.componentId) && orig.has(w.to.componentId)) wires.set(w.id, w.points.map((p) => ({ ...p })));
+    }
+    const ids = new Set(sel.selectedAnnotations);
+    const notes = new Map<string, Annotation>();
+    for (const a of circuit.annotations ?? []) if (ids.has(a.id)) notes.set(a.id, structuredClone(a));
+    useProject.getState().begin();
+    drag.current = { kind: 'move', start: world, orig, wires, notes, anchor, moved: false };
+    ref.current?.setPointerCapture(pointerId);
+  };
+
   // ----------------------------------------------------------- pointer
   const onPointerDown = (e: React.PointerEvent) => {
-    if (e.button === 2) return;
+    if (e.button === 2) {
+      const ed = useEditor.getState();
+      if (!ed.rightDragPan) return;
+      // No pointer capture yet: a menu event fired on press (Linux/macOS) must keep its real target.
+      gate.down(e.clientX, e.clientY);
+      drag.current = { kind: 'pan', sx: e.clientX, sy: e.clientY, vx: ed.viewport.x, vy: ed.viewport.y, button: 2 };
+      return;
+    }
     // Overlay controls (hint buttons, zoom bar) handle their own clicks.
     if ((e.target as Element).closest('button, .canvas-hint .btns')) return;
     const el = ref.current!;
     el.focus();
     const ed = useEditor.getState();
     if (e.button === 1 || (e.button === 0 && space.current)) {
-      drag.current = { kind: 'pan', sx: e.clientX, sy: e.clientY, vx: ed.viewport.x, vy: ed.viewport.y };
+      drag.current = { kind: 'pan', sx: e.clientX, sy: e.clientY, vx: ed.viewport.x, vy: ed.viewport.y, button: e.button };
       el.setPointerCapture(e.pointerId);
       setDragging(true);
       return;
     }
     const world = toWorld(e.clientX, e.clientY);
     const zoom = ed.viewport.zoom;
-    const hit = hitPin(index, world, Math.max(4.5, 7 / zoom));
     const target = e.target as Element;
     const wireEl = target.closest('[data-wire]');
     const handleAttr = target.getAttribute('data-handle');
     const compEl = target.closest('[data-comp]');
     const compId = compEl?.getAttribute('data-comp') ?? null;
+    const hit = uncoveredPin(hitPin(index, world, Math.max(4.5, 7 / zoom)), compId);
+
+    // Drawing notes: a click places a text note, a drag draws an arrow or a frame.
+    if (ed.tool === 'text' || ed.tool === 'arrow' || ed.tool === 'rect') {
+      if (e.button !== 0) return;
+      const p = snapPt(world);
+      if (ed.tool === 'text') {
+        // No mouse-down default: the canvas must not take the focus from the new text box.
+        e.preventDefault();
+        editTextNote(newText(nanoid(10), p));
+        return;
+      }
+      drag.current = { kind: 'note-create', tool: ed.tool, start: p };
+      el.setPointerCapture(e.pointerId);
+      setDragging(true);
+      return;
+    }
 
     if (ed.tool !== 'select') {
       if (hit) assignProbe(ed.tool, hit.ref);
       if (!e.shiftKey) ed.set({ tool: 'select' });
+      return;
+    }
+
+    // Canvas notes sit above everything: grab, select or resize them.
+    const noteId = !ed.wiring ? target.closest('[data-annot]')?.getAttribute('data-annot') : null;
+    const note = noteId ? circuit.annotations?.find((a) => a.id === noteId) : undefined;
+    if (note) {
+      const handle = target.getAttribute('data-annot-handle') as NoteHandle | null;
+      if (handle) {
+        useProject.getState().begin();
+        drag.current = { kind: 'note-handle', id: note.id, handle, orig: structuredClone(note) };
+        el.setPointerCapture(e.pointerId);
+        setDragging(true);
+        return;
+      }
+      let notes = ed.selectedAnnotations;
+      if (e.shiftKey || e.ctrlKey) {
+        notes = notes.includes(note.id) ? notes.filter((x) => x !== note.id) : [...notes, note.id];
+        ed.select(ed.selectedComponents, ed.selectedWires, notes);
+        if (!notes.includes(note.id)) return;
+      } else if (!notes.includes(note.id)) {
+        notes = [note.id];
+        ed.select([], [], notes);
+      }
+      startMove(world, note.id, null, e.pointerId);
       return;
     }
 
@@ -307,38 +403,78 @@ export function Workspace() {
         sel = [compId];
         ed.select(sel);
       }
-      // Parts plugged into a moved breadboard travel with it.
-      const moving = withCarried(sel);
-      const orig = new Map<string, Point>();
-      for (const c of circuit.components) if (moving.has(c.id)) orig.set(c.id, { x: c.x, y: c.y });
-      const wires = new Map<string, Point[]>();
-      for (const w of circuit.wires) {
-        if (orig.has(w.from.componentId) && orig.has(w.to.componentId)) wires.set(w.id, w.points.map((p) => ({ ...p })));
-      }
-      useProject.getState().begin();
-      drag.current = { kind: 'move', start: world, orig, wires, anchor: compId, moved: false };
-      el.setPointerCapture(e.pointerId);
+      startMove(world, null, compId, e.pointerId);
       return;
     }
 
     if (!e.shiftKey) ed.clearSelection();
-    drag.current = { kind: 'marquee', start: world, base: e.shiftKey ? ed.selectedComponents : [], baseWires: e.shiftKey ? ed.selectedWires : [] };
+    drag.current = { kind: 'marquee', start: world, base: e.shiftKey ? ed.selectedComponents : [], baseWires: e.shiftKey ? ed.selectedWires : [], baseNotes: e.shiftKey ? ed.selectedAnnotations : [] };
     el.setPointerCapture(e.pointerId);
   };
 
-  const onPointerMove = (e: React.PointerEvent) => {
+  // Edge auto-pan: while dragging near the edge, scroll and re-apply the drag at the new position.
+  const lastMove = useRef<PointerSnapshot | null>(null);
+  const edgeFrame = useRef(0);
+  const moveRef = useRef<(e: PointerSnapshot) => void>(() => {});
+  const edgeVelocity = (cx: number, cy: number) => {
+    const r = ref.current?.getBoundingClientRect();
+    if (!r) return { dx: 0, dy: 0 };
+    const axis = (p: number, lo: number, hi: number) => {
+      if (p < lo + EDGE) return EDGE_SPEED * Math.min(1.5, (lo + EDGE - p) / EDGE);
+      if (p > hi - EDGE) return -EDGE_SPEED * Math.min(1.5, (p - (hi - EDGE)) / EDGE);
+      return 0;
+    };
+    return { dx: axis(cx, r.left, r.right), dy: axis(cy, r.top, r.bottom) };
+  };
+  const autoPanActive = () => {
+    const d = drag.current;
+    return !!d && AUTO_PAN.has(d.kind) && (d.kind !== 'move' || d.moved) && (d.kind !== 'pin' || d.dragging);
+  };
+  const autoPanTick = () => {
+    const lm = lastMove.current;
+    const v = lm && autoPanActive() ? edgeVelocity(lm.clientX, lm.clientY) : { dx: 0, dy: 0 };
+    if (!lm || (!v.dx && !v.dy)) {
+      edgeFrame.current = 0;
+      return;
+    }
+    const ed = useEditor.getState();
+    ed.set({ viewport: { ...ed.viewport, x: ed.viewport.x + v.dx, y: ed.viewport.y + v.dy } });
+    moveRef.current(lm);
+    edgeFrame.current = requestAnimationFrame(autoPanTick);
+  };
+  useEffect(() => () => cancelAnimationFrame(edgeFrame.current), []);
+
+  const onPointerMove = (e: PointerSnapshot) => {
+    lastMove.current = { clientX: e.clientX, clientY: e.clientY, buttons: e.buttons, pointerId: e.pointerId, target: e.target };
+    if (!edgeFrame.current && autoPanActive()) {
+      const v = edgeVelocity(e.clientX, e.clientY);
+      if (v.dx || v.dy) edgeFrame.current = requestAnimationFrame(autoPanTick);
+    }
     const world = toWorld(e.clientX, e.clientY);
     const ed = useEditor.getState();
     setCursor(world);
     ed.set({ cursor: world });
     const d = drag.current;
+    let onPin = false;
     if (!d || d.kind === 'pin' || d.kind === 'wire-end') {
-      const h = hitPin(index, world, Math.max(4.5, 7 / ed.viewport.zoom));
+      const over = d ? null : ((e.target as Element | null)?.closest?.('[data-comp]')?.getAttribute('data-comp') ?? null);
+      const h = uncoveredPin(hitPin(index, world, Math.max(4.5, 7 / ed.viewport.zoom)), over);
       if (h !== hover) setHover(h);
+      onPin = !!h;
     }
+    // Resting on a part (not on one of its pins, which have their own tooltip) shows its card.
+    const compEl = !d && !onPin && !ed.wiring && ed.tool === 'select' && ed.hoverCards && e.buttons === 0 ? (e.target as Element).closest('[data-comp]') : null;
+    const compId = compEl?.getAttribute('data-comp') ?? null;
+    partHover.track(compId, e.clientX, e.clientY, compId ? (circuit.components.find((c) => c.id === compId)?.type ?? null) : null);
     if (!d) return;
     switch (d.kind) {
       case 'pan':
+        if (d.button === 2 && !gate.dragging) {
+          // A right press only pans once it moved; until then it may still be a click (menu).
+          if (!gate.move(e.clientX, e.clientY)) break;
+          ref.current?.setPointerCapture(e.pointerId);
+          setDragging(true);
+        }
         ed.set({ viewport: { ...ed.viewport, x: d.vx + e.clientX - d.sx, y: d.vy + e.clientY - d.sy } });
         break;
       case 'move': {
@@ -347,19 +483,29 @@ export function Workspace() {
         if (!d.moved && Math.hypot(dx, dy) * ed.viewport.zoom < DRAG_THRESHOLD) return;
         if (!d.moved) setDragging(true);
         d.moved = true;
-        const anchorInst = circuit.components.find((c) => c.id === d.anchor);
+        const anchorInst = d.anchor ? circuit.components.find((c) => c.id === d.anchor) : undefined;
         const anchorDef = anchorInst && lookup(anchorInst.type);
-        const o = d.orig.get(d.anchor)!;
+        const o = d.anchor ? d.orig.get(d.anchor) : undefined;
         let cx = 0;
         let cy = 0;
-        if (anchorInst && anchorDef && ed.snap) {
+        if (anchorInst && anchorDef && o && ed.snap) {
           const s = snapComponentPosition(anchorInst, anchorDef, o.x + dx, o.y + dy);
           cx = s.x - (o.x + dx);
           cy = s.y - (o.y + dy);
+        } else if (!anchorInst && ed.snap) {
+          // A grabbed note moves in half-grid steps.
+          cx = snap(dx, GRID / 2) - dx;
+          cy = snap(dy, GRID / 2) - dy;
         }
         const mx = dx + cx;
         const my = dy + cy;
         useProject.getState().edit((doc) => {
+          if (d.notes.size && doc.annotations) {
+            for (let i = 0; i < doc.annotations.length; i++) {
+              const orig = d.notes.get(doc.annotations[i].id);
+              if (orig) doc.annotations[i] = movedFrom(orig, mx, my);
+            }
+          }
           for (const inst of doc.components) {
             const p = d.orig.get(inst.id);
             if (p) {
@@ -388,6 +534,19 @@ export function Workspace() {
           if (w && w.points[d.index]) w.points[d.index] = snapPt(world);
         });
         break;
+      case 'note-handle': {
+        const shaped = dragHandle(d.orig, d.handle, snapPt(world));
+        useProject.getState().edit((doc) => {
+          const i = doc.annotations?.findIndex((a) => a.id === d.id) ?? -1;
+          if (i >= 0) doc.annotations![i] = shaped;
+        });
+        break;
+      }
+      case 'note-create': {
+        const p = snapPt(world);
+        setNoteDraft(d.tool === 'arrow' ? newArrow('draft', d.start, p) : newFrame('draft', d.start, p));
+        break;
+      }
       case 'interact':
         if (d.mode === 'slider' && d.prop) {
           const v = Math.max(0, Math.min(1, d.v0 + (e.clientX - d.sx - (e.clientY - d.sy)) / 160));
@@ -408,6 +567,8 @@ export function Workspace() {
     }
   };
 
+  moveRef.current = onPointerMove;
+
   const onPointerUp = (e: React.PointerEvent) => {
     const d = drag.current;
     drag.current = null;
@@ -416,18 +577,36 @@ export function Workspace() {
     const ed = useEditor.getState();
     const world = toWorld(e.clientX, e.clientY);
     switch (d.kind) {
+      case 'pan': {
+        if (d.button !== 2) break;
+        // A right click (no drag) on a platform that fired the menu on press: open it now.
+        const held = gate.up(performance.now());
+        if (held) replayContextMenu(held);
+        break;
+      }
       case 'move':
       case 'handle':
+      case 'note-handle':
         useProject.getState().end();
         break;
+      case 'note-create': {
+        setNoteDraft(null);
+        const p = snapPt(world);
+        addNote(d.tool === 'arrow' ? newArrow(nanoid(10), d.start, p) : newFrame(nanoid(10), d.start, p));
+        // Shift keeps the tool for drawing several.
+        if (!e.shiftKey) ed.set({ tool: 'select' });
+        break;
+      }
       case 'marquee': {
         setMarquee(null);
         const x1 = Math.min(d.start.x, world.x);
         const y1 = Math.min(d.start.y, world.y);
         const rect = { x: x1, y: y1, width: Math.abs(world.x - d.start.x), height: Math.abs(world.y - d.start.y) };
         if (rect.width * ed.viewport.zoom < 3 && rect.height * ed.viewport.zoom < 3) break;
-        const hit = marqueeSelection(circuit, rect, world.x < d.start.x);
-        ed.select([...new Set([...d.base, ...hit.components])], [...new Set([...d.baseWires, ...hit.wires])]);
+        const crossing = world.x < d.start.x;
+        const hit = marqueeSelection(circuit, rect, crossing);
+        const notes = annotationsIn(circuit.annotations, rect, crossing);
+        ed.select([...new Set([...d.base, ...hit.components])], [...new Set([...d.baseWires, ...hit.wires])], [...new Set([...d.baseNotes, ...notes])]);
         break;
       }
       case 'interact':
@@ -460,8 +639,30 @@ export function Workspace() {
     }
   };
 
+  /** Re-fires a held-back `contextmenu` so the menu opens for what was right-clicked. */
+  const replayContextMenu = (held: HeldMenu) => {
+    const target = held.target instanceof Element && held.target.isConnected ? held.target : ref.current;
+    if (!target) return;
+    gate.replaying = true;
+    try {
+      target.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: held.x, clientY: held.y, button: 2, view: window }));
+    } finally {
+      gate.replaying = false;
+    }
+  };
+
+  const onPointerCancel = (e: React.PointerEvent) => {
+    gate.cancel();
+    onPointerUp(e);
+  };
+
   // Records what was right-clicked; the context menu (a portal) then opens at the pointer.
   const onContextMenu = (e: React.MouseEvent) => {
+    if (useEditor.getState().rightDragPan && !gate.contextMenu(performance.now(), { target: e.target, x: e.clientX, y: e.clientY })) {
+      // Part of a right-button drag (or decided at release): no menu now.
+      e.preventDefault();
+      return;
+    }
     const ed = useEditor.getState();
     if (ed.wiring || ed.tool !== 'select') {
       // Right-click cancels wiring/probing instead of opening the menu.
@@ -476,7 +677,11 @@ export function Workspace() {
     }
     const wireId = target.closest('[data-wire]')?.getAttribute('data-wire');
     const compId = target.closest('[data-comp]')?.getAttribute('data-comp');
-    if (wireId) {
+    const noteId = target.closest('[data-annot]')?.getAttribute('data-annot');
+    if (noteId) {
+      if (!ed.selectedAnnotations.includes(noteId)) ed.select([], [], [noteId]);
+      ed.set({ contextMenu: { kind: 'annotation', id: noteId } });
+    } else if (wireId) {
       if (!ed.selectedWires.includes(wireId)) ed.select([], [wireId]);
       ed.set({ contextMenu: { kind: 'wire', id: wireId } });
     } else if (compId) {
@@ -491,7 +696,15 @@ export function Workspace() {
     const target = e.target as Element;
     const wireId = target.closest('[data-wire]')?.getAttribute('data-wire');
     const world = toWorld(e.clientX, e.clientY);
-    if (wireId && !useEditor.getState().wiring) {
+    // The press captured the pointer, so the event targets the canvas: look at what is under it.
+    const under = document.elementFromPoint(e.clientX, e.clientY) ?? target;
+    const noteId = under.closest('[data-annot]')?.getAttribute('data-annot');
+    const note = noteId ? circuit.annotations?.find((a) => a.id === noteId) : undefined;
+    if (note) {
+      // Type in a text note; other notes open their properties.
+      if (note.kind === 'text') editTextNote(note);
+      else useEditor.getState().setPrefs({ showInspector: true });
+    } else if (wireId && !useEditor.getState().wiring) {
       const w = circuit.wires.find((x) => x.id === wireId)!;
       const pts = wirePolyline(circuit, w)!;
       const seg = nearestSegment(pts, world);
@@ -533,11 +746,21 @@ export function Workspace() {
       const cx = e.clientX - r.left;
       const cy = e.clientY - r.top;
       const { x, y, zoom } = ed.viewport;
-      if (e.shiftKey && !e.ctrlKey) {
-        ed.set({ viewport: { zoom, x: x - e.deltaY, y } });
+      const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? r.height : 1;
+      const dx = e.deltaX * unit;
+      const dy = e.deltaY * unit;
+      // Touchpad pinches arrive as Ctrl+wheel: always a zoom.
+      const pinch = e.ctrlKey || e.metaKey;
+      if (!pinch && (ed.wheelAction === 'scroll' || e.shiftKey || Math.abs(dx) > Math.abs(dy))) {
+        // Shift turns a mouse wheel sideways (some systems already report it as deltaX).
+        const sx = dx || (e.shiftKey ? dy : 0);
+        const sy = e.shiftKey && !dx ? 0 : dy;
+        ed.set({ viewport: { zoom, x: x - sx, y: y - sy } });
         return;
       }
-      const nz = Math.max(0.1, Math.min(6, zoom * Math.pow(1.0015, -e.deltaY)));
+      // Small steps (touchpads, pinches) need a stronger factor than mouse-wheel notches.
+      const base = Math.abs(dy) < 40 ? 1.01 : 1.0015;
+      const nz = Math.max(0.1, Math.min(6, zoom * Math.pow(base, -dy)));
       ed.set({ viewport: { zoom: nz, x: cx - (cx - x) * (nz / zoom), y: cy - (cy - y) * (nz / zoom) } });
     };
     el.addEventListener('wheel', onWheel, { passive: false });
@@ -722,17 +945,23 @@ export function Workspace() {
           {hover.inst.label}.{hover.pin.label ?? hover.pin.id}
         </b>
         {hover.pin.description ? ` — ${hover.pin.description}` : ''}
-        {net && <span style={{ color: 'var(--text-3)' }}> · net {net.name}</span>}
+        {net && <span style={{ color: 'var(--text-3)' }}> · {t('net {name}', { name: net.name })}</span>}
         {simulating && (
           <span className="v">
             {' '}
-            · {v !== undefined ? formatEngineering(v, 'V') : 'floating'}
+            · {v !== undefined ? formatEngineering(v, 'V') : t('floating')}
             {drive ? ` (${drive})` : ''}
           </span>
         )}
       </AnchoredPopover>
     );
   }
+
+  // What the part under the resting pointer is.
+  let hoverCard: React.ReactNode = null;
+  const cardInst = partHover.card && !tip && !dragging && !marquee ? circuit.components.find((c) => c.id === partHover.card!.id) : undefined;
+  const cardDef = cardInst && lookup(cardInst.type);
+  if (partHover.card && cardInst && cardDef) hoverCard = <PartHoverCard card={partHover.card} inst={cardInst} def={cardDef} simulating={simulating} />;
 
   // Floating wire toolbar anchored above the selected wires.
   const wireBarVisible = useWireToolbarVisible() && !dragging && !marquee;
@@ -792,7 +1021,7 @@ export function Workspace() {
         )}
         {c.label}
         {def.simulation.support === 'visual-only' &&
-          (simulating ? <span className="vo-tag">not simulated</span> : <span className="vo"> (visual)</span>)}
+          (simulating ? <span className="vo-tag">{t('not simulated')}</span> : <span className="vo"> ({t('visual')})</span>)}
       </div>
     );
   });
@@ -807,7 +1036,7 @@ export function Workspace() {
         showGrid && 'grid',
         dragging && drag.current?.kind === 'pan' && 'panning',
         dragging && drag.current?.kind === 'move' && 'moving',
-        (tool !== 'select' || wiring) && 'probe',
+        (tool !== 'select' || wiring) && (tool === 'text' ? 'tool-text' : 'probe'),
         hover && !dragging && 'on-pin',
         simulating && `sim-${simState}`,
       ]
@@ -817,7 +1046,11 @@ export function Workspace() {
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
-      onPointerLeave={() => setHover(null)}
+      onPointerCancel={onPointerCancel}
+      onPointerLeave={() => {
+        setHover(null);
+        partHover.cancel();
+      }}
       onContextMenu={onContextMenu}
       onDoubleClick={onDoubleClick}
       onDragOver={onDragOver}
@@ -825,6 +1058,7 @@ export function Workspace() {
       onDrop={onDrop}
     >
       <div className="world" style={{ transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})` }}>
+        <FrameLayer notes={notes} selected={noteSet} />
         {renderOrder.map((c) => {
           const def = lookup(c.type);
           return def ? (
@@ -846,18 +1080,18 @@ export function Workspace() {
         )}
         <WireLayer circuit={circuit} selectedWires={selectedWires} zoom={viewport.zoom} overlay={overlay} />
         <SimControlsLayer components={circuit.components} simulating={simulating} selected={selectedSet} zoom={viewport.zoom} toWorld={toWorld} />
+        <NoteLayer notes={notes} selected={noteSet} zoom={viewport.zoom} draft={noteDraft} />
       </div>
       {!circuit.components.length && (
         <div className="canvas-hint">
-          <h3>Start building your circuit</h3>
-          Drag parts from the library on the left onto this canvas. Click a pin to start a wire, click another pin to finish it.
-          Legs dropped onto breadboard holes connect automatically.
+          <h3>{t('Start building your circuit')}</h3>
+          {t('Drag parts from the library onto this canvas. Click a pin to start a wire, click another pin to finish it. Legs dropped onto breadboard holes connect automatically.')}
           <div className="btns">
             <button className="btn primary" onClick={() => loadExample('blink')}>
-              <Icon name="sparkles" /> Load the Blink example
+              <Icon name="sparkles" /> {t('Load the Blink example')}
             </button>
             <button className="btn" onClick={() => useEditor.getState().set({ dialog: 'examples' })}>
-              <Icon name="book" /> Browse examples
+              <Icon name="book" /> {t('Browse examples')}
             </button>
           </div>
           <RecentProjects />
@@ -867,12 +1101,22 @@ export function Workspace() {
       {simulating && <div className={`sim-frame ${simState}`} />}
       {wiring && (
         <div className="sim-banner">
-          Drawing wire — click a pin to finish, click the canvas to add a bend, Esc or right-click to cancel
+          {t('Drawing wire — click a pin to finish, click the canvas to add a bend, Esc or right-click to cancel')}
         </div>
       )}
+      {!wiring && (tool === 'text' || tool === 'arrow' || tool === 'rect') && (
+        <div className="sim-banner">
+          {tool === 'text'
+            ? t('Click where the note goes, then type — Arabic and English both work. Esc to cancel')
+            : tool === 'arrow'
+              ? t('Drag from the tail to the tip of the arrow. Hold Shift to draw several. Esc to cancel')
+              : t('Drag a frame around a group of parts, then give it a title in Properties. Esc to cancel')}
+        </div>
+      )}
+      {showMinimap && <Minimap />}
       <div className="zoom-ctl" onPointerDown={(e) => e.stopPropagation()}>
-        <Tip content="Zoom out" shortcut="−" side="top">
-          <button className="icon-btn" aria-label="Zoom out" onClick={() => zoomBy(1 / 1.2)}>
+        <Tip content={t('Zoom out')} shortcut="−" side="top">
+          <button className="icon-btn" aria-label={t('Zoom out')} onClick={() => zoomBy(1 / 1.2)}>
             <Icon name="zoom-out" />
           </button>
         </Tip>
@@ -880,23 +1124,28 @@ export function Workspace() {
           side="top"
           align="center"
           trigger={
-            <button className="zoom-level" aria-label="Zoom presets">
+            <button className="zoom-level" aria-label={t('Zoom presets')}>
               {Math.round(viewport.zoom * 100)}%
             </button>
           }
         >
           <ZoomItems />
           <MenuSeparator />
-          <MenuItem label="Fit to window" icon="fit" shortcut="F" onSelect={fitView} />
-          <MenuItem label="Zoom to selection" icon="zoom-in" shortcut="Shift+F" onSelect={zoomToSelection} disabled={!selectedComponents.length} />
+          <MenuItem label={t('Fit to window')} icon="fit" shortcut="F" onSelect={() => fitView()} />
+          <MenuItem label={t('Zoom to selection')} icon="zoom-in" shortcut="Shift+F" onSelect={zoomToSelection} disabled={!selectedComponents.length} />
         </DropdownMenu>
-        <Tip content="Zoom in" shortcut="+" side="top">
-          <button className="icon-btn" aria-label="Zoom in" onClick={() => zoomBy(1.2)}>
+        <Tip content={t('Zoom in')} shortcut="+" side="top">
+          <button className="icon-btn" aria-label={t('Zoom in')} onClick={() => zoomBy(1.2)}>
             <Icon name="zoom-in" />
           </button>
         </Tip>
-        <Tip content="Fit to view" shortcut="F" side="top">
-          <button className="icon-btn" aria-label="Fit to view" onClick={fitView}>
+        <Tip content={t('Minimap')} shortcut="M" side="top">
+          <button className={`icon-btn${showMinimap ? ' on' : ''}`} aria-label={t('Minimap')} aria-pressed={showMinimap} onClick={() => useEditor.getState().setPrefs({ showMinimap: !showMinimap })}>
+            <Icon name="map" />
+          </button>
+        </Tip>
+        <Tip content={t('Fit to view')} shortcut="F" side="top">
+          <button className="icon-btn" aria-label={t('Fit to view')} onClick={() => fitView()}>
             <Icon name="fit" />
           </button>
         </Tip>
@@ -910,6 +1159,7 @@ export function Workspace() {
       </ContextMenu>
       {tip}
       {wireBar}
+      {hoverCard}
     </>
   );
 }

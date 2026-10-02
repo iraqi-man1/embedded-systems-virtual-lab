@@ -14,10 +14,13 @@ import {
   Box,
   Cable,
   ChartLine,
+  Check,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   ChevronsRight,
   CircleCheck,
+  CircleHelp,
   CircleDot,
   CircleX,
   ClipboardPaste,
@@ -45,8 +48,10 @@ import {
   Hammer,
   Hand,
   History,
+  House,
   Info,
   Keyboard,
+  Languages,
   Lightbulb,
   Magnet,
   Maximize,
@@ -94,6 +99,11 @@ import {
   Zap,
   ZoomIn,
   ZoomOut,
+  ImageDown,
+  Type,
+  MoveUpRight,
+  SquareDashed,
+  Map as MapIcon,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -115,6 +125,9 @@ const ICONS: Record<string, LucideIcon> = {
   chart: ChartLine,
   'chevron-down': ChevronDown,
   'chevron-right': ChevronRight,
+  'chevron-left': ChevronLeft,
+  check: Check,
+  help: CircleHelp,
   ok: CircleCheck,
   probe: CircleDot,
   error: CircleX,
@@ -134,6 +147,7 @@ const ICONS: Record<string, LucideIcon> = {
   build: Hammer,
   info: Info,
   keyboard: Keyboard,
+  languages: Languages,
   bulb: Lightbulb,
   magnet: Magnet,
   fit: Maximize,
@@ -172,12 +186,18 @@ const ICONS: Record<string, LucideIcon> = {
   zap: Zap,
   'zoom-in': ZoomIn,
   'zoom-out': ZoomOut,
+  image: ImageDown,
+  type: Type,
+  arrow: MoveUpRight,
+  frame: SquareDashed,
+  map: MapIcon,
   'chevrons-right': ChevronsRight,
   'palette': Palette,
   'more': Ellipsis,
   'tag': Tag,
   'pencil': Pencil,
   'history': History,
+  home: House,
   'command': Command,
   'thermometer': Thermometer,
   'droplets': Droplets,
@@ -195,7 +215,11 @@ const ICONS: Record<string, LucideIcon> = {
   wind: Wind,
 };
 
+/** Icons that point along the reading direction: mirrored in right-to-left layouts. */
+const DIRECTIONAL = new Set(['chevron-right', 'chevron-left', 'chevrons-right']);
+
 export function Icon({ name, size, className, fill }: { name: string; size?: number; className?: string; fill?: string }) {
   const C = ICONS[name] ?? Box;
-  return <C size={size} className={className} strokeWidth={1.75} fill={fill ?? 'none'} />;
+  const cls = DIRECTIONAL.has(name) ? `${className ?? ''} dir-icon`.trim() : className;
+  return <C size={size} className={cls} strokeWidth={1.75} fill={fill ?? 'none'} />;
 }

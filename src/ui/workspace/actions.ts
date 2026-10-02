@@ -8,10 +8,13 @@ import { GRID } from '../../core/model/component';
 import { componentBounds, snapComponentPosition } from '../../core/circuit/geometry';
 import { carriedComponents } from '../../core/circuit/netlist';
 import { lookup, registry } from '../../app/registry';
+import { t } from '../../i18n';
 import { getNetlist } from '../../state/derived';
 import { useEditor } from '../../state/editor';
 import { createInstance, nextLabel, useProject } from '../../state/project';
 import { autoRoute, selectionBounds } from './geometry';
+import { annotationBounds, movedFrom, translateAnnotation } from '../../core/circuit/annotations';
+import type { Annotation, TextNote } from '../../core/model/circuit';
 
 const ed = () => useEditor.getState();
 const proj = () => useProject.getState();
@@ -41,13 +44,15 @@ export function addComponentAtCenter(type: string) {
 }
 
 export function deleteSelection() {
-  const { selectedComponents, selectedWires } = ed();
-  if (!selectedComponents.length && !selectedWires.length) return;
+  const { selectedComponents, selectedWires, selectedAnnotations } = ed();
+  if (!selectedComponents.length && !selectedWires.length && !selectedAnnotations.length) return;
   const comps = new Set(selectedComponents);
   const wires = new Set(selectedWires);
+  const notes = new Set(selectedAnnotations);
   proj().edit((c) => {
     c.components = c.components.filter((x) => !comps.has(x.id));
     c.wires = c.wires.filter((w) => !wires.has(w.id) && !comps.has(w.from.componentId) && !comps.has(w.to.componentId));
+    if (notes.size && c.annotations) c.annotations = c.annotations.filter((a) => !notes.has(a.id));
   });
   ed().clearSelection();
 }
@@ -83,18 +88,21 @@ export function selectAll() {
   ed().select(
     c.components.map((x) => x.id),
     c.wires.map((w) => w.id),
+    (c.annotations ?? []).map((a) => a.id),
   );
 }
 
 function selectionAsDocument(): CircuitDocument | null {
-  const { selectedComponents } = ed();
-  if (!selectedComponents.length) return null;
+  const { selectedComponents, selectedAnnotations } = ed();
+  if (!selectedComponents.length && !selectedAnnotations.length) return null;
   const c = proj().project.circuit;
   const ids = new Set(selectedComponents);
+  const notes = new Set(selectedAnnotations);
   return {
     components: c.components.filter((x) => ids.has(x.id)),
     // Copy wires whose both ends are copied (selected or not).
     wires: c.wires.filter((w) => ids.has(w.from.componentId) && ids.has(w.to.componentId)),
+    annotations: (c.annotations ?? []).filter((a) => notes.has(a.id)),
   };
 }
 
@@ -111,7 +119,7 @@ export function cutSelection() {
 /** Pastes the clipboard offset by `offset` (or at `at`, top-left of the group). */
 export function paste(at?: { x: number; y: number }) {
   const clip = ed().clipboard;
-  if (!clip?.components.length) return;
+  if (!clip?.components.length && !clip?.annotations?.length) return;
   pasteDocument(clip, at);
 }
 
@@ -121,8 +129,10 @@ export function duplicateSelection() {
 }
 
 function pasteDocument(doc: CircuitDocument, at?: { x: number; y: number }) {
-  const minX = Math.min(...doc.components.map((c) => c.x));
-  const minY = Math.min(...doc.components.map((c) => c.y));
+  const notes = doc.annotations ?? [];
+  const noteBoxes = notes.map(annotationBounds);
+  const minX = Math.min(...doc.components.map((c) => c.x), ...noteBoxes.map((b) => b.x));
+  const minY = Math.min(...doc.components.map((c) => c.y), ...noteBoxes.map((b) => b.y));
   const dx = at ? at.x - minX : GRID * 3;
   const dy = at ? at.y - minY : GRID * 3;
   const idMap = new Map<string, string>();
@@ -142,13 +152,16 @@ function pasteDocument(doc: CircuitDocument, at?: { x: number; y: number }) {
     to: { componentId: idMap.get(w.to.componentId)!, pinId: w.to.pinId },
     points: w.points.map((p) => ({ x: p.x + dx, y: p.y + dy })),
   }));
+  const newNotes = notes.map((a) => movedFrom({ ...a, id: nanoid(10) }, dx, dy));
   proj().edit((c) => {
     c.components.push(...newComps);
     c.wires.push(...newWires);
+    if (newNotes.length) (c.annotations ??= []).push(...newNotes);
   });
   ed().select(
     newComps.map((c) => c.id),
     newWires.map((w) => w.id),
+    newNotes.map((a) => a.id),
   );
 }
 
@@ -163,8 +176,10 @@ export function withCarried(ids: Iterable<string>): Set<string> {
 
 export function nudgeSelection(dx: number, dy: number) {
   const ids = withCarried(ed().selectedComponents);
-  if (!ids.size) return;
+  const notes = new Set(ed().selectedAnnotations);
+  if (!ids.size && !notes.size) return;
   proj().edit((c) => {
+    for (const a of c.annotations ?? []) if (notes.has(a.id)) translateAnnotation(a, dx, dy);
     for (const inst of c.components) if (ids.has(inst.id)) {
       inst.x += dx;
       inst.y += dy;
@@ -267,7 +282,7 @@ export function netWireIds(wireId: string): string[] {
 export function setNetWireColor(wireId: string, color: string) {
   const ids = netWireIds(wireId);
   setWireColor(ids, color);
-  if (ids.length > 1) ed().notify(`Recoloured ${ids.length} wires on this net.`, 'info');
+  if (ids.length > 1) ed().notify(t('Recoloured {n} wires on this net.', { n: ids.length }), 'info');
 }
 
 /**
@@ -311,7 +326,7 @@ export function autoRouteWires(ids: string[]) {
       if (r) w.points = r;
     }
   });
-  if (routes.size < ids.length) ed().notify('Some wires could not be routed around parts automatically.', 'warning');
+  if (routes.size < ids.length) ed().notify(t('Some wires could not be routed around parts automatically.'), 'warning');
 }
 
 export function bringToFront(id: string, front = true) {
@@ -324,8 +339,55 @@ export function bringToFront(id: string, front = true) {
   });
 }
 
-export function fitView() {
-  zoomToComponents(proj().project.circuit.components.map((x) => x.id));
+type Viewport = { x: number; y: number; zoom: number };
+
+const canvasSize = () => {
+  const el = document.querySelector('.workspace') as HTMLElement | null;
+  return { w: el?.clientWidth || 800, h: el?.clientHeight || 600, el };
+};
+
+let animation = 0;
+
+/**
+ * Moves the view smoothly to `target` (zoom changes geometrically around a
+ * gliding centre, so the motion looks straight). Instant with reduced motion,
+ * and abandoned as soon as anything else moves the view.
+ */
+export function animateViewport(target: Viewport, ms = 220) {
+  cancelAnimationFrame(animation);
+  const from = ed().viewport;
+  const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduce || ms <= 0 || (from.x === target.x && from.y === target.y && from.zoom === target.zoom)) {
+    ed().set({ viewport: target });
+    return;
+  }
+  const { w, h } = canvasSize();
+  const centre = (v: Viewport) => ({ x: (w / 2 - v.x) / v.zoom, y: (h / 2 - v.y) / v.zoom });
+  const c0 = centre(from);
+  const c1 = centre(target);
+  const t0 = performance.now();
+  let last = from;
+  const step = (now: number) => {
+    if (ed().viewport !== last) return; // the user took over (wheel, pan…)
+    const k = Math.min(1, (now - t0) / ms);
+    const e = 1 - Math.pow(1 - k, 3);
+    const zoom = k >= 1 ? target.zoom : Math.exp(Math.log(from.zoom) + (Math.log(target.zoom) - Math.log(from.zoom)) * e);
+    const cx = c0.x + (c1.x - c0.x) * e;
+    const cy = c0.y + (c1.y - c0.y) * e;
+    last = k >= 1 ? target : { zoom, x: w / 2 - cx * zoom, y: h / 2 - cy * zoom };
+    ed().set({ viewport: last });
+    if (k < 1) animation = requestAnimationFrame(step);
+  };
+  animation = requestAnimationFrame(step);
+}
+
+/** Fits the whole circuit in the canvas (`instant` when a project has just been opened). */
+export function fitView(opts?: { instant?: boolean }) {
+  zoomToComponents(
+    proj().project.circuit.components.map((x) => x.id),
+    1.6,
+    !opts?.instant,
+  );
 }
 
 /** Zooms to the selection (Shift+F), or to the whole circuit when nothing is selected. */
@@ -336,36 +398,119 @@ export function zoomToSelection() {
 }
 
 /** Centres the given parts in the canvas at the largest zoom (≤ maxZoom) that shows them all. */
-export function zoomToComponents(ids: string[], maxZoom = 1.6) {
+export function zoomToComponents(ids: string[], maxZoom = 1.6, animate = true) {
   const c = proj().project.circuit;
-  const el = document.querySelector('.workspace') as HTMLElement | null;
+  const { w, h, el } = canvasSize();
   if (!el) return;
   const b = selectionBounds(c, ids, true);
+  const go = (v: Viewport) => (animate ? animateViewport(v) : ed().set({ viewport: v }));
   if (!b) {
-    ed().set({ viewport: { x: 80, y: 60, zoom: 1 } });
+    go({ x: 80, y: 60, zoom: 1 });
     return;
   }
   const pad = 60;
-  const zoom = Math.max(0.15, Math.min(maxZoom, Math.min((el.clientWidth - pad * 2) / b.width, (el.clientHeight - pad * 2) / b.height)));
-  ed().set({
-    viewport: {
-      zoom,
-      x: el.clientWidth / 2 - (b.x + b.width / 2) * zoom,
-      y: el.clientHeight / 2 - (b.y + b.height / 2) * zoom,
-    },
-  });
+  const zoom = Math.max(0.15, Math.min(maxZoom, Math.min((w - pad * 2) / b.width, (h - pad * 2) / b.height)));
+  go({ zoom, x: w / 2 - (b.x + b.width / 2) * zoom, y: h / 2 - (b.y + b.height / 2) * zoom });
 }
 
 /** Sets the zoom level, keeping the centre of the canvas in place. */
 export function setZoom(level: number) {
-  const el = document.querySelector('.workspace') as HTMLElement | null;
+  const { w, h } = canvasSize();
   const { viewport } = ed();
-  const cx = (el?.clientWidth ?? 800) / 2;
-  const cy = (el?.clientHeight ?? 600) / 2;
+  const cx = w / 2;
+  const cy = h / 2;
   const zoom = Math.max(0.1, Math.min(6, level));
-  ed().set({ viewport: { zoom, x: cx - (cx - viewport.x) * (zoom / viewport.zoom), y: cy - (cy - viewport.y) * (zoom / viewport.zoom) } });
+  animateViewport({ zoom, x: cx - (cx - viewport.x) * (zoom / viewport.zoom), y: cy - (cy - viewport.y) * (zoom / viewport.zoom) }, 160);
 }
 
 export function zoomBy(factor: number) {
   setZoom(ed().viewport.zoom * factor);
+}
+
+/** Moves the view by a number of screen pixels (arrow keys). */
+export function panBy(dx: number, dy: number) {
+  cancelAnimationFrame(animation);
+  const v = ed().viewport;
+  ed().set({ viewport: { ...v, x: v.x + dx, y: v.y + dy } });
+}
+
+/** Centres the view on a world point, keeping the zoom (minimap). */
+export function centerOn(x: number, y: number, animate = false) {
+  const { w, h } = canvasSize();
+  const { zoom } = ed().viewport;
+  const v = { zoom, x: w / 2 - x * zoom, y: h / 2 - y * zoom };
+  if (animate) animateViewport(v, 180);
+  else {
+    cancelAnimationFrame(animation);
+    ed().set({ viewport: v });
+  }
+}
+
+// ------------------------------------------------------------ canvas notes
+
+/** Adds a note and selects it. */
+export function addNote(a: Annotation) {
+  proj().edit((c) => {
+    (c.annotations ??= []).push(a);
+  });
+  ed().select([], [], [a.id]);
+}
+
+/** Changes a note's properties (one undo step per call). */
+export function updateNote(id: string, patch: Partial<Annotation>) {
+  proj().edit((c) => {
+    const a = c.annotations?.find((x) => x.id === id);
+    if (a) Object.assign(a, patch);
+  });
+}
+
+/** Starts typing in a text note (an existing one, or a new one at a point). */
+export function editTextNote(note: TextNote) {
+  ed().set({ editingNote: structuredClone(note), tool: 'select' });
+}
+
+/** Ends typing: saves the text, or removes the note when it was left empty. */
+export function finishTextNote(text: string) {
+  const note = ed().editingNote;
+  if (!note) return;
+  ed().set({ editingNote: null });
+  const trimmed = text.replace(/\s+$/, '');
+  const existing = proj().project.circuit.annotations?.find((a) => a.id === note.id);
+  if (!existing) {
+    if (trimmed) addNote({ ...note, text: trimmed });
+    return;
+  }
+  if (!trimmed) {
+    proj().edit((c) => {
+      c.annotations = c.annotations?.filter((a) => a.id !== note.id);
+    });
+    ed().clearSelection();
+  } else if (existing.kind === 'text' && existing.text !== trimmed) updateNote(note.id, { text: trimmed });
+}
+
+/** Puts a note above (or below) the other notes. */
+export function noteToFront(id: string, front = true) {
+  proj().edit((c) => {
+    const list = c.annotations;
+    const i = list?.findIndex((a) => a.id === id) ?? -1;
+    if (!list || i < 0) return;
+    const [a] = list.splice(i, 1);
+    if (front) list.push(a);
+    else list.unshift(a);
+  });
+}
+
+/**
+ * Brings a world rectangle into view (Find): glides to it at the current
+ * zoom when it fits, otherwise zooms out just enough to show it.
+ */
+export function revealRect(r: { x: number; y: number; width: number; height: number }) {
+  const { w, h } = canvasSize();
+  const { zoom } = ed().viewport;
+  const pad = 80;
+  const fit = Math.min((w - pad * 2) / Math.max(1, r.width), (h - pad * 2) / Math.max(1, r.height));
+  const z = Math.max(0.15, Math.min(zoom, fit, 2));
+  const cx = r.x + r.width / 2;
+  const cy = r.y + r.height / 2;
+  animateViewport({ zoom: z, x: w / 2 - cx * z, y: h / 2 - cy * z }, 260);
 }

@@ -3,14 +3,16 @@
  * autosave, the native window title, and project files opened from the
  * operating system (double-click, second launch, drag and drop).
  */
+import { t } from '../i18n';
 import { isTauri, launch } from '../platform';
+import { useEditor } from '../state/editor';
 import { useProject } from '../state/project';
 import { askSaveChanges, dialogOpen } from '../ui/common/Dialog';
 import { clearAutosave, offerRestore, startAutosave } from './autosave';
 import { openDroppedFile, openPath, saveDocument } from './fileOps';
 
 export function windowTitle(name: string, dirty: boolean) {
-  return `${dirty ? '● ' : ''}${name} — Embedded Systems Virtual Lab`;
+  return `${dirty ? '● ' : ''}${t('{name} — Embedded Systems Virtual Lab', { name })}`;
 }
 
 /** Keeps the document and native window titles in sync with the project. */
@@ -27,7 +29,13 @@ function installTitleSync(): () => void {
     }
   };
   apply();
-  return useProject.subscribe(apply);
+  const offProject = useProject.subscribe(apply);
+  // The title is translated too.
+  const offEditor = useEditor.subscribe((s, prev) => s.language !== prev.language && apply());
+  return () => {
+    offProject();
+    offEditor();
+  };
 }
 
 /** Asks Save / Don't save / Cancel when the window is closed with unsaved changes. */
@@ -55,7 +63,7 @@ async function installCloseGuard(): Promise<() => void> {
     if (asking || dialogOpen()) return;
     asking = true;
     try {
-      const choice = await askSaveChanges({ message: 'Your project has unsaved changes. Save them before closing?', discardLabel: "Don't save" });
+      const choice = await askSaveChanges({ message: t('Your project has unsaved changes. Save them before closing?'), discardLabel: t("Don't save") });
       if (choice === 'cancel') return;
       if (choice === 'save' && !(await saveDocument())) return;
       await clearAutosave();

@@ -3,6 +3,7 @@ import { nanoid } from 'nanoid';
 import type { CircuitDocument, PinRef } from '../../core/model/circuit';
 import type { Project } from '../../core/project/schema';
 import { lookup } from '../../app/registry';
+import { t } from '../../i18n';
 import { useEditor, type Tool } from '../../state/editor';
 import { useProject } from '../../state/project';
 import { pinPosition } from '../workspace/geometry';
@@ -28,7 +29,7 @@ export function assignProbe(tool: Tool, ref: PinRef) {
       const max = tool === 'probe-logic' ? 8 : 4;
       if (list.some((c) => c.target.componentId === ref.componentId && c.target.pinId === ref.pinId)) return;
       if (list.length >= max) {
-        ed.notify(`The ${tool === 'probe-logic' ? 'logic analyzer' : 'oscilloscope'} has ${max} channels.`, 'warning');
+        ed.notify(tool === 'probe-logic' ? t('The logic analyzer has {n} channels.', { n: max }) : t('The oscilloscope has {n} channels.', { n: max }), 'warning');
         return;
       }
       list.push({ id: nanoid(6), target: ref, label, color: CHANNEL_COLORS[list.length % CHANNEL_COLORS.length] });

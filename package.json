@@ -1,7 +1,7 @@
 {
   "name": "embedded-systems-virtual-lab",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "description": "Embedded Systems Virtual Lab - offline desktop electronics & embedded systems laboratory",
   "scripts": {
@@ -32,6 +32,8 @@
     "nanoid": "^6.0.1",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
+    "rp2040js": "^1.4.0",
+    "uf2": "^2.0.0",
     "uplot": "^1.6.32",
     "zustand": "^5.0.15"
   },

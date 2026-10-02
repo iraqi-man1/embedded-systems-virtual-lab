@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { installLifecycle } from '../app/lifecycle';
+import { isRtl } from '../i18n';
+import { useT } from '../i18n/react';
 import { useEditor } from '../state/editor';
 import { refreshToolchain } from '../state/sim';
 import { installShortcuts } from './commands';
@@ -15,17 +17,23 @@ import { MenuBar } from './shell/MenuBar';
 import { StatusBar } from './shell/StatusBar';
 import { Toolbar } from './shell/Toolbar';
 import { Workspace } from './workspace/Workspace';
+import { HomeScreen } from './home/HomeScreen';
+import { PartsGuide } from './guide/PartsGuide';
+import { applyTheme, resolveTheme, systemPrefersDark } from './themes';
 
 type SizeKey = 'libraryWidth' | 'inspectorHeight' | 'codeWidth' | 'dockHeight';
 
 /** Drag to resize; double-click collapses the panel it belongs to. */
 function Splitter({ k, dir, invert, min, max, onCollapse }: { k: SizeKey; dir: 'v' | 'h'; invert?: boolean; min: number; max: number; onCollapse: () => void }) {
+  const t = useT();
   const onPointerDown = (e: React.PointerEvent) => {
     e.preventDefault();
     const start = dir === 'v' ? e.clientX : e.clientY;
     const startSize = useEditor.getState()[k];
+    // Right-to-left layouts mirror the panels, so horizontal drags count the other way.
+    const sign = dir === 'v' && isRtl() ? -1 : 1;
     const move = (ev: PointerEvent) => {
-      const d = (dir === 'v' ? ev.clientX : ev.clientY) - start;
+      const d = sign * ((dir === 'v' ? ev.clientX : ev.clientY) - start);
       const size = Math.max(min, Math.min(max, startSize + (invert ? -d : d)));
       useEditor.getState().set({ [k]: size } as never);
     };
@@ -38,7 +46,7 @@ function Splitter({ k, dir, invert, min, max, onCollapse }: { k: SizeKey; dir: '
     window.addEventListener('pointerup', up);
   };
   return (
-    <Tip content="Drag to resize · double-click to hide" side={dir === 'v' ? 'right' : 'top'} delay={900} direct>
+    <Tip content={t('Drag to resize · double-click to hide')} side={dir === 'v' ? 'right' : 'top'} delay={900} direct>
       <div
         className={dir === 'v' ? 'splitter-v' : 'splitter-h'}
         onPointerDown={onPointerDown}
@@ -52,8 +60,27 @@ function Splitter({ k, dir, invert, min, max, onCollapse }: { k: SizeKey; dir: '
 
 const CHROME_HEIGHT = 28 + 40 + 24; // menu bar + toolbar + status bar
 
+/** Follows the theme preference (and the operating system's light/dark setting for 'system'). */
+function useAppliedTheme() {
+  const pref = useEditor((s) => s.theme);
+  const [systemDark, setSystemDark] = useState(systemPrefersDark);
+  useEffect(() => {
+    if (typeof matchMedia === 'undefined') return;
+    const mq = matchMedia('(prefers-color-scheme: dark)');
+    const onChange = () => setSystemDark(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  const theme = resolveTheme(pref, systemDark);
+  useEffect(() => {
+    applyTheme(theme);
+    if (useEditor.getState().appliedTheme !== theme) useEditor.getState().set({ appliedTheme: theme });
+  }, [theme]);
+}
+
 export function App() {
-  const theme = useEditor((s) => s.theme);
+  useT();
+  useAppliedTheme();
   const showLibrary = useEditor((s) => s.showLibrary);
   const showInspector = useEditor((s) => s.showInspector);
   const showCode = useEditor((s) => s.showCode);
@@ -62,10 +89,6 @@ export function App() {
   const inspectorHeight = useEditor((s) => s.inspectorHeight);
   const codeWidth = useEditor((s) => s.codeWidth);
   const dockHeight = useEditor((s) => s.dockHeight);
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-  }, [theme]);
 
   // Clamp panel sizes to the window so the canvas always keeps usable space.
   const [win, setWin] = useState({ w: window.innerWidth, h: window.innerHeight });
@@ -93,6 +116,7 @@ export function App() {
   }, []);
 
   const hide = (p: Partial<Record<'showLibrary' | 'showInspector' | 'showCode' | 'showDock', boolean>>) => () => useEditor.getState().setPrefs(p);
+  const page = useEditor((s) => s.page);
 
   return (
     <TooltipProvider>
@@ -144,6 +168,8 @@ export function App() {
           </div>
         </div>
         <StatusBar />
+        {page === 'home' && <HomeScreen />}
+        {page === 'guide' && <PartsGuide />}
         <Dialogs />
         <DialogHost />
         <CommandPalette />

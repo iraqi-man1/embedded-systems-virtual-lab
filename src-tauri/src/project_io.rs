@@ -42,8 +42,42 @@ pub fn write_text_file(path: String, contents: String) -> Result<(), String> {
     write_atomic(Path::new(&path), &contents)
 }
 
+/// Writes a binary export (a PNG image). The bytes arrive as the raw request
+/// body, without JSON encoding; the target path is the percent-encoded
+/// `path` header (headers are ASCII).
+#[tauri::command]
+pub fn write_binary_file(request: tauri::ipc::Request<'_>) -> Result<(), String> {
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err("Expected the file contents as binary data".into());
+    };
+    let path = request
+        .headers()
+        .get("path")
+        .and_then(|v| v.to_str().ok())
+        .ok_or("Missing target path")?;
+    let path = percent_decode(path)?;
+    write_atomic(Path::new(&path), bytes)
+}
+
+fn percent_decode(s: &str) -> Result<String, String> {
+    let b = s.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'%' && i + 2 < b.len() {
+            let hex = std::str::from_utf8(&b[i + 1..i + 3]).map_err(|e| e.to_string())?;
+            out.push(u8::from_str_radix(hex, 16).map_err(|_| format!("Bad escape in path: %{hex}"))?);
+            i += 3;
+        } else {
+            out.push(b[i]);
+            i += 1;
+        }
+    }
+    String::from_utf8(out).map_err(|_| "Path is not valid UTF-8".to_string())
+}
+
 /// Writes to a temporary sibling first so a crash never leaves a truncated file.
-fn write_atomic(target: &Path, contents: &str) -> Result<(), String> {
+fn write_atomic(target: &Path, contents: impl AsRef<[u8]>) -> Result<(), String> {
     if let Some(parent) = target.parent() {
         fs::create_dir_all(parent).map_err(|e| format!("Cannot create {}: {e}", parent.display()))?;
     }
@@ -130,6 +164,24 @@ mod tests {
         assert!(!dir.join("current.evlab.tmp").exists());
         clear_autosave(&dir).unwrap();
         assert!(read_autosave(&dir).unwrap().is_none());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn decodes_percent_encoded_paths() {
+        assert_eq!(percent_decode("C%3A%5CUsers%5C%D8%B9%D9%84%D9%8A%5Cdesk.png").unwrap(), "C:\\Users\\علي\\desk.png");
+        assert_eq!(percent_decode("/tmp/a%20b.png").unwrap(), "/tmp/a b.png");
+        assert_eq!(percent_decode("100%").unwrap(), "100%");
+        assert!(percent_decode("%zz").is_err());
+    }
+
+    #[test]
+    fn writes_binary_atomically() {
+        let dir = std::env::temp_dir().join(format!("evlab-bin-test-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let target = dir.join("image.png");
+        write_atomic(&target, [0x89u8, b'P', b'N', b'G']).unwrap();
+        assert_eq!(fs::read(&target).unwrap(), vec![0x89, b'P', b'N', b'G']);
         let _ = fs::remove_dir_all(&dir);
     }
 

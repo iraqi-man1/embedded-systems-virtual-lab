@@ -5,6 +5,8 @@
  */
 import { useEffect, useState } from 'react';
 import { WIRE_COLORS } from '../../core/model/circuit';
+import { tr } from '../../i18n';
+import { useT } from '../../i18n/react';
 import { useEditor } from '../../state/editor';
 import { useProject } from '../../state/project';
 import { Icon } from '../common/Icon';
@@ -14,6 +16,7 @@ import { Tip } from '../common/Tooltip';
 import { autoRouteWires, clearWirePoints, deleteSelection, setNetWireColor, setWireColor } from './actions';
 
 export function WireToolbar({ anchor, ids }: { anchor: ScreenRect; ids: string[] }) {
+  const t = useT();
   const wires = useProject((s) => s.project.circuit.wires);
   const selected = wires.filter((w) => ids.includes(w.id));
   const single = selected.length === 1 ? selected[0] : null;
@@ -31,10 +34,10 @@ export function WireToolbar({ anchor, ids }: { anchor: ScreenRect; ids: string[]
   };
   return (
     <AnchoredPopover anchor={anchor} side="top" className="float-bar" sideOffset={10}>
-      <div className="float-swatches" role="group" aria-label="Wire colour">
+      <div className="float-swatches" role="group" aria-label={t('Wire colour')}>
         {WIRE_COLORS.map((c, i) => (
-          <Tip key={c.value} content={c.label} shortcut={i < 9 ? String(i + 1) : undefined} side="top" direct>
-            <button className={`swatch${current === c.value ? ' active' : ''}`} style={{ background: c.value }} aria-label={c.label} onClick={() => setWireColor(ids, c.value)} />
+          <Tip key={c.value} content={tr(c.label)} shortcut={i < 9 ? String(i + 1) : undefined} side="top" direct>
+            <button className={`swatch${current === c.value ? ' active' : ''}`} style={{ background: c.value }} aria-label={tr(c.label)} onClick={() => setWireColor(ids, c.value)} />
           </Tip>
         ))}
       </div>
@@ -42,8 +45,8 @@ export function WireToolbar({ anchor, ids }: { anchor: ScreenRect; ids: string[]
       {single && (
         <input
           className="input float-label"
-          placeholder="Label"
-          aria-label="Wire label"
+          placeholder={t('Label')}
+          aria-label={t('Wire label')}
           value={label}
           onChange={(e) => setLabel(e.target.value)}
           onBlur={commitLabel}
@@ -56,33 +59,33 @@ export function WireToolbar({ anchor, ids }: { anchor: ScreenRect; ids: string[]
           }}
         />
       )}
-      <Tip content="Auto-route around parts">
-        <button className="icon-btn" aria-label="Auto-route" onClick={() => autoRouteWires(ids)}>
+      <Tip content={t('Auto-route around parts')}>
+        <button className="icon-btn" aria-label={t('Auto-route')} onClick={() => autoRouteWires(ids)}>
           <Icon name="route" />
         </button>
       </Tip>
-      <Tip content="Straighten (remove bends)">
-        <button className="icon-btn" aria-label="Straighten" disabled={!selected.some((w) => w.points.length)} onClick={() => clearWirePoints(ids)}>
+      <Tip content={t('Straighten (remove bends)')}>
+        <button className="icon-btn" aria-label={t('Straighten')} disabled={!selected.some((w) => w.points.length)} onClick={() => clearWirePoints(ids)}>
           <Icon name="minus" />
         </button>
       </Tip>
       {single && (
-        <Tip content="Colour every wire on this net">
+        <Tip content={t('Colour every wire on this net')}>
           <DropdownMenu
             align="center"
             trigger={
-              <button className="icon-btn" aria-label="Colour whole net">
+              <button className="icon-btn" aria-label={t('Colour whole net')}>
                 <Icon name="palette" />
               </button>
             }
           >
-            <MenuLabel>Every wire on this net</MenuLabel>
+            <MenuLabel>{t('Every wire on this net')}</MenuLabel>
             <MenuSwatches colors={WIRE_COLORS} onPick={(c) => setNetWireColor(single.id, c)} />
           </DropdownMenu>
         </Tip>
       )}
-      <Tip content="Delete" shortcut="Del">
-        <button className="icon-btn danger" aria-label="Delete wire" onClick={deleteSelection}>
+      <Tip content={t('Delete')} shortcut="Del">
+        <button className="icon-btn danger" aria-label={t('Delete wire')} onClick={deleteSelection}>
           <Icon name="trash" />
         </button>
       </Tip>

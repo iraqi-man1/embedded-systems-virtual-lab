@@ -1,10 +1,14 @@
 /** Editor/UI state: selection, viewport, tools, panels, preferences. */
 import { create } from 'zustand';
-import type { CircuitDocument, PinRef, Point } from '../core/model/circuit';
+import type { CircuitDocument, PinRef, Point, TextNote } from '../core/model/circuit';
+import { detectLanguage, setLanguage, type Lang } from '../i18n';
+import { resolveTheme, systemPrefersDark, type ThemeId, type ThemePref } from '../ui/themes';
 
-export type Tool = 'select' | 'probe-logic' | 'probe-scope' | 'probe-meter-red' | 'probe-meter-black';
+export type Tool = 'select' | 'probe-logic' | 'probe-scope' | 'probe-meter-red' | 'probe-meter-black' | NoteTool;
+/** Drawing a text note, an arrow or a frame on the canvas. */
+export type NoteTool = 'text' | 'arrow' | 'rect';
 export type DockTab = 'serial' | 'plotter' | 'scope' | 'logic' | 'meter' | 'mcu' | 'problems' | 'output';
-export type Theme = 'light' | 'dark';
+export type Theme = ThemePref;
 
 export interface Toast {
   id: number;
@@ -13,7 +17,7 @@ export interface Toast {
 }
 
 /** What the canvas context menu was opened on (the menu positions itself at the pointer). */
-export type ContextMenuState = { kind: 'component'; id: string } | { kind: 'wire'; id: string } | { kind: 'canvas'; world: { x: number; y: number } };
+export type ContextMenuState = { kind: 'component'; id: string } | { kind: 'wire'; id: string } | { kind: 'annotation'; id: string } | { kind: 'canvas'; world: { x: number; y: number } };
 
 /** A project file opened or saved recently (File › Open Recent). */
 export interface RecentProject {
@@ -26,7 +30,16 @@ export interface RecentProject {
 const MAX_RECENT_PROJECTS = 10;
 
 interface Prefs {
+  /** Interface language (Arabic switches the layout to right-to-left). */
+  language: Lang;
+  /** Colour theme, or 'system' to follow the operating system. */
   theme: Theme;
+  /** Last light and dark themes chosen (the quick light/dark toggle switches between them). */
+  themeLight: ThemeId;
+  themeDark: ThemeId;
+  /** Code editor font size (px) and soft wrapping of long lines. */
+  editorFontSize: number;
+  editorWordWrap: boolean;
   favorites: string[];
   recent: string[];
   recentProjects: RecentProject[];
@@ -57,14 +70,29 @@ interface Prefs {
   libraryCollapsed: string[];
   /** Library shows simulated parts only. */
   librarySimOnly: boolean;
+  /** Dragging with the right mouse button pans the canvas (a click still opens the menu). */
+  rightDragPan: boolean;
+  /** Open on the start screen (recent projects, templates, examples). */
+  showStartScreen: boolean;
+  /** Resting the mouse on a part shows what it is and what it is for. */
+  hoverCards: boolean;
+  /** Overview of the whole circuit in the corner of the canvas (key M). */
+  showMinimap: boolean;
+  /** What the mouse wheel does: zoom (Shift scrolls sideways) or scroll (Ctrl zooms, for touchpads). */
+  wheelAction: 'zoom' | 'scroll';
 }
 
 const PREFS_KEY = 'evlab.prefs.v1';
 
-function loadPrefs(): Prefs {
-  const dark = typeof matchMedia !== 'undefined' && matchMedia('(prefers-color-scheme: dark)').matches;
-  const defaults: Prefs = {
-    theme: dark ? 'dark' : 'light',
+/** Preferences of a fresh installation. Every key here is persisted. */
+export function defaultPrefs(): Prefs {
+  return {
+    language: detectLanguage(),
+    theme: 'system',
+    themeLight: 'light',
+    themeDark: 'dark',
+    editorFontSize: 13,
+    editorWordWrap: false,
     favorites: ['evlab.arduino-uno', 'evlab.breadboard-half', 'evlab.resistor', 'evlab.led', 'evlab.pushbutton', 'evlab.potentiometer'],
     recent: [],
     recentProjects: [],
@@ -87,18 +115,44 @@ function loadPrefs(): Prefs {
     serialView: 'text',
     libraryCollapsed: ['Communication', 'Integrated Circuits', 'Actuators', 'Sensors'],
     librarySimOnly: false,
+    rightDragPan: true,
+    showStartScreen: true,
+    hoverCards: true,
+    showMinimap: true,
+    wheelAction: 'zoom',
   };
+}
+
+const PREF_KEYS = Object.keys(defaultPrefs()) as (keyof Prefs)[];
+
+function loadPrefs(): Prefs {
+  const defaults = defaultPrefs();
+  let prefs = defaults;
   try {
     const raw = localStorage.getItem(PREFS_KEY);
-    return raw ? { ...defaults, ...JSON.parse(raw) } : defaults;
+    if (raw) prefs = { ...defaults, ...JSON.parse(raw) };
   } catch {
-    return defaults;
+    /* unreadable: defaults */
   }
+  setLanguage(prefs.language);
+  return prefs;
 }
 
 interface EditorState extends Prefs {
+  /** Theme currently shown (resolves 'system'). */
+  appliedTheme: ThemeId;
+  /** Full-window page shown over the editor (null = the editor). */
+  page: null | 'home' | 'guide';
+  /** Part shown in the parts guide (null: the overview). */
+  guideType: string | null;
+  /** Where the guide's Back button goes. */
+  guideReturn: null | 'home';
   selectedComponents: string[];
   selectedWires: string[];
+  /** Selected canvas notes (text, arrows, frames). */
+  selectedAnnotations: string[];
+  /** Text note being typed (a new one is not in the document until it has text). */
+  editingNote: TextNote | null;
   viewport: { x: number; y: number; zoom: number };
   hoverPin: PinRef | null;
   /** Wire being drawn: start pin and waypoints placed so far. */
@@ -108,10 +162,10 @@ interface EditorState extends Prefs {
   dockTab: DockTab;
   clipboard: CircuitDocument | null;
   contextMenu: ContextMenuState | null;
-  dialog: null | 'examples' | 'toolchain' | 'shortcuts' | 'about' | 'project';
+  dialog: null | 'examples' | 'toolchain' | 'shortcuts' | 'about' | 'project' | 'settings' | 'export';
   toasts: Toast[];
   /** Open command palette: run commands, or add a part (optionally at a canvas point). */
-  palette: null | { mode: 'commands' | 'add'; at?: { x: number; y: number } };
+  palette: null | { mode: 'commands' | 'add' | 'find'; at?: { x: number; y: number } };
   /** Component type being dragged from the library (drop preview). */
   dragType: string | null;
   /** Line to reveal in the code editor (set by the Problems panel). */
@@ -119,7 +173,9 @@ interface EditorState extends Prefs {
 
   set(partial: Partial<EditorState>): void;
   setPrefs(partial: Partial<Prefs>): void;
-  select(components: string[], wires?: string[]): void;
+  /** Restores default settings; keeps the language, favourites and recent lists. */
+  resetPrefs(): void;
+  select(components: string[], wires?: string[], annotations?: string[]): void;
   clearSelection(): void;
   toggleFavorite(type: string): void;
   pushRecent(type: string): void;
@@ -131,10 +187,18 @@ interface EditorState extends Prefs {
 
 let toastSeq = 0;
 
+const initialPrefs = loadPrefs();
+
 export const useEditor = create<EditorState>((set, get) => ({
-  ...loadPrefs(),
+  ...initialPrefs,
+  appliedTheme: resolveTheme(initialPrefs.theme, systemPrefersDark()),
+  page: initialPrefs.showStartScreen ? 'home' : null,
+  guideType: null,
+  guideReturn: null,
   selectedComponents: [],
   selectedWires: [],
+  selectedAnnotations: [],
+  editingNote: null,
   viewport: { x: 80, y: 60, zoom: 1 },
   hoverPin: null,
   wiring: null,
@@ -151,44 +215,26 @@ export const useEditor = create<EditorState>((set, get) => ({
 
   set: (partial) => set(partial),
   setPrefs(partial) {
+    if (partial.language && partial.language !== get().language) setLanguage(partial.language);
     set(partial);
     const s = get();
-    const prefs: Prefs = {
-      theme: s.theme,
-      favorites: s.favorites,
-      recent: s.recent,
-      recentProjects: s.recentProjects,
-      showGrid: s.showGrid,
-      snap: s.snap,
-      libraryWidth: s.libraryWidth,
-      inspectorHeight: s.inspectorHeight,
-      codeWidth: s.codeWidth,
-      dockHeight: s.dockHeight,
-      showLibrary: s.showLibrary,
-      showInspector: s.showInspector,
-      showCode: s.showCode,
-      showDock: s.showDock,
-      wireColor: s.wireColor,
-      sound: s.sound,
-      showLogicLevels: s.showLogicLevels,
-      showVoltages: s.showVoltages,
-      serialClearOnRun: s.serialClearOnRun,
-      serialTimestamps: s.serialTimestamps,
-      serialView: s.serialView,
-      libraryCollapsed: s.libraryCollapsed,
-      librarySimOnly: s.librarySimOnly,
-    };
+    const prefs = Object.fromEntries(PREF_KEYS.map((k) => [k, s[k]])) as unknown as Prefs;
     try {
       localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
     } catch {
       /* storage unavailable: preferences stay in memory */
     }
   },
-  select(components, wires = []) {
-    set({ selectedComponents: components, selectedWires: wires });
+  resetPrefs() {
+    const { language, favorites, recent, recentProjects } = get();
+    get().setPrefs({ ...defaultPrefs(), language, favorites, recent, recentProjects });
+  },
+  select(components, wires = [], annotations = []) {
+    set({ selectedComponents: components, selectedWires: wires, selectedAnnotations: annotations });
   },
   clearSelection() {
-    if (get().selectedComponents.length || get().selectedWires.length) set({ selectedComponents: [], selectedWires: [] });
+    const s = get();
+    if (s.selectedComponents.length || s.selectedWires.length || s.selectedAnnotations.length) set({ selectedComponents: [], selectedWires: [], selectedAnnotations: [] });
   },
   toggleFavorite(type) {
     const f = get().favorites;

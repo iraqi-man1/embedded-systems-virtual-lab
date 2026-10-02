@@ -6,6 +6,7 @@
  */
 import { useMemo, type ReactNode } from 'react';
 import * as PO from '@radix-ui/react-popover';
+import { mirrorSide } from '../../i18n';
 import { COLLISION_PADDING } from './Menu';
 
 export interface ScreenRect {
@@ -44,7 +45,7 @@ export function AnchoredPopover({ anchor, side = 'top', align = 'center', sideOf
       <PO.Portal>
         <PO.Content
           className={`${className}${passive ? ' passive-pop' : ''}`}
-          side={side}
+          side={mirrorSide(side)}
           align={align}
           sideOffset={sideOffset}
           collisionPadding={COLLISION_PADDING}

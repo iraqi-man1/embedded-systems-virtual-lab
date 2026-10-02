@@ -1,4 +1,5 @@
 import { newProject, parseProject, PROJECT_EXTENSION, serializeProject, type Project } from '../core/project/schema';
+import { t } from '../i18n';
 import { isTauri, storage } from '../platform';
 import { useEditor } from '../state/editor';
 import { useProject } from '../state/project';
@@ -28,13 +29,13 @@ function resetForNewDocument() {
 export function showProject(project: Project, path: string | null) {
   resetForNewDocument();
   useProject.getState().load(project, path);
-  useEditor.getState().set({ viewport: project.view, selectedComponents: [], selectedWires: [], wiring: null });
+  useEditor.getState().set({ viewport: project.view, selectedComponents: [], selectedWires: [], wiring: null, page: null });
   void clearAutosave();
 }
 
 export async function newDocument() {
   if (!(await confirmDiscard())) return;
-  showProject(newProject(), null);
+  showProject(newProject(t('Untitled')), null);
 }
 
 /** File name without folders and extension. */
@@ -54,11 +55,11 @@ export function openProjectText(text: string, path: string | null) {
     const missing = [...new Set(project.circuit.components.filter((c) => !lookup(c.type)).map((c) => c.type))];
     showProject(project, path);
     if (path) remember(path, project.meta.name, text);
-    if (missing.length) useEditor.getState().notify(`Missing component packages for: ${missing.join(', ')}`, 'warning');
-    else useEditor.getState().notify(`Opened ${project.meta.name}`, 'success');
+    if (missing.length) useEditor.getState().notify(t('Missing component packages for: {types}', { types: missing.join(', ') }), 'warning');
+    else useEditor.getState().notify(t('Opened {name}', { name: project.meta.name }), 'success');
     return true;
   } catch (e) {
-    useEditor.getState().notify(`Could not open project: ${(e as Error).message}`, 'error');
+    useEditor.getState().notify(t('Could not open project: {error}', { error: (e as Error).message }), 'error');
     return false;
   }
 }
@@ -69,7 +70,7 @@ export async function openDocument() {
     const file = await storage.openProject();
     if (file) openProjectText(file.text, file.path);
   } catch (e) {
-    useEditor.getState().notify(`Could not open project: ${(e as Error).message}`, 'error');
+    useEditor.getState().notify(t('Could not open project: {error}', { error: (e as Error).message }), 'error');
   }
 }
 
@@ -79,14 +80,14 @@ export async function openPath(path: string) {
   try {
     openProjectText(await storage.readProject(path), path);
   } catch (e) {
-    useEditor.getState().notify(`Could not open ${path}: ${(e as Error).message ?? e}`, 'error');
+    useEditor.getState().notify(t('Could not open {path}: {error}', { path, error: String((e as Error).message ?? e) }), 'error');
   }
 }
 
 /** Opens a project file dropped onto the window. */
 export async function openDroppedFile(file: File) {
   if (!file.name.toLowerCase().endsWith(`.${PROJECT_EXTENSION}`)) {
-    useEditor.getState().notify(`${file.name} is not a Virtual Lab project (.${PROJECT_EXTENSION})`, 'warning');
+    useEditor.getState().notify(t('{file} is not a Virtual Lab project (.{ext})', { file: file.name, ext: PROJECT_EXTENSION }), 'warning');
     return;
   }
   if (!(await confirmDiscard())) return;
@@ -102,7 +103,10 @@ export async function openRecent(path: string) {
     text = await storage.readProject(path);
   } catch (e) {
     useEditor.getState().forgetProject(path);
-    useEditor.getState().notify(`Could not open ${path.split(/[\\/]/).pop()} — removed from the recent list (${(e as Error).message ?? e})`, 'error');
+    useEditor.getState().notify(
+      t('Could not open {file} — removed from the recent list ({error})', { file: path.split(/[\\/]/).pop() ?? path, error: String((e as Error).message ?? e) }),
+      'error',
+    );
     return;
   }
   openProjectText(text, path);
@@ -122,10 +126,10 @@ export async function saveDocument(saveAs = false): Promise<boolean> {
     remember(path, project.meta.name, text);
     if (!unchanged) useProject.setState({ dirty: true });
     else void clearAutosave();
-    useEditor.getState().notify(`Saved ${path.split(/[\\/]/).pop()}`, 'success');
+    useEditor.getState().notify(t('Saved {file}', { file: path.split(/[\\/]/).pop() ?? path }), 'success');
     return true;
   } catch (e) {
-    useEditor.getState().notify(`Save failed: ${(e as Error).message}`, 'error');
+    useEditor.getState().notify(t('Save failed: {error}', { error: (e as Error).message }), 'error');
     return false;
   }
 }

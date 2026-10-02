@@ -5,6 +5,8 @@
  * the user is offered to restore a copy left behind by a crash.
  */
 import { parseProject, serializeProject } from '../core/project/schema';
+import { intlLocale, t } from '../i18n';
+import { rich } from '../i18n/react';
 import { autosaveStore } from '../platform';
 import { useEditor } from '../state/editor';
 import { useProject } from '../state/project';
@@ -64,10 +66,10 @@ export function startAutosave(): () => void {
 }
 
 function describeAge(iso?: string) {
-  if (!iso) return 'an earlier session';
-  const t = new Date(iso);
-  if (Number.isNaN(t.getTime())) return 'an earlier session';
-  return t.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+  if (!iso) return t('an earlier session');
+  const when = new Date(iso);
+  if (Number.isNaN(when.getTime())) return t('an earlier session');
+  return when.toLocaleString(intlLocale(), { dateStyle: 'medium', timeStyle: 'short' });
 }
 
 /** If a recovery copy exists, asks whether to restore it. Resolves when the question is settled. */
@@ -81,21 +83,23 @@ export async function offerRestore(): Promise<void> {
   if (!found) return;
   const { text, meta } = found;
   const answer = await choose({
-    title: 'Restore unsaved work?',
+    title: t('Restore unsaved work?'),
     message: (
       <>
         <p style={{ marginTop: 0 }}>
-          The application closed unexpectedly while <b>{meta.name ?? 'a project'}</b> had unsaved changes. A copy was saved automatically at{' '}
-          {describeAge(meta.savedAt)}.
+          {rich(t('The application closed unexpectedly while {name} had unsaved changes. A copy was saved automatically at {when}.'), {
+            name: <b>{meta.name ?? t('a project')}</b>,
+            when: describeAge(meta.savedAt),
+          })}
         </p>
         <p style={{ marginBottom: 0, color: 'var(--text-2)', fontSize: 12 }}>
-          {meta.sourcePath ? `Original file: ${meta.sourcePath}` : 'The project had not been saved to a file yet.'}
+          {meta.sourcePath ? t('Original file: {path}', { path: meta.sourcePath }) : t('The project had not been saved to a file yet.')}
         </p>
       </>
     ),
     buttons: [
-      { id: 'discard', label: 'Discard copy', variant: 'danger' },
-      { id: 'restore', label: 'Restore', variant: 'primary' },
+      { id: 'discard', label: t('Discard copy'), variant: 'danger' },
+      { id: 'restore', label: t('Restore'), variant: 'primary' },
     ],
     cancelId: 'later',
     defaultId: 'restore',
@@ -110,9 +114,9 @@ export async function offerRestore(): Promise<void> {
     useProject.getState().load(project, meta.sourcePath ?? null);
     // Restored work is unsaved until the user saves it.
     useProject.setState({ dirty: true });
-    useEditor.getState().set({ viewport: project.view, selectedComponents: [], selectedWires: [] });
-    useEditor.getState().notify('Unsaved work restored. Save it to keep it.', 'success');
+    useEditor.getState().set({ viewport: project.view, selectedComponents: [], selectedWires: [], page: null });
+    useEditor.getState().notify(t('Unsaved work restored. Save it to keep it.'), 'success');
   } catch (e) {
-    useEditor.getState().notify(`The autosaved copy could not be read: ${(e as Error).message}`, 'error');
+    useEditor.getState().notify(t('The autosaved copy could not be read: {error}', { error: (e as Error).message }), 'error');
   }
 }

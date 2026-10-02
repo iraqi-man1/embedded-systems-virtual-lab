@@ -1,11 +1,11 @@
 /**
- * Workspace geometry: CAD-style box selection and the breadboard insertion
- * preview shown while dragging parts.
+ * Workspace geometry: CAD-style box selection, the breadboard insertion
+ * preview shown while dragging parts, and which pin the pointer is on.
  */
 import { describe, expect, it } from 'vitest';
 import { componentBounds, pinWorld } from '../src/core/circuit/geometry';
 import { buildNetlist } from '../src/core/circuit/netlist';
-import { insertionPreview, marqueeSelection } from '../src/ui/workspace/geometry';
+import { hitPin, insertionPreview, marqueeSelection, pinIndex, uncoveredPin } from '../src/ui/workspace/geometry';
 import { CircuitBuilder, lookup, registry } from './helpers';
 
 function boardWithLed() {
@@ -68,5 +68,22 @@ describe('insertion preview', () => {
     expect(preview.strips).toHaveLength(8);
     // Nothing is highlighted for parts that are being moved themselves.
     expect(insertionPreview(b.doc, buildNetlist(b.doc, lookup), legs, new Set([bb.id])).holes).toHaveLength(0);
+  });
+});
+
+describe('pins under the pointer', () => {
+  it('a breadboard hole covered by another part is not a pin target', () => {
+    const { b, bb, led } = boardWithLed();
+    const index = pinIndex(b.doc);
+    const hole = b.pin(bb, 'a20');
+    const hit = hitPin(index, hole, 7);
+    expect(hit?.ref).toEqual({ componentId: bb.id, pinId: 'a20' });
+    // Pointer over the breadboard itself: the hole is reachable.
+    expect(uncoveredPin(hit, bb.id)).toBe(hit);
+    // Pointer over a part lying across the hole (its body hides it).
+    expect(uncoveredPin(hit, led.id)).toBeNull();
+    // A part's own leg stays reachable through its body.
+    const leg = hitPin(index, b.pin(led, 'A'), 7);
+    expect(uncoveredPin(leg, led.id)?.ref).toEqual({ componentId: led.id, pinId: 'A' });
   });
 });

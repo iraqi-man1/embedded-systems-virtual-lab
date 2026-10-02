@@ -10,8 +10,9 @@ z-index tokens in `src/styles/theme.css`:
 | Canvas | `--z-canvas` (0) |
 | Canvas overlays (hints, banners) | `--z-canvas-overlay` (10) |
 | Simulation controls on parts | `--z-sim-controls` (20) |
-| Floating canvas toolbars (zoom bar, wire toolbar) | `--z-canvas-toolbar` (30) |
+| Floating canvas toolbars (zoom bar, wire toolbar, minimap) | `--z-canvas-toolbar` (30) |
 | Panels / splitters | `--z-panel` (40) |
+| Full pages (start screen, parts guide) | `--z-page` (500) |
 | Dropdowns, popovers | `--z-dropdown` (1000) |
 | Context menus | `--z-context` (1100) |
 | Tooltips | `--z-tooltip` (1200) |
@@ -25,12 +26,42 @@ npm run dev
 node tools/ui-floating-check.mjs
 ```
 
-Opens every toolbar menu, every menu-bar menu and submenu, the canvas context menu at the four
-window edges, the wire context menu and its submenu, the floating wire toolbar, a library info
-card near the bottom of the window, the command palette / quick-add, and the toolbar overflow
-menu and palette in a narrow window — in both themes — and fails if any of them is outside the window or covered by something else.
+Leaves the start screen, then opens every toolbar menu, every menu-bar menu and submenu, the
+canvas context menu at the four window edges, the wire context menu and its submenu, the
+floating wire toolbar, a library info card near the bottom of the window, the hover card of a
+part, the command palette / quick-add / Find, the export dialog, and the toolbar overflow menu
+and palette in a narrow window — in a light and a dark theme, and again in Arabic
+(right-to-left) — and fails if any of them is outside the window or covered by something else.
 
 ## Manual checks (keyboard and focus)
+
+- Start screen: shown at launch (unless turned off); Recent shows live previews and relative
+  times, a missing file says so; New creates a project from a template with the typed name;
+  Examples and Learn open projects; Esc or *Go to the editor* returns to the editor.
+- Language: EN | ع switches instantly; Arabic mirrors panels, menus, tooltips and the inspector
+  (right-to-left) while the canvas, code, serial output and numbers stay left-to-right.
+- Themes: every theme in Settings › Theme and View › Theme repaints the app, the code editor and
+  the instruments; the sun/moon button toggles between the last light and dark theme.
+- Canvas: right-drag pans without opening the menu, a right-click without moving opens it;
+  arrow keys pan when nothing is selected; dragging near an edge scrolls; the minimap (`M`)
+  moves the view on click/drag; Settings › Canvas switches the wheel between zoom and scroll.
+- Help on hover: toolbar buttons show name, one-line explanation and shortcut; resting on a part
+  shows its card (value, simulation state, what it is for) unless dragging or wiring; F1 opens
+  the Parts Guide on the selected part; Back returns to where it was opened.
+- Notes: `T` text, `A` arrow, `B` frame; double-click edits text (Arabic text flows right to
+  left); handles reshape arrows and frames; undo, copy/paste, duplicate and the context menu
+  work on notes; notes are saved with the project.
+- Find (Ctrl+F): part labels, part names, net names and note text; Enter selects and zooms.
+- Export (Ctrl+Shift+E): PNG at 1×–8× shows the pixel size, SVG keeps vectors; white /
+  theme / transparent backgrounds; *Selection only*; Copy as Image (Ctrl+Shift+C) pastes into a
+  document.
+- Raspberry Pi Pico (MicroPython): open *Pico Blink*, Run — the LEDs blink without a compile
+  step; the code tab is `main.py` (Python highlighting, completions and hover help for
+  `machine`/`time`); the Serial Monitor shows `print()` output, **Ctrl+C** gives `>>>` and
+  `print(6*7)` answers `42`; editing while running shows *Modified* and **Upload & restart**;
+  a misspelt method stops the program with a traceback, a Problems entry and a red marker on
+  its line; the MCU tab shows ARM registers (R0–R12, SP, LR, PC, APSR) and pin modes as
+  `Pin.OUT` / `Pin.IN, PULL_UP`.
 
 - Menu bar: click **File**, then move the mouse across the other menus — they switch without
   clicking. ←/→ move between menus, ↑/↓ between items, Enter runs, Esc closes and returns focus.
@@ -51,7 +82,8 @@ menu and palette in a narrow window — in both themes — and fails if any of t
   *Modified* and a dot on the changed tab; undoing the edit returns to *Built*; a failed build
   shows *Build failed* and opens Problems on click.
 - Code tabs: + opens an inline name field (Enter adds, Esc cancels, invalid names are outlined
-  red); double-clicking a tab renames it (not `sketch.ino`).
+  red; `.py` names for a Pico, `.h/.c/.cpp` otherwise); double-clicking a tab renames it (not
+  `sketch.ino` or `main.py`); files the target board doesn't use are shown in italics.
 - Recent projects: File › Open Recent and the empty canvas list opened/saved projects; a missing
   file is removed from the list with a message.
 - Desktop only: double-clicking an `.evlab` file opens it (in the running window if the app is
