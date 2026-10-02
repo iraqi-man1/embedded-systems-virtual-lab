@@ -11,6 +11,7 @@ import { commands } from '../commands';
 import { ModalFrame } from '../common/Dialog';
 import { Icon } from '../common/Icon';
 import { ExampleGallery } from '../home/ExampleGallery';
+import { HistoryDialog } from './HistoryDialog';
 import { SettingsDialog } from './SettingsDialog';
 import { ExportDialog } from '../export/ExportDialog';
 
@@ -281,6 +282,7 @@ export function Dialogs() {
   if (dialog === 'settings') return <SettingsDialog />;
   if (dialog === 'export') return <ExportDialog />;
   if (dialog === 'report') return <ReportDialog />;
+  if (dialog === 'history') return <HistoryDialog />;
   return null;
 }
 

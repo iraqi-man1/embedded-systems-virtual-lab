@@ -9,6 +9,7 @@ import { useEditor } from '../state/editor';
 import { useProject } from '../state/project';
 import { askSaveChanges, dialogOpen } from '../ui/common/Dialog';
 import { clearAutosave, offerRestore, startAutosave, startFileAutosave } from './autosave';
+import { installHistory } from './history';
 import { openDroppedFile, openPath, saveDocument, saveQuietly } from './fileOps';
 
 export function windowTitle(name: string, dirty: boolean) {
@@ -101,7 +102,7 @@ function installFileDrop(): () => void {
 
 /** Called once at start-up. Returns a cleanup function. */
 export function installLifecycle(): () => void {
-  const cleanups: (() => void)[] = [installTitleSync(), installFileDrop()];
+  const cleanups: (() => void)[] = [installTitleSync(), installFileDrop(), installHistory()];
   let disposed = false;
   const keep = (off: () => void) => (disposed ? off() : cleanups.push(off));
   void installCloseGuard().then(keep);

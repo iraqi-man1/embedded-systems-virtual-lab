@@ -705,3 +705,21 @@ body.panel-resizing, body.panel-resizing * { user-select: none !important; }
 .snip-desc { color: var(--text-3); font-size: var(--fs-xs); line-height: 1.35; }
 .snip-where { color: var(--accent); }
 .dropdown.snippets .item[data-highlighted] .snip-desc, .dropdown.snippets .item[data-highlighted] .snip-where { color: inherit; opacity: 0.85; }
+
+/* File › Version History */
+.history { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: 14px; min-height: 360px; }
+.history-list { list-style: none; margin: 0; padding: 0; max-height: 52vh; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.history-item { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; width: 100%; padding: 8px 10px; border: 0; border-bottom: 1px solid var(--border); background: none; color: var(--text); text-align: start; cursor: pointer; }
+.history-item:hover { background: var(--bg-hover); }
+.history-item.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+:root[dir='rtl'] .history-item.on { box-shadow: inset -3px 0 0 var(--accent); }
+.history-when { font-weight: 600; }
+.history-reason { justify-self: end; }
+.history-reason.run { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 50%, var(--border)); }
+.history-reason.restore { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 50%, var(--border)); }
+.history-size { grid-column: 1 / -1; color: var(--text-3); font-size: var(--fs-xs); }
+.history-preview { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.history-preview .card-canvas { border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.history-code { margin: 0; padding: 8px 10px; max-height: 220px; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-panel-2); font: 11.5px/1.45 var(--font-mono); white-space: pre; user-select: text; }
+.history-file { color: var(--text-3); }
+.history-clock { margin-inline-start: 4px; color: var(--text-3); font-weight: 400; font-size: var(--fs-xs); font-family: var(--font-mono); }

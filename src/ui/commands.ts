@@ -129,6 +129,7 @@ export const commands: Record<string, Command> = {
   home: cmd('home', 'Start Screen', 'Recent projects, templates, examples and getting started.', { icon: 'home', run: () => ed().set({ page: 'home', wiring: null }) }),
   new: cmd('new', 'New Project', 'Start a new project from the template you used last (at first, an empty project). Asks to save the current one.', { icon: 'new', shortcut: 'Ctrl+N', run: () => void newFromTemplate() }),
   open: cmd('open', 'Open Project…', 'Open a .evlab project file.', { icon: 'open', shortcut: 'Ctrl+O', run: () => void openDocument() }),
+  history: cmd('history', 'Version History…', 'Earlier versions of the project, kept each time it was run or saved; bring one back.', { icon: 'history', run: () => ed().set({ dialog: 'history' }) }),
   exportCode: cmd('exportCode', 'Export Code…', 'Save the code (.ino and its files, or main.py and its modules) to continue in the Arduino IDE or Thonny.', {
     icon: 'file-down',
     run: () => void exportCode(),
