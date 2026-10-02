@@ -11,7 +11,8 @@ import { buildNetlist } from '../src/core/circuit/netlist';
 import { buildSimSetup } from '../src/core/sim/setup';
 import { SimulationEngine } from '../src/core/sim/engine/engine';
 import type { SimEvent } from '../src/core/sim/types';
-import type { Project } from '../src/core/project/schema';
+import { newProject, type Project } from '../src/core/project/schema';
+import { CircuitBuilder, WIRE } from '../src/examples/builder';
 import { sourcesFor } from '../src/core/project/firmware';
 import { pyString, uploadScript } from '../src/core/sim/mcu/rp2040/micropythonHost';
 import { TracebackReader, errorLocation } from '../src/core/toolchain/pythonTraceback';
@@ -51,6 +52,21 @@ function runProject(p: Project) {
 }
 
 const example = (id: string) => ALL_EXAMPLES.find((e) => e.id === id)!.build(registry);
+
+/** A Pico wired to one I2C module (SDA, SCL, power) running `main`. */
+function i2cProject(type: string, sda: string, scl: string, supply: string, main: string): Project {
+  const b = new CircuitBuilder(registry);
+  const pico = b.add('evlab.rpi-pico', 0, 0);
+  const dev = b.add(type, 300, 200);
+  b.wire(pico, sda, dev, 'SDA', WIRE.blue);
+  b.wire(pico, scl, dev, 'SCL', WIRE.yellow);
+  b.wire(pico, supply, dev, 'VCC', WIRE.red);
+  b.wire(pico, 'GND.b2', dev, 'GND', WIRE.black);
+  const p = newProject('I2C');
+  p.circuit = b.doc;
+  p.firmware.files = [{ name: 'main.py', content: main }];
+  return p;
+}
 
 describe('MicroPython host helpers', () => {
   it('quotes file contents as Python string literals', () => {
@@ -159,6 +175,24 @@ describe('MicroPython on the Raspberry Pi Pico', () => {
     const v = h.frames().at(-1)!.visuals;
     expect(v[h.byLabel('LED1').id]?.value).toBe(true);
     expect(v[h.byLabel('LED3').id]?.value).toBe(false);
+  }, 60_000);
+
+  it('I2C.scan() finds a module on the hardware I2C pins', () => {
+    // The RP2040 port bit-bangs the zero-length writes of a scan; the bus decoder answers them.
+    const h = runProject(i2cProject('evlab.lcd1602-i2c', 'GP4', 'GP5', 'VBUS', "from machine import I2C, Pin\ni2c = I2C(0, sda=Pin(4), scl=Pin(5))\nprint('scan', i2c.scan())\n"));
+    h.run(3, () => /scan \[.*\]/.test(h.serial()));
+    expect(h.serial()).toContain('scan [39]');
+  }, 60_000);
+
+  it('SoftI2C talks to a module on any two pins', () => {
+    const main = "from machine import SoftI2C, Pin\ni2c = SoftI2C(sda=Pin(2), scl=Pin(3))\nprint('scan', i2c.scan())\nprint('who', i2c.readfrom_mem(0x68, 0x75, 1))\ni2c.writeto_mem(0x68, 0x6B, bytes([0]))\nprint('accel', i2c.readfrom_mem(0x68, 0x3B, 6))\n";
+    const h = runProject(i2cProject('evlab.mpu6050', 'GP2', 'GP3', '3V3', main));
+    h.run(3, () => /accel .*\n/.test(h.serial()));
+    const out = h.serial();
+    expect(out).toContain('scan [104]');
+    expect(out).toContain("who b'h'"); // WHO_AM_I = 0x68
+    // Lying flat: 0 g on X and Y, +1 g (16384) on Z.
+    expect(out).toContain("accel b'\\x00\\x00\\x00\\x00@\\x00'");
   }, 60_000);
 
   it('imports other .py files of the project and reports errors with a traceback', () => {

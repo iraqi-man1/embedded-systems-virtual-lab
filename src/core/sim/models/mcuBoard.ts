@@ -7,6 +7,8 @@
  *                        Schmitt thresholds (0.3·Vcc / 0.6·Vcc)
  *  - ADC pins         -> solved voltage fed to the ADC channel
  *  - supply pins      -> regulated sources with current limits checked
+ *  - pins on an I2C module's SDA/SCL -> read the bus as decoded by BitBangI2C,
+ *                        so bit-banged I2C reaches the devices too
  */
 import type { Diagnostic } from '../../circuit/diagnostics';
 import type { PropValue } from '../../model/circuit';
@@ -15,6 +17,7 @@ import type { SolveResult, StampCollector } from '../analog/solver';
 import type { McuDebug } from '../types';
 import { createMcu, type McuEmulator, type PinDrive } from '../mcu/mcu';
 import { registerModel, type ModelContext, type SimModel } from '../model';
+import { BitBangI2C } from './bitBangI2C';
 
 const DEFAULT_GPIO = { rOut: 25, rPullUp: 35_000, absMaxCurrent: 0.04, recommendedCurrent: 0.02 };
 
@@ -43,6 +46,9 @@ class McuBoardModel implements SimModel {
   private rxPumping = false;
   private resetLow = false;
   private hasFirmware: boolean;
+  /** Bit-banged I2C buses by board pin, for the setup they were found in. */
+  private buses = new Map<string, BitBangI2C>();
+  private busesFor: unknown = null;
 
   constructor(readonly ctx: ModelContext) {
     const def = ctx.setup.mcu;
@@ -94,6 +100,53 @@ class McuBoardModel implements SimModel {
     return nets;
   }
 
+  /**
+   * I2C modules wired to this board's pins: each SDA/SCL net pair with a device on it is a
+   * bus a program can bit-bang. Found again whenever the circuit changes.
+   */
+  private bitBangBuses(): Map<string, BitBangI2C> {
+    if (this.busesFor === this.ctx.setup) return this.buses;
+    this.busesFor = this.ctx.setup;
+    const old = this.buses;
+    this.buses = new Map();
+    const byNets = new Map<string, BitBangI2C>();
+    for (const m of this.ctx.models()) {
+      const d = m.i2c;
+      if (!d) continue;
+      const sda = m.ctx.net(d.sdaPin);
+      const scl = m.ctx.net(d.sclPin);
+      if (sda < 0 || scl < 0) continue;
+      const key = `${sda}:${scl}`;
+      let bus = byNets.get(key);
+      if (!bus) {
+        const sdaPins = this.mcu.pins.filter((p) => this.ctx.net(p) === sda);
+        const sclPins = this.mcu.pins.filter((p) => this.ctx.net(p) === scl);
+        if (!sdaPins.length || !sclPins.length) continue;
+        bus = new BitBangI2C(sdaPins, sclPins);
+        byNets.set(key, bus);
+        for (const p of [...sdaPins, ...sclPins]) this.buses.set(p, bus);
+      }
+      bus.devices.push(d);
+    }
+    // Pins that left a bus go back to the solver's levels.
+    for (const p of old.keys()) if (!this.buses.has(p)) this.inputLevel.delete(p);
+    return this.buses;
+  }
+
+  /** Feeds the controller's drive of a bus to its decoder and gives the pins the line levels. */
+  private updateBus(bus: BitBangI2C) {
+    const low = (pins: string[]) => pins.some((p) => this.mcu.pinDrive(p) === 'low');
+    bus.update(low(bus.sdaPins), low(bus.sclPins));
+    for (const p of bus.sdaPins) this.setLevel(p, bus.sda);
+    for (const p of bus.sclPins) this.setLevel(p, bus.scl);
+  }
+
+  private setLevel(pin: string, level: boolean) {
+    if (this.inputLevel.get(pin) === level) return;
+    this.inputLevel.set(pin, level);
+    this.mcu.setInputLevel(pin, level);
+  }
+
   private get gnd(): number {
     for (const [pin, kind] of Object.entries(this.ctx.setup.pinKinds)) {
       if (kind === 'ground') return this.ctx.net(pin);
@@ -105,6 +158,9 @@ class McuBoardModel implements SimModel {
     const drive = this.mcu.pinDrive(pin);
     if (this.lastDrive.get(pin) === drive) return;
     this.lastDrive.set(pin, drive);
+    // Decode bit-banged I2C at the exact moment of the edge (the program reads SDA right after).
+    const bus = this.bitBangBuses().get(pin);
+    if (bus) this.updateBus(bus);
     const n = this.ctx.net(pin);
     if (n < 0) return;
     // An unconnected pin cannot influence anything: defer the solve to the next frame.
@@ -151,6 +207,7 @@ class McuBoardModel implements SimModel {
     const gndIsland = result.island[gnd];
     this.floating.clear();
     this.midLevel.clear();
+    const buses = this.bitBangBuses();
     for (const pin of this.mcu.pins) {
       const n = this.ctx.net(pin);
       if (n < 0) continue;
@@ -159,6 +216,12 @@ class McuBoardModel implements SimModel {
       const driven = isl >= 0 && result.islandDriven[isl] && isl === gndIsland;
       const volts = driven ? v[n] - v[gnd] : NaN;
       if (driven) this.mcu.setAnalogVoltage(pin, Math.max(0, Math.min(vcc, volts)));
+      const bus = buses.get(pin);
+      if (bus) {
+        // I2C lines: the module's pull-ups and the bus decoder set the level.
+        this.updateBus(bus);
+        continue;
+      }
       if (drive === 'input' || drive === 'input-pullup' || drive === 'input-pulldown') {
         if (!driven) {
           // Floating: hardware reads noise. Keep the last level, flag it if wired to something.
@@ -243,6 +306,7 @@ class McuBoardModel implements SimModel {
   reset() {
     this.mcu.reset();
     this.inputLevel.clear();
+    for (const bus of new Set(this.buses.values())) bus.reset();
     for (const p of this.mcu.pins) this.lastDrive.set(p, this.mcu.pinDrive(p));
     this.ctx.invalidate();
   }

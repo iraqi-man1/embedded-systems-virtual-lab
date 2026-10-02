@@ -41,6 +41,8 @@ export class Rp2040Emulator implements McuEmulator {
   private gpioOf = new Map<string, number>();
   private adcOf = new Map<string, number>();
   private analog = new Map<number, number>();
+  /** Level the circuit last put on each GPIO (what its input buffer reads when not driving). */
+  private circuitLevel = new Map<number, boolean>();
   private i2cDevices: I2CDevice[] = [];
   private spiDevices: SPIDevice[] = [];
   private limit = 0;
@@ -107,8 +109,10 @@ export class Rp2040Emulator implements McuEmulator {
     for (const [pin, n] of this.gpioOf) {
       const gpio = chip.gpio[n];
       gpio.addListener(() => {
-        // The input buffer of a driven pin reads its own level (Pin.value() on an output).
-        if (gpio.outputEnable) gpio.setInputValue(gpio.outputValue);
+        // The input buffer of a driven pin reads its own level (Pin.value() on an output); once
+        // released it reads the circuit again (open-drain bit-banging, e.g. the I2C scan).
+        const level = gpio.outputEnable ? gpio.outputValue : this.circuitLevel.get(n);
+        if (level !== undefined && level !== gpio.inputValue) gpio.setInputValue(level);
         this.onPinChange?.(pin);
       });
     }
@@ -233,7 +237,9 @@ export class Rp2040Emulator implements McuEmulator {
 
   setInputLevel(pinId: string, high: boolean) {
     const n = this.gpioOf.get(pinId);
-    if (n !== undefined && !this.chip.gpio[n].outputEnable) this.chip.gpio[n].setInputValue(high);
+    if (n === undefined) return;
+    this.circuitLevel.set(n, high);
+    if (!this.chip.gpio[n].outputEnable) this.chip.gpio[n].setInputValue(high);
   }
 
   setAnalogVoltage(pinId: string, volts: number) {
