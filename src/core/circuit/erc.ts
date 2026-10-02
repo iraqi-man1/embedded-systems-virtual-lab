@@ -19,6 +19,7 @@ export function runStaticErc(doc: CircuitDocument, netlist: Netlist, lookup: Def
         code: 'supply-shorted-to-ground',
         severity: 'error',
         message: `Short circuit: supply pin ${[...supplies].join(', ')} is connected directly to GND (net ${net.name}).`,
+        params: { pins: [...supplies].join(', '), net: net.name },
         componentIds: [...new Set(net.pins.map((p) => p.componentId))],
         netIds: [net.id],
         source: 'erc',
@@ -28,6 +29,7 @@ export function runStaticErc(doc: CircuitDocument, netlist: Netlist, lookup: Def
         code: 'supply-conflict',
         severity: 'error',
         message: `Supplies with different voltages tied together (${net.powerVoltages.map((v) => `${v} V`).join(' / ')}): ${[...supplies].join(', ')}.`,
+        params: { volts: net.powerVoltages.map((v) => `${v} V`).join(' / '), pins: [...supplies].join(', ') },
         componentIds: [...new Set(net.pins.map((p) => p.componentId))],
         netIds: [net.id],
         source: 'erc',
@@ -42,6 +44,7 @@ export function runStaticErc(doc: CircuitDocument, netlist: Netlist, lookup: Def
         code: 'unknown-component',
         severity: 'error',
         message: `${inst.label}: component type "${inst.type}" is not installed.`,
+        params: { label: inst.label, type: inst.type },
         componentIds: [inst.id],
         source: 'erc',
       });
@@ -65,6 +68,7 @@ export function runStaticErc(doc: CircuitDocument, netlist: Netlist, lookup: Def
         code: 'required-pin-unconnected',
         severity: 'warning',
         message: `${inst.label} (${def.name}): ${unconnectedRequired.join(', ')} not connected.`,
+        params: { label: inst.label, name: def.name, pins: unconnectedRequired.join(', ') },
         componentIds: [inst.id],
         source: 'erc',
       });
@@ -74,6 +78,7 @@ export function runStaticErc(doc: CircuitDocument, netlist: Netlist, lookup: Def
         code: 'visual-only',
         severity: 'info',
         message: `${inst.label} (${def.name}) is visual-only: it is drawn and wired but not simulated yet.`,
+        params: { label: inst.label, name: def.name },
         componentIds: [inst.id],
         source: 'erc',
       });

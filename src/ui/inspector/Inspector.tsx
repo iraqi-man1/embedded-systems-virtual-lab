@@ -16,6 +16,7 @@ import { clearWirePoints, deleteSelection, flipSelection, rotateSelection, setNe
 import { pinLabel } from '../instruments/probes';
 import { openGuide } from '../guide/open';
 import { NoteInspector } from './NoteInspector';
+import { diagnosticText } from '../diagnosticText';
 
 const SUPPORT_LABEL: Record<ComponentDefinition['simulation']['support'], MessageKey> = { full: 'Simulated', partial: 'Partially simulated', 'visual-only': 'Visual only' };
 
@@ -189,11 +190,15 @@ function ComponentInspector({ inst, def }: { inst: ComponentInstance; def: Compo
       {(erc.length > 0 || simDiags.length > 0) && (
         <div className="insp-sec">
           <div className="h">{t('Problems')}</div>
-          {[...erc, ...simDiags].map((d, i) => (
-            <div key={i} className={`note${d.severity !== 'info' ? ' warn' : ''}`} style={{ marginBottom: 4 }}>
-              <span className={`sev-${d.severity}`}>●</span> {d.message}
-            </div>
-          ))}
+          {[...erc, ...simDiags].map((d, i) => {
+            const { message, fix } = diagnosticText(d);
+            return (
+              <div key={i} className={`note${d.severity !== 'info' ? ' warn' : ''}`} style={{ marginBottom: 4 }}>
+                <span className={`sev-${d.severity}`}>●</span> {message}
+                {fix && <div className="note-fix">{fix}</div>}
+              </div>
+            );
+          })}
         </div>
       )}
       {def.simulation.support !== 'full' && (

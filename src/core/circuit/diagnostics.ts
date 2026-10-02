@@ -6,6 +6,8 @@ export interface Diagnostic {
   code: string;
   severity: Severity;
   message: string;
+  /** The values in the message, so the interface can show it in another language. */
+  params?: Record<string, string | number>;
   componentIds?: string[];
   netIds?: number[];
   source: 'erc' | 'simulation' | 'toolchain';

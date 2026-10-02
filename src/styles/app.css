@@ -723,3 +723,10 @@ body.panel-resizing, body.panel-resizing * { user-select: none !important; }
 .history-code { margin: 0; padding: 8px 10px; max-height: 220px; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-panel-2); font: 11.5px/1.45 var(--font-mono); white-space: pre; user-select: text; }
 .history-file { color: var(--text-3); }
 .history-clock { margin-inline-start: 4px; color: var(--text-3); font-weight: 400; font-size: var(--fs-xs); font-family: var(--font-mono); }
+
+/* Problems: how to fix them, and the part's page in the guide. */
+.problem .fix { display: block; margin-top: 2px; color: var(--text-2); font-size: var(--fs-xs); }
+.problem .fix svg { vertical-align: -2px; color: var(--accent); }
+.link-btn { margin-inline-start: 6px; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; cursor: pointer; }
+.link-btn:hover { text-decoration: underline; }
+.note-fix { margin-top: 2px; color: var(--text-2); font-size: var(--fs-xs); }

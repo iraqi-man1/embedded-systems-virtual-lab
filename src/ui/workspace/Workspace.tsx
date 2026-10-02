@@ -37,6 +37,7 @@ import { useWireToolbarVisible, WireToolbar } from './WireToolbar';
 import { ContextMenuGate, type HeldMenu } from './contextMenuGate';
 import { PartHoverCard, usePartHover } from './PartHoverCard';
 import { openQuickEdit, QuickEdit } from './QuickEdit';
+import { diagnosticText } from '../diagnosticText';
 import { Minimap } from './Minimap';
 
 type Drag =
@@ -108,6 +109,7 @@ export function Workspace() {
   const netlist = useNetlist();
   const erc = useErc();
   const simDiagnostics = useSim((s) => s.diagnostics);
+  const language = useEditor((s) => s.language);
   // Worst problem per part, for outlines and badges on the canvas.
   const problems = useMemo(() => {
     const m = new Map<string, { severity: 'error' | 'warning'; messages: string[] }>();
@@ -116,12 +118,14 @@ export function Workspace() {
       for (const id of d.componentIds ?? []) {
         const cur = m.get(id) ?? { severity: d.severity, messages: [] };
         if (d.severity === 'error') cur.severity = 'error';
-        cur.messages.push(d.message);
+        cur.messages.push(diagnosticText(d).message);
         m.set(id, cur);
       }
     }
     return m;
-  }, [erc, simDiagnostics]);
+    // The language too: the messages are translated.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [erc, simDiagnostics, language]);
 
   const ref = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag | null>(null);

@@ -44,6 +44,7 @@ class DiodeModel implements SimModel {
             code: 'diode-overcurrent',
             severity: 'error',
             message: `${this.ctx.setup.label}: ${this.avgI.toFixed(2)} A forward current exceeds its ${max} A rating.`,
+            params: { label: this.ctx.setup.label, a: this.avgI.toFixed(2), max },
             componentIds: [this.ctx.setup.id],
             source: 'simulation',
           },

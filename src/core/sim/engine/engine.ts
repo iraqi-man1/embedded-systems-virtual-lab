@@ -108,6 +108,7 @@ export class SimulationEngine {
         code: 'model-missing',
         severity: 'warning',
         message: `${comp.label}: simulation model "${comp.model}" is not available; the part is treated as disconnected.`,
+        params: { label: comp.label, model: String(comp.model) },
         componentIds: [comp.id],
         source: 'simulation',
       });
@@ -123,6 +124,7 @@ export class SimulationEngine {
         code: 'model-error',
         severity: 'error',
         message: `${comp.label}: ${(e as Error).message}`,
+        params: { label: comp.label, error: (e as Error).message },
         componentIds: [comp.id],
         source: 'simulation',
       });
