@@ -4,7 +4,7 @@
  * with simulated parts.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Annotation, PinRef, Point, Wire } from '../../core/model/circuit';
+import type { Annotation, ComponentInstance, PinRef, Point, Wire } from '../../core/model/circuit';
 import { annotationsIn, dragHandle, movedFrom, newArrow, newFrame, newText, type NoteHandle } from '../../core/circuit/annotations';
 import { nanoid } from 'nanoid';
 import { GRID } from '../../core/model/component';
@@ -21,7 +21,7 @@ import { useT } from '../../i18n/react';
 import { ComponentView } from './ComponentView';
 import { WireLayer, type Overlay } from './WireLayer';
 import { hitPin, insertionPreview, uncoveredPin, marqueeSelection, nearestSegment, pinIndex, pinPosition, pointAlong, polylineLength, wirePolyline, type IndexedPin } from './geometry';
-import { addComponentAt, addNote, editTextNote, fitView, withCarried, zoomBy, zoomToSelection } from './actions';
+import { addComponentAt, addNote, editTextNote, fitView, noticeLocked, unlockedOf, withCarried, zoomBy, zoomToSelection } from './actions';
 import { FrameLayer, NoteLayer } from './AnnotationLayer';
 import { assignProbe, probeMarkers } from '../instruments/probes';
 import { Icon } from '../common/Icon';
@@ -36,13 +36,15 @@ import { SimControlsLayer } from './SimControls';
 import { useWireToolbarVisible, WireToolbar } from './WireToolbar';
 import { ContextMenuGate, type HeldMenu } from './contextMenuGate';
 import { PartHoverCard, usePartHover } from './PartHoverCard';
+import { openQuickEdit, QuickEdit } from './QuickEdit';
+import { diagnosticText } from '../diagnosticText';
 import { Minimap } from './Minimap';
 
 type Drag =
   /** `button` 2: right-button pan, which only starts once the pointer moved past the threshold. */
   | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number; button: number }
   /** `anchor`: the part grabbed (its legs snap to the grid); null when a note was grabbed. */
-  | { kind: 'move'; start: Point; orig: Map<string, Point>; wires: Map<string, Point[]>; notes: Map<string, Annotation>; anchor: string | null; moved: boolean }
+  | { kind: 'move'; start: Point; orig: Map<string, Point>; wires: Map<string, Point[]>; notes: Map<string, Annotation>; anchor: string | null; moved: boolean; locked: ComponentInstance[] }
   | { kind: 'marquee'; start: Point; base: string[]; baseWires: string[]; baseNotes: string[] }
   | { kind: 'note-handle'; id: string; handle: NoteHandle; orig: Annotation }
   | { kind: 'note-create'; tool: 'arrow' | 'rect'; start: Point }
@@ -107,6 +109,7 @@ export function Workspace() {
   const netlist = useNetlist();
   const erc = useErc();
   const simDiagnostics = useSim((s) => s.diagnostics);
+  const language = useEditor((s) => s.language);
   // Worst problem per part, for outlines and badges on the canvas.
   const problems = useMemo(() => {
     const m = new Map<string, { severity: 'error' | 'warning'; messages: string[] }>();
@@ -115,12 +118,14 @@ export function Workspace() {
       for (const id of d.componentIds ?? []) {
         const cur = m.get(id) ?? { severity: d.severity, messages: [] };
         if (d.severity === 'error') cur.severity = 'error';
-        cur.messages.push(d.message);
+        cur.messages.push(diagnosticText(d).message);
         m.set(id, cur);
       }
     }
     return m;
-  }, [erc, simDiagnostics]);
+    // The language too: the messages are translated.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [erc, simDiagnostics, language]);
 
   const ref = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag | null>(null);
@@ -222,9 +227,12 @@ export function Workspace() {
   /** Starts moving the selected parts and notes (parts plugged into a moved breadboard travel with it). */
   const startMove = (world: Point, _noteId: string | null, anchor: string | null, pointerId: number) => {
     const sel = useEditor.getState();
-    const moving = withCarried(sel.selectedComponents);
+    // Locked parts stay (and so do parts plugged into them, unless selected themselves).
+    const moving = withCarried(unlockedOf(sel.selectedComponents));
+    const locked = circuit.components.filter((c) => c.locked && sel.selectedComponents.includes(c.id));
     const orig = new Map<string, Point>();
-    for (const c of circuit.components) if (moving.has(c.id)) orig.set(c.id, { x: c.x, y: c.y });
+    for (const c of circuit.components) if (moving.has(c.id) && !c.locked) orig.set(c.id, { x: c.x, y: c.y });
+    if (anchor && !orig.has(anchor)) anchor = null;
     const wires = new Map<string, Point[]>();
     for (const w of circuit.wires) {
       if (orig.has(w.from.componentId) && orig.has(w.to.componentId)) wires.set(w.id, w.points.map((p) => ({ ...p })));
@@ -233,7 +241,7 @@ export function Workspace() {
     const notes = new Map<string, Annotation>();
     for (const a of circuit.annotations ?? []) if (ids.has(a.id)) notes.set(a.id, structuredClone(a));
     useProject.getState().begin();
-    drag.current = { kind: 'move', start: world, orig, wires, notes, anchor, moved: false };
+    drag.current = { kind: 'move', start: world, orig, wires, notes, anchor, moved: false, locked };
     ref.current?.setPointerCapture(pointerId);
   };
 
@@ -481,7 +489,10 @@ export function Workspace() {
         const dx = world.x - d.start.x;
         const dy = world.y - d.start.y;
         if (!d.moved && Math.hypot(dx, dy) * ed.viewport.zoom < DRAG_THRESHOLD) return;
-        if (!d.moved) setDragging(true);
+        if (!d.moved) {
+          setDragging(true);
+          noticeLocked(d.locked);
+        }
         d.moved = true;
         const anchorInst = d.anchor ? circuit.components.find((c) => c.id === d.anchor) : undefined;
         const anchorDef = anchorInst && lookup(anchorInst.type);
@@ -712,8 +723,12 @@ export function Workspace() {
       useProject.getState().edit((d) => {
         d.wires.find((x) => x.id === wireId)!.points.splice(insertAt, 0, snapPt(world));
       });
-    } else if (target.closest('[data-comp]')) {
-      useEditor.getState().setPrefs({ showInspector: true });
+    } else if (target.closest('[data-comp]') || under.closest('[data-comp]')) {
+      // A part: its main value, right there (parts clicked while simulating keep their clicks).
+      const id = (target.closest('[data-comp]') ?? under.closest('[data-comp]'))!.getAttribute('data-comp')!;
+      const inst = circuit.components.find((c) => c.id === id);
+      const interactive = simulating && !!(inst && lookup(inst.type)?.interaction);
+      if (interactive || !openQuickEdit(id, e.clientX, e.clientY)) useEditor.getState().setPrefs({ showInspector: true });
     } else if (!target.closest('button, .simctl-chip, .simctl-key, .canvas-hint') && !useEditor.getState().wiring) {
       // Double-click on empty canvas: add a part right here.
       useEditor.getState().set({ palette: { mode: 'add', at: world } });
@@ -1026,6 +1041,20 @@ export function Workspace() {
     );
   });
 
+  // A padlock at the corner of each locked part.
+  const locks = circuit.components.map((c) => {
+    const def = c.locked ? lookup(c.type) : undefined;
+    if (!def) return null;
+    const b = componentBounds(c, def);
+    return (
+      <Tip key={c.id} content={t('Locked: it stays in place (Ctrl+L unlocks)')} direct>
+        <span className="lock-badge" style={{ left: b.x + b.width, top: b.y }} role="img" aria-label={t('Locked: it stays in place (Ctrl+L unlocks)')}>
+          <Icon name="lock" size={9} />
+        </span>
+      </Tip>
+    );
+  });
+
   const gridSize = GRID * viewport.zoom * (viewport.zoom < 0.5 ? 5 : 1);
   const canvas = (
     <div
@@ -1073,6 +1102,7 @@ export function Workspace() {
           ) : null;
         })}
         {labels}
+        {locks}
         {ghostInst && (
           <div className="ghost">
             <ComponentView inst={ghostInst} def={registry.get(ghostInst.type)!} selected={false} />
@@ -1160,6 +1190,7 @@ export function Workspace() {
       {tip}
       {wireBar}
       {hoverCard}
+      <QuickEdit />
     </>
   );
 }

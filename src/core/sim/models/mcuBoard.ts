@@ -364,6 +364,7 @@ class McuBoardModel implements SimModel {
         code: 'no-firmware',
         severity: 'info',
         message: this.def.runtime ? `${label}: no main.py — add a main.py file to run Python on this board.` : `${label}: no firmware loaded — compile the sketch to run code on this board.`,
+        params: { label, python: this.def.runtime ? 1 : 0 },
         componentIds: [id],
         source: 'simulation',
       });
@@ -386,6 +387,7 @@ class McuBoardModel implements SimModel {
         code: 'supply-overcurrent',
         severity: 'error',
         message: `${label} ${pin} supply delivers ${(i * 1000).toFixed(0)} mA — more than it can provide (short circuit?).`,
+        params: { label, pin, ma: (i * 1000).toFixed(0) },
         componentIds: [id],
         source: 'simulation',
       });
@@ -395,6 +397,7 @@ class McuBoardModel implements SimModel {
         code: 'floating-input',
         severity: 'warning',
         message: `${label} pin ${pin} is a floating input: nothing pulls it high or low, so reads are unpredictable. ${this.def.runtime ? 'Use Pin.PULL_UP (or Pin.PULL_DOWN)' : 'Use INPUT_PULLUP'} or add a pull-up/pull-down resistor.`,
+        params: { label, pin, python: this.def.runtime ? 1 : 0 },
         componentIds: [id],
         source: 'simulation',
       });
@@ -404,6 +407,7 @@ class McuBoardModel implements SimModel {
         code: 'undefined-logic-level',
         severity: 'warning',
         message: `${label} pin ${pin} sits between the logic thresholds (0.3–0.6 Vcc); its digital value is undefined.`,
+        params: { label, pin },
         componentIds: [id],
         source: 'simulation',
       });

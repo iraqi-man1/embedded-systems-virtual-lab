@@ -51,6 +51,29 @@ export async function clearAutosave(): Promise<void> {
   }
 }
 
+/** How long after the last change the project file is saved by itself. */
+const FILE_DELAY_MS = 2500;
+
+/**
+ * Saves the project file by itself shortly after each change, when it has a
+ * file and the setting is on (desktop application). Returns the cleanup.
+ */
+export function startFileAutosave(save: () => Promise<boolean>): () => void {
+  let timer: number | undefined;
+  const schedule = () => {
+    window.clearTimeout(timer);
+    timer = window.setTimeout(() => void save(), FILE_DELAY_MS);
+  };
+  const off = useProject.subscribe((s, prev) => {
+    if (!useEditor.getState().autosaveFile || !s.dirty || !s.filePath) return;
+    if (s.project !== prev.project || s.dirty !== prev.dirty) schedule();
+  });
+  return () => {
+    window.clearTimeout(timer);
+    off();
+  };
+}
+
 /** Starts periodic autosaving. Call after `offerRestore()` so a pending copy is not overwritten. */
 export function startAutosave(): () => void {
   const timer = setInterval(() => void autosaveNow(), INTERVAL_MS);

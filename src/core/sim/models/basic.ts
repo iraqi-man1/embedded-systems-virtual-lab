@@ -51,6 +51,7 @@ class ResistorModel implements SimModel {
         code: 'resistor-overpower',
         severity: this.avgPower > 2 * rating ? 'error' : 'warning',
         message: `${this.ctx.setup.label} dissipates ${this.avgPower.toFixed(2)} W, above its ${rating} W rating.`,
+        params: { label: this.ctx.setup.label, w: this.avgPower.toFixed(2), rating },
         componentIds: [this.ctx.setup.id],
         source: 'simulation',
       },
@@ -114,6 +115,7 @@ function ledDiagnostics(ctx: ModelContext, junctions: LedJunction[]): Diagnostic
         code: 'led-destroyed',
         severity: 'error',
         message: `${ctx.setup.label}: ${(j.avg * 1000).toFixed(0)} mA through the LED — a real LED would burn out. Add a series resistor (e.g. 220 Ω).`,
+        params: { label: ctx.setup.label, ma: (j.avg * 1000).toFixed(0) },
         componentIds: [ctx.setup.id],
         source: 'simulation',
       });
@@ -122,6 +124,7 @@ function ledDiagnostics(ctx: ModelContext, junctions: LedJunction[]): Diagnostic
         code: 'led-overcurrent',
         severity: 'warning',
         message: `${ctx.setup.label}: ${(j.avg * 1000).toFixed(0)} mA exceeds the ${(maxContinuous * 1000).toFixed(0)} mA rating.`,
+        params: { label: ctx.setup.label, ma: (j.avg * 1000).toFixed(0), max: (maxContinuous * 1000).toFixed(0) },
         componentIds: [ctx.setup.id],
         source: 'simulation',
       });
@@ -131,6 +134,7 @@ function ledDiagnostics(ctx: ModelContext, junctions: LedJunction[]): Diagnostic
         code: 'led-reverse-voltage',
         severity: 'warning',
         message: `${ctx.setup.label}: ${j.peakReverse.toFixed(1)} V reverse bias exceeds the typical 5 V limit (is it inserted backwards?).`,
+        params: { label: ctx.setup.label, v: j.peakReverse.toFixed(1) },
         componentIds: [ctx.setup.id],
         source: 'simulation',
       });
@@ -161,8 +165,10 @@ class LedModel implements SimModel {
     this.ctx.solveNow([this.ctx.net('A'), this.ctx.net('C')]);
   }
   visualState() {
-    const b = brightnessOf(this.j.sample());
-    return { value: b > 0.005, brightness: Math.max(b, b > 0.005 ? 0.08 : 0) };
+    const amps = this.j.sample();
+    const b = brightnessOf(amps);
+    // `_amps`: average current over the frame (the part's hover card shows it).
+    return { value: b > 0.005, brightness: Math.max(b, b > 0.005 ? 0.08 : 0), _amps: amps };
   }
   diagnostics() {
     return ledDiagnostics(this.ctx, [this.j]);
@@ -393,6 +399,7 @@ class DcSourceModel implements SimModel {
         code: 'source-overcurrent',
         severity: 'error',
         message: `${this.ctx.setup.label} delivers ${this.avgI.toFixed(2)} A, above its ${limit} A limit (short circuit?).`,
+        params: { label: this.ctx.setup.label, a: this.avgI.toFixed(2), limit },
         componentIds: [this.ctx.setup.id],
         source: 'simulation',
       },

@@ -5,6 +5,8 @@ import { useEditor, type DockTab } from '../../state/editor';
 import { useProject } from '../../state/project';
 import { useSim } from '../../state/sim';
 import { zoomToComponents } from '../workspace/actions';
+import { diagnosticText } from '../diagnosticText';
+import { openGuide } from '../guide/open';
 import { Icon } from '../common/Icon';
 import { Tip } from '../common/Tooltip';
 import { LogicAnalyzer } from './LogicAnalyzer';
@@ -20,6 +22,12 @@ function useProblems() {
   const compile = useSim((s) => s.compile.diagnostics);
   const script = useSim((s) => s.scriptErrors);
   return { erc, sim, compile, script };
+}
+
+/** The part type a problem is about, for its page in the parts guide (problems about one part only). */
+function guidePart(ids?: string[]): string | null {
+  if (ids?.length !== 1) return null;
+  return useProject.getState().project.circuit.components.find((c) => c.id === ids[0])?.type ?? null;
 }
 
 /** Selects the parts a problem refers to and brings them into view. */
@@ -50,8 +58,11 @@ function ProblemsPanel() {
       source: 'MicroPython',
       onClick: () => useEditor.getState().set({ revealLine: { file: d.file, line: d.line, nonce: Math.random() }, showCode: true }),
     })),
-    ...sim.map((d) => ({ severity: d.severity, message: d.message, where: '', source: t('simulation'), onClick: () => revealComponents(d.componentIds) })),
-    ...erc.map((d) => ({ severity: d.severity, message: d.message, where: '', source: t('circuit check'), onClick: () => revealComponents(d.componentIds) })),
+    ...[...sim.map((d) => ({ d, source: t('simulation') })), ...erc.map((d) => ({ d, source: t('circuit check') }))].map(({ d, source }) => {
+      const { message, fix } = diagnosticText(d);
+      const part = guidePart(d.componentIds);
+      return { severity: d.severity, message, fix, part, where: '', source, onClick: () => revealComponents(d.componentIds) };
+    }),
   ];
   const rank = { error: 0, warning: 1, info: 2, note: 2 } as Record<string, number>;
   items.sort((a, b) => rank[a.severity] - rank[b.severity]);
@@ -76,6 +87,23 @@ function ProblemsPanel() {
           <span className="msg" dir="auto">
             {p.message}
             {p.where && <span className="ltr" style={{ color: 'var(--text-3)', fontFamily: 'var(--font-mono)', marginInlineStart: 8 }}>{p.where}</span>}
+            {'fix' in p && p.fix && (
+              <span className="fix">
+                <Icon name="wrench" size={12} /> {p.fix}
+                {p.part && (
+                  <button
+                    type="button"
+                    className="link-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openGuide(p.part);
+                    }}
+                  >
+                    {t('Parts guide')} ›
+                  </button>
+                )}
+              </span>
+            )}
           </span>
           <span className="src">{p.source}</span>
         </div>

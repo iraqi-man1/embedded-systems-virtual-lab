@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { installLifecycle } from '../app/lifecycle';
-import { isRtl } from '../i18n';
+import { isRtl, t } from '../i18n';
 import { useT } from '../i18n/react';
 import { useEditor } from '../state/editor';
 import { refreshToolchain } from '../state/sim';
@@ -10,15 +10,20 @@ import { Inspector } from './inspector/Inspector';
 import { BottomDock } from './instruments/BottomDock';
 import { LibraryPanel } from './library/LibraryPanel';
 import { DialogHost } from './common/Dialog';
+import { ErrorBoundary } from './common/ErrorBoundary';
+import { FloatingPanel } from './common/FloatingPanel';
+import { clampRect, type Size } from './common/floatGeometry';
 import { Tip, TooltipProvider } from './common/Tooltip';
 import { CommandPalette } from './shell/CommandPalette';
 import { Dialogs, Toasts } from './shell/Dialogs';
 import { MenuBar } from './shell/MenuBar';
 import { StatusBar } from './shell/StatusBar';
 import { Toolbar } from './shell/Toolbar';
+import { installTourStart, Tour } from './shell/Tour';
 import { Workspace } from './workspace/Workspace';
 import { HomeScreen } from './home/HomeScreen';
 import { PartsGuide } from './guide/PartsGuide';
+import { closeGuide } from './guide/open';
 import { applyTheme, resolveTheme, systemPrefersDark } from './themes';
 
 type SizeKey = 'libraryWidth' | 'inspectorHeight' | 'codeWidth' | 'dockHeight';
@@ -60,6 +65,41 @@ function Splitter({ k, dir, invert, min, max, onCollapse }: { k: SizeKey; dir: '
 
 const CHROME_HEIGHT = 28 + 40 + 24; // menu bar + toolbar + status bar
 
+/**
+ * The code editor's place: beside the canvas, or floating over the window.
+ * Only this re-renders while the floating editor is dragged; the editor
+ * itself (`children`) stays mounted either way.
+ */
+function CodeSlot({ width, win, children }: { width: number; win: Size; children: React.ReactNode }) {
+  const t = useT();
+  const floating = useEditor((s) => s.codeFloating);
+  const saved = useEditor((s) => s.codeFloatRect);
+  const docking = useEditor((s) => s.codeDocking);
+  const rect = clampRect(saved ?? { x: win.w - width - 48, y: 120, w: Math.min(width, 640), h: 520 }, win);
+  return (
+    <>
+      <FloatingPanel
+        className="code-slot"
+        floating={floating}
+        rect={rect}
+        docked={{ width, flex: 'none', display: 'flex', minHeight: 0 }}
+        label={t('Code Editor')}
+        onResize={(r, done) => (done ? useEditor.getState().setPrefs({ codeFloatRect: r }) : useEditor.getState().set({ codeFloatRect: r }))}
+      >
+        {children}
+      </FloatingPanel>
+      {/* Where the floating editor docks when let go now. */}
+      {docking && <div className="dock-preview" style={{ width }} aria-hidden />}
+    </>
+  );
+}
+
+/** A dialog or the palette failed to draw: close it and say so. */
+function closeBroken(partial: Parameters<ReturnType<typeof useEditor.getState>['set']>[0]) {
+  useEditor.getState().set(partial);
+  useEditor.getState().notify(t('That window could not be shown. Help › Report a Problem has the details.'), 'error');
+}
+
 /** Follows the theme preference (and the operating system's light/dark setting for 'system'). */
 function useAppliedTheme() {
   const pref = useEditor((s) => s.theme);
@@ -85,6 +125,7 @@ export function App() {
   const showInspector = useEditor((s) => s.showInspector);
   const showCode = useEditor((s) => s.showCode);
   const showDock = useEditor((s) => s.showDock);
+  const codeFloating = useEditor((s) => s.codeFloating);
   const libraryWidth = useEditor((s) => s.libraryWidth);
   const inspectorHeight = useEditor((s) => s.inspectorHeight);
   const codeWidth = useEditor((s) => s.codeWidth);
@@ -108,21 +149,31 @@ export function App() {
   useEffect(() => {
     const off = installShortcuts();
     const offLifecycle = installLifecycle();
+    const offTour = installTourStart();
     void refreshToolchain();
     return () => {
       off();
       offLifecycle();
+      offTour();
     };
   }, []);
 
   const hide = (p: Partial<Record<'showLibrary' | 'showInspector' | 'showCode' | 'showDock', boolean>>) => () => useEditor.getState().setPrefs(p);
   const page = useEditor((s) => s.page);
+  const guideType = useEditor((s) => s.guideType);
+  const dialog = useEditor((s) => s.dialog);
+  const palette = useEditor((s) => s.palette);
+  const toEditor = () => useEditor.getState().set({ page: null, guideType: null });
 
   return (
     <TooltipProvider>
       <div className="app">
-        <MenuBar />
-        <Toolbar />
+        <ErrorBoundary area="Menu bar" variant="bar">
+          <MenuBar />
+        </ErrorBoundary>
+        <ErrorBoundary area="Toolbar" variant="bar">
+          <Toolbar />
+        </ErrorBoundary>
         <div className="main">
           {showLeft && (
             <>
@@ -130,7 +181,9 @@ export function App() {
               <div className="left-column" style={{ width: leftW }}>
                 {showLibrary && (
                   <div className="left-top">
-                    <LibraryPanel />
+                    <ErrorBoundary area="Component Library">
+                      <LibraryPanel />
+                    </ErrorBoundary>
                   </div>
                 )}
                 {showLibrary && showInspector && (
@@ -138,7 +191,9 @@ export function App() {
                 )}
                 {showInspector && (
                   <div className="left-bottom" style={{ height: showLibrary ? inspH : undefined, flex: showLibrary ? 'none' : 1 }}>
-                    <Inspector />
+                    <ErrorBoundary area="Properties">
+                      <Inspector />
+                    </ErrorBoundary>
                   </div>
                 )}
               </div>
@@ -147,33 +202,56 @@ export function App() {
           )}
           <div className="center">
             <div className="center-top">
-              <Workspace />
+              <ErrorBoundary area="Canvas">
+                <Workspace />
+              </ErrorBoundary>
+              {showCode && !codeFloating && <Splitter k="codeWidth" dir="v" invert min={300} max={1100} onCollapse={hide({ showCode: false })} />}
               {showCode && (
-                <>
-                  <Splitter k="codeWidth" dir="v" invert min={300} max={1100} onCollapse={hide({ showCode: false })} />
-                  <div style={{ width: codeW, flex: 'none', display: 'flex', minHeight: 0 }}>
+                <CodeSlot width={codeW} win={win}>
+                  <ErrorBoundary area="Code editor">
                     <CodeEditor />
-                  </div>
-                </>
+                  </ErrorBoundary>
+                </CodeSlot>
               )}
             </div>
             {showDock && (
               <>
                 <Splitter k="dockHeight" dir="h" invert min={120} max={700} onCollapse={hide({ showDock: false })} />
                 <div className="dock" style={{ height: dockH }}>
-                  <BottomDock />
+                  <ErrorBoundary area="Instruments">
+                    <BottomDock />
+                  </ErrorBoundary>
                 </div>
               </>
             )}
           </div>
         </div>
-        <StatusBar />
-        {page === 'home' && <HomeScreen />}
-        {page === 'guide' && <PartsGuide />}
-        <Dialogs />
+        <ErrorBoundary area="Status bar" variant="bar">
+          <StatusBar />
+        </ErrorBoundary>
+        {page === 'home' && (
+          <ErrorBoundary area="Start screen" variant="page" onBack={toEditor}>
+            <HomeScreen />
+          </ErrorBoundary>
+        )}
+        {page === 'guide' && (
+          <ErrorBoundary area="Parts guide" variant="page" resetKey={guideType} onBack={closeGuide}>
+            <PartsGuide />
+          </ErrorBoundary>
+        )}
+        <ErrorBoundary area="Dialog" variant="silent" resetKey={dialog} onError={() => closeBroken({ dialog: null })}>
+          <Dialogs />
+        </ErrorBoundary>
         <DialogHost />
-        <CommandPalette />
-        <Toasts />
+        <ErrorBoundary area="Command palette" variant="silent" resetKey={palette} onError={() => closeBroken({ palette: null })}>
+          <CommandPalette />
+        </ErrorBoundary>
+        <ErrorBoundary area="Notifications" variant="silent">
+          <Toasts />
+        </ErrorBoundary>
+        <ErrorBoundary area="Tour" variant="silent" onError={() => useEditor.getState().set({ tourStep: null })}>
+          <Tour />
+        </ErrorBoundary>
       </div>
     </TooltipProvider>
   );

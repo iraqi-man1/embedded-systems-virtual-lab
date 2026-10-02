@@ -20,6 +20,8 @@ export interface ComponentInstance {
   /** Reference designator shown on the canvas, e.g. "R1". */
   label: string;
   props: Record<string, PropValue>;
+  /** Locked in place: not moved, rotated or deleted until unlocked. */
+  locked?: boolean;
 }
 
 export interface PinRef {

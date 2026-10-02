@@ -9,6 +9,7 @@ import { Tip } from '../common/Tooltip';
 import { setZoom } from '../workspace/actions';
 import { setTheme } from '../commands';
 import { THEMES, themeInfo } from '../themes';
+import { setUiScale, stepUiScale, UI_SCALES } from '../uiScale';
 import { AlignItems, SpeedItems, WireColorItems } from './Toolbar';
 
 type Entry = string | '-' | { sub: MessageKey; icon?: string; render: () => React.ReactNode };
@@ -27,17 +28,44 @@ export function ZoomItems() {
   );
 }
 
+/** View › Interface Size. */
+export function UiScaleItems() {
+  const t = useT();
+  const scale = useEditor((s) => s.uiScale);
+  return (
+    <>
+      {UI_SCALES.map((z) => (
+        <MenuCheckItem key={z} label={<span className="ltr">{Math.round(z * 100)}%</span>} checked={Math.abs(scale - z) < 1e-3} onSelect={() => setUiScale(z)} />
+      ))}
+      <MenuSeparator />
+      <MenuItem label={t('Larger Interface')} shortcut="Ctrl+Alt+=" onSelect={() => stepUiScale(1)} />
+      <MenuItem label={t('Smaller Interface')} shortcut="Ctrl+Alt+−" onSelect={() => stepUiScale(-1)} />
+    </>
+  );
+}
+
 /** View › Theme: every theme, plus following the system setting. */
 export function ThemeItems() {
   const t = useT();
   const pref = useEditor((s) => s.theme);
   return (
     <>
-      <MenuCheckItem label={t('Follow system (light/dark)')} checked={pref === 'system'} onSelect={() => setTheme('system')} />
+      <MenuCheckItem id="theme-system" label={t('Follow system (light/dark)')} checked={pref === 'system'} onSelect={() => setTheme('system')} />
       <MenuSeparator />
       {THEMES.map((th) => (
-        <MenuCheckItem key={th.id} label={t(th.label)} checked={pref === th.id} onSelect={() => setTheme(th.id)} />
+        <MenuCheckItem key={th.id} id={`theme-${th.id}`} label={t(th.label)} checked={pref === th.id} onSelect={() => setTheme(th.id)} />
       ))}
+    </>
+  );
+}
+
+/** File › Wokwi: projects of wokwi.com in and out. */
+function WokwiItems() {
+  return (
+    <>
+      <CommandEntry id="importWokwi" />
+      <CommandEntry id="exportWokwi" />
+      <CommandEntry id="copyWokwi" />
     </>
   );
 }
@@ -58,8 +86,8 @@ function RecentItems() {
 }
 
 const MENUS: { name: MessageKey; items: Entry[] }[] = [
-  { name: 'File', items: ['home', '-', 'new', 'open', { sub: 'Open Recent', icon: 'history', render: () => <RecentItems /> }, '-', 'save', 'saveAs', '-', 'exportImage', 'copyImage', '-', 'examples', '-', 'settings'] },
-  { name: 'Edit', items: ['undo', 'redo', '-', 'cut', 'copy', 'paste', 'duplicate', 'delete', '-', 'selectAll', 'find', '-', 'rotate', 'rotateCcw', 'flip', '-', 'quickAdd', 'palette'] },
+  { name: 'File', items: ['home', '-', 'new', 'open', { sub: 'Open Recent', icon: 'history', render: () => <RecentItems /> }, '-', 'save', 'saveAs', 'history', '-', 'exportImage', 'copyImage', '-', 'exportCode', 'importCode', { sub: 'Wokwi', icon: 'package', render: () => <WokwiItems /> }, '-', 'examples', '-', 'settings'] },
+  { name: 'Edit', items: ['undo', 'redo', '-', 'cut', 'copy', 'paste', 'duplicate', 'delete', '-', 'selectAll', 'find', '-', 'rotate', 'rotateCcw', 'flip', 'lock', '-', 'quickAdd', 'palette'] },
   {
     name: 'Arrange',
     items: [
@@ -71,13 +99,13 @@ const MENUS: { name: MessageKey; items: Entry[] }[] = [
   },
   {
     name: 'View',
-    items: ['zoomIn', 'zoomOut', 'zoomReset', 'fit', 'zoomSelection', { sub: 'Zoom', render: () => <ZoomItems /> }, 'minimap', '-', 'grid', 'snap', 'logicLevels', 'voltages', '-', 'toggleLibrary', 'toggleInspector', 'toggleCode', 'toggleDock', 'focusCanvas', '-', 'sound', { sub: 'Theme', icon: 'palette', render: () => <ThemeItems /> }, 'theme', 'language'],
+    items: ['zoomIn', 'zoomOut', 'zoomReset', 'fit', 'zoomSelection', { sub: 'Zoom', render: () => <ZoomItems /> }, 'minimap', '-', 'grid', 'snap', 'logicLevels', 'voltages', '-', 'toggleLibrary', 'toggleInspector', 'toggleCode', 'floatCode', 'toggleDock', 'focusCanvas', '-', 'sound', { sub: 'Theme', icon: 'palette', render: () => <ThemeItems /> }, 'theme', { sub: 'Interface Size', icon: 'scale', render: () => <UiScaleItems /> }, 'language'],
   },
   {
     name: 'Simulation',
     items: ['compile', '-', 'run', 'pause', 'step', 'stepInstr', 'reset', 'stop', '-', { sub: 'Speed', icon: 'gauge', render: () => <SpeedItems /> }, '-', 'probeLogic', 'probeScope', '-', 'toolchain'],
   },
-  { name: 'Help', items: ['guide', '-', 'palette', 'quickAdd', '-', 'examples', 'shortcuts', '-', 'about'] },
+  { name: 'Help', items: ['guide', 'tour', '-', 'palette', 'quickAdd', '-', 'examples', 'shortcuts', '-', 'report', 'about'] },
 ];
 
 const TOGGLES: Record<string, () => boolean> = {
@@ -91,6 +119,7 @@ const TOGGLES: Record<string, () => boolean> = {
   toggleLibrary: () => useEditor.getState().showLibrary,
   toggleInspector: () => useEditor.getState().showInspector,
   toggleCode: () => useEditor.getState().showCode,
+  floatCode: () => useEditor.getState().codeFloating,
   toggleDock: () => useEditor.getState().showDock,
 };
 
@@ -98,10 +127,10 @@ function CommandEntry({ id }: { id: string }) {
   useT();
   const c = commands[id];
   // Toggles reflect the current preferences.
-  useEditor((s) => [s.showGrid, s.showMinimap, s.snap, s.appliedTheme, s.sound, s.showLibrary, s.showInspector, s.showCode, s.showDock, s.showLogicLevels, s.showVoltages].join());
+  useEditor((s) => [s.showGrid, s.showMinimap, s.snap, s.appliedTheme, s.sound, s.showLibrary, s.showInspector, s.showCode, s.codeFloating, s.showDock, s.showLogicLevels, s.showVoltages].join());
   const disabled = !!c.enabled && !c.enabled();
-  if (TOGGLES[id]) return <MenuCheckItem label={c.label} checked={TOGGLES[id]()} shortcut={c.shortcut} disabled={disabled} onSelect={c.run} />;
-  return <MenuItem label={c.label} icon={c.icon} shortcut={c.shortcut} disabled={disabled} onSelect={c.run} />;
+  if (TOGGLES[id]) return <MenuCheckItem id={id} label={c.label} checked={TOGGLES[id]()} shortcut={c.shortcut} disabled={disabled} onSelect={c.run} />;
+  return <MenuItem id={id} label={c.label} icon={c.icon} shortcut={c.shortcut} disabled={disabled} onSelect={c.run} />;
 }
 
 export function MenuBar() {
@@ -128,7 +157,7 @@ export function MenuBar() {
               ) : typeof it === 'string' ? (
                 <CommandEntry key={it} id={it} />
               ) : (
-                <SubMenu key={it.sub} label={t(it.sub)} icon={it.icon}>
+                <SubMenu key={it.sub} id={it.sub} label={t(it.sub)} icon={it.icon}>
                   {it.render()}
                 </SubMenu>
               ),

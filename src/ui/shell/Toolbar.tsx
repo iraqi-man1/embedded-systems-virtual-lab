@@ -25,7 +25,7 @@ function Btn({ id, label, className = '', active }: { id: string; label?: string
   const enabled = !c.enabled || c.enabled();
   return (
     <Tip content={c.label} description={c.description} shortcut={c.shortcut}>
-      <button className={`tb-btn ${className}${active ? ' active' : ''}`} disabled={!enabled} onClick={c.run} aria-label={c.label}>
+      <button className={`tb-btn ${className}${active ? ' active' : ''}`} disabled={!enabled} onClick={c.run} aria-label={c.label} data-id={id}>
         {c.icon && <Icon name={c.icon} />}
         {label && <span className="label">{label}</span>}
       </button>

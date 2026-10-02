@@ -4,6 +4,28 @@ What the lab can grow into next, grouped by area. Items are ideas with a directi
 commitments; [04 — Simulation fidelity](04-simulation-fidelity.md) lists what is simulated today
 and its limits.
 
+## Added in 0.4.0
+
+- **Fixed:** the window no longer goes blank after the Parts Guide. In the desktop app's
+  WebView2, `scrollIntoView` returns a value, and an effect that returned it handed React
+  something that is not a cleanup function; React failed and removed the whole interface. Every
+  part of the window now also has its own error boundary (a message with *Back* and *Try
+  again*, never an empty window), problems are recorded for Help › Report a Problem, and the
+  built application is tested in its real WebView2 on every pull request.
+- **Fixed:** *New project* on the start screen creates the project and opens the editor (on the
+  template used last).
+- The code editor floats: drag its tab bar anywhere, resize it, drag it back to dock it.
+- Double-click a part to set its value (resistor colour bands, E12 values); lock parts in place.
+- Interface size 80–150 %; the project file saves itself after changes; version history.
+- Export and import code (`.ino`, `.py`); code snippets for Arduino and MicroPython; the serial
+  monitor remembers sent lines.
+- Live voltage, current and power on the part card while simulating.
+- Problems in Arabic with how to fix them; Arduino help in Arabic in the editor.
+- A first-run tour.
+- Wokwi projects: open a `diagram.json` (or Wokwi's zip) and save for Wokwi.
+- An interface sweep (`tools/ui-sweep.mjs`) runs every example in both languages and all themes
+  on every pull request.
+
 ## Added in 0.3.0
 
 - Start screen with recent projects (live previews), templates, examples and a Learn tab.
@@ -26,11 +48,10 @@ and its limits.
 - **Assignments and grading**: a teacher packs a starting project with checks; students hand in
   a project file the lab can grade.
 - **Lab report**: export the circuit image, code, instrument captures and notes as a PDF.
-- **First-run tour** of the canvas, the code editor and the instruments.
 - **“Find the fault”** exercises: circuits with a planted mistake (reversed LED, missing
   pull-up, short) that the student diagnoses with the multimeter and the checks.
-- **Arabic everywhere**: translate simulation and circuit-check messages and the Arduino and
-  MicroPython API help (the interface is translated; these still appear in English).
+- **Arabic everywhere**: compiler errors and MicroPython tracebacks explained in Arabic (the
+  tools write them in English).
 
 ## Simulation
 
@@ -60,7 +81,6 @@ and its limits.
 
 - Automatic updates and signed installers; an installer that carries the Arduino toolchain
   (no Python or internet needed on first compile); macOS and Linux builds.
-- Import and export of Wokwi `diagram.json` projects; bill of materials and netlist export; a
-  schematic view generated from the same circuit.
-- Several projects open in tabs; smart alignment guides; locking parts in place; customisable
-  keyboard shortcuts.
+- Bill of materials and netlist export; a schematic view generated from the same circuit; more
+  Wokwi parts (ESP32 boards, logic gates, the 4-digit 7-segment display).
+- Several projects open in tabs; smart alignment guides; customisable keyboard shortcuts.

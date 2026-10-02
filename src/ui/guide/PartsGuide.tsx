@@ -3,7 +3,7 @@
  * for, how to wire it step by step, its pins with the suggested Arduino Uno
  * and Raspberry Pi Pico connections, tips, and the examples that use it.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ComponentDefinition } from '../../core/model/component';
 import { registry } from '../../app/registry';
 import { guideEntry } from '../../components/builtin/guide';
@@ -13,6 +13,7 @@ import { tr, type MessageKey } from '../../i18n';
 import { useT } from '../../i18n/react';
 import { useEditor } from '../../state/editor';
 import { Icon } from '../common/Icon';
+import { revealInList } from '../common/scroll';
 import { Tip } from '../common/Tooltip';
 import { ExampleCard, exampleProject } from '../home/ExampleGallery';
 import { CircuitPreview } from '../home/CircuitPreview';
@@ -30,6 +31,9 @@ const SUPPORT: Record<ComponentDefinition['simulation']['support'], { label: Mes
 };
 
 const showPart = (type: string | null) => useEditor.getState().set({ guideType: type });
+
+/** Where the overview was scrolled to: coming back to it (All parts, Back) finds the same place. */
+let overviewTop = 0;
 
 /** Examples whose circuit contains each part type (built once, on first use). */
 let usage: Map<string, ExampleInfo[]> | null = null;
@@ -76,7 +80,10 @@ function useCategories(query: string, simOnly: boolean) {
 function Sidebar({ cats, current }: { cats: ReturnType<typeof useCategories>; current: string | null }) {
   const t = useT();
   const active = useRef<HTMLButtonElement>(null);
-  useEffect(() => active.current?.scrollIntoView({ block: 'nearest' }), [current]);
+  // A braced body: an effect's return value is its cleanup, and scroll methods may return promises.
+  useEffect(() => {
+    revealInList(active.current);
+  }, [current]);
   return (
     <nav className="guide-nav" aria-label={t('Parts')}>
       <button className={`guide-nav-item overview${current ? '' : ' on'}`} onClick={() => showPart(null)}>
@@ -105,8 +112,13 @@ function Overview({ cats }: { cats: ReturnType<typeof useCategories> }) {
   const t = useT();
   const all = registry.all();
   const simulated = all.filter((d) => d.simulation.support !== 'visual-only').length;
+  const root = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const main = root.current?.closest('.guide-main');
+    if (main) main.scrollTop = overviewTop;
+  }, []);
   return (
-    <div className="guide-overview">
+    <div className="guide-overview" ref={root}>
       <header className="guide-intro">
         <h1>{t('Parts guide')}</h1>
         <p>{t('What each part is, what it is for and how to connect it, with the pins to use on an Arduino Uno and a Raspberry Pi Pico.')}</p>
@@ -411,7 +423,9 @@ export function PartsGuide() {
       </div>
       <div className="guide-body">
         <Sidebar cats={cats} current={def ? def.type : null} />
-        <div className="guide-main">{def ? <PartPage key={def.type} def={def} /> : <Overview cats={cats} />}</div>
+        <div className="guide-main" onScroll={(e) => !def && (overviewTop = e.currentTarget.scrollTop)}>
+          {def ? <PartPage key={def.type} def={def} /> : <Overview cats={cats} />}
+        </div>
       </div>
     </div>
   );

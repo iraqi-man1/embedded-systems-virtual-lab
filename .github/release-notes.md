@@ -4,15 +4,26 @@
 
 ## What's new
 
-- **Python:** program a simulated **Raspberry Pi Pico** in MicroPython — the real firmware runs on an RP2040 emulator. Run copies your `.py` files to the board, the Serial Monitor is an interactive `>>>` REPL (Ctrl+C / Ctrl+D), errors appear in Problems and on their line in the editor, and the editor completes and explains `machine`, `time` and `neopixel`. Four Pico examples and a Pico template.
-- **Start screen:** recent projects with live previews, new projects from templates, the example gallery and a Learn tab.
-- **عربي / English:** the whole interface in Arabic (right-to-left) or English, switchable at any time.
-- **Eight themes** (light, dark, midnight, Nord, Dracula, Solarized, blueprint, high contrast) and a Settings dialog.
-- **Help where you look:** hover a button, a setting or a part for a short explanation; the **Parts Guide** (F1) explains every part — what it is for, how to wire it step by step, every pin, and which Uno or Pico pin to use.
-- **Canvas navigation:** pan by dragging with the right mouse button, a minimap (M), scrolling at the edges while dragging, arrow keys, and a scroll mode for the mouse wheel that suits touchpads.
-- **Notes on the canvas:** text (T), arrows (A) and frames (B), saved with the project; **Find** (Ctrl+F) jumps to a part, a net or a note.
-- **Export:** save the circuit as a PNG up to 768 DPI or as an SVG, or copy it as an image (Ctrl+Shift+C) to paste into a report.
-- **77 simulated parts** (55 full, 22 partial) and **27 example projects**.
+**Fixed**
+
+- **The window no longer goes blank** after visiting the Parts Guide and going back. The cause was specific to the desktop app's WebView2 (a scroll call that returns a value inside a React effect); it is fixed and the built app is now tested in its real WebView2 on every change. If a part of the window ever fails, it now shows a message with **Back** and **Try again** instead of an empty window, and **Help › Report a Problem** copies the details.
+- **New project** on the start screen creates the project and opens the editor straight away (on the template you used last).
+
+**Easier to work with**
+
+- **Move the code editor anywhere:** drag its tab bar to float it over the lab, resize it, and drag it back (or double-click its bar) to dock it. It reopens where you left it.
+- **Double-click a part to set its value** — a resistor shows E12 values and its colour bands. **Lock parts** (Ctrl+L) so a breadboard cannot move by mistake.
+- **Your work is kept:** once a project has a file it is saved by itself after each change, and **File › Version History** keeps a copy each time you run or save (the last 30) to look at and restore.
+- **Code in and out:** export the code to the Arduino IDE or Thonny and import `.ino`, `.h`, `.cpp` and `.py` files; **Snippets** inserts ready patterns (debounce, `millis()` timers, a state machine, PWM fade, servo, interrupts, averaged ADC readings) for Arduino and MicroPython.
+- **Interface size** 80–150 % (Ctrl+Alt+= / −) for small screens and projectors; the serial monitor remembers what you sent (↑/↓).
+- **Wokwi projects:** open a project from wokwi.com — its downloaded zip, or its `diagram.json` with the code (or drop them on the window) — and save yours for Wokwi (File › Wokwi). Parts, values, wires, breadboard holes and code carry over.
+
+**Learn while you work**
+
+- A short **tour** the first time (Help › Take the Tour shows it again).
+- While simulating, a part's card shows the **voltage across it, the current, the power** and how much of its rating that is.
+- **Problems in Arabic** (or English), each with **how to fix it** and a link to the part's page in the guide.
+- **Arduino functions explained in Arabic** in the code editor, as well as in English.
 
 ## Known limitations
 

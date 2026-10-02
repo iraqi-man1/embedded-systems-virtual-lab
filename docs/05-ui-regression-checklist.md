@@ -12,6 +12,7 @@ z-index tokens in `src/styles/theme.css`:
 | Simulation controls on parts | `--z-sim-controls` (20) |
 | Floating canvas toolbars (zoom bar, wire toolbar, minimap) | `--z-canvas-toolbar` (30) |
 | Panels / splitters | `--z-panel` (40) |
+| The floating code editor | `--z-float` (300) |
 | Full pages (start screen, parts guide) | `--z-page` (500) |
 | Dropdowns, popovers | `--z-dropdown` (1000) |
 | Context menus | `--z-context` (1100) |
@@ -32,6 +33,34 @@ floating wire toolbar, a library info card near the bottom of the window, the ho
 part, the command palette / quick-add / Find, the export dialog, and the toolbar overflow menu
 and palette in a narrow window — in a light and a dark theme, and again in Arabic
 (right-to-left) — and fails if any of them is outside the window or covered by something else.
+
+## Interface sweep
+
+```bash
+npm run dev
+node tools/ui-sweep.mjs
+```
+
+Opens every example from the Examples dialog and runs it (compiling is answered with a test
+firmware), alternating English and Arabic and going through the themes; while it runs, opens
+each instrument tab, switches the language and the theme, floats the code editor and docks it
+back, hovers, double-clicks and right-clicks a part, then pauses, resumes and stops. Then the
+Settings tabs, the dialogs (shortcuts, about, report, history, export, toolchain), the palette,
+quick add and Find, Save for Wokwi, the Parts Guide and the start screen. Fails on any page
+error, any problem the lab records and any window without the editor. The Windows build runs it
+against the built pages (`vite preview`, Edge) on every pull request.
+
+## Desktop application test
+
+```bash
+node tools/e2e-desktop.mjs --exe src-tauri/target/release/evlab.exe
+```
+
+Starts the built application with WebView2's debugging port and drives it: the Parts Guide and
+every way back (its Back button, Esc, Alt+←, the mouse's Back button), New project, the
+first-run tour, the floating code editor, a dropped Wokwi zip, Add to canvas, interface size
+125 %, Arabic. Fails on an empty window (checked on a screenshot), a covered page, a recorded
+problem or a page error. With `--url` it drives the dev server instead.
 
 ## Manual checks (keyboard and focus)
 
@@ -86,6 +115,26 @@ and palette in a narrow window — in a light and a dark theme, and again in Ara
   `sketch.ino` or `main.py`); files the target board doesn't use are shown in italics.
 - Recent projects: File › Open Recent and the empty canvas list opened/saved projects; a missing
   file is removed from the list with a message.
+- Floating code editor: dragging the empty part of its tab bar floats it under the mouse; it
+  moves and resizes, never leaves the window (shrink the window), stays above the canvas and
+  below menus, dialogs and pages. Dragging it to its side shows the docking preview and docks
+  it; the dock button, a double-click on the bar and View › *Floating Code Editor* do too. The
+  code, the cursor and undo survive; it reopens where it was left. In Arabic it docks on the
+  left.
+- Errors: a failing panel shows a message with *Back* / *Try again* and the rest keeps working;
+  Help › Report a Problem lists what happened and copies it.
+- New project (start screen): creates the project at once (template used last, named under the
+  button); with unsaved changes the question appears above the start screen.
+- Parts: double-click a resistor, LED or potentiometer — a small editor (E12 values and colour
+  bands for resistors), Enter applies (one undo step). Ctrl+L locks: a lock badge, no moving,
+  rotating or deleting until unlocked.
+- Version History (File): a copy appears after Run and after Save; Restore asks, then brings the
+  version back (the current one is kept too).
+- Wokwi (File › Wokwi): *Open Wokwi Project…* with a Wokwi zip or `diagram.json` + `sketch.ino`
+  opens the circuit with its wires and code; *Save for Wokwi…* writes `diagram.json` and the
+  code; *Copy diagram.json* puts it on the clipboard.
+- Tour: shown once on the first editor view; Esc, a click elsewhere or Skip ends it; Help ›
+  *Take the Tour* shows it again.
 - Desktop only: double-clicking an `.evlab` file opens it (in the running window if the app is
   already open); dropping an `.evlab` file onto the window opens it; dragging parts from the
   library onto the canvas works (HTML5 drag and drop needs `dragDropEnabled: false`).

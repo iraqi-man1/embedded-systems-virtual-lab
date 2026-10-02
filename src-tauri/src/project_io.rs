@@ -37,6 +37,14 @@ pub fn read_text_file(path: String) -> Result<String, String> {
     fs::read_to_string(&path).map_err(|e| format!("Cannot read {path}: {e}"))
 }
 
+/// Reads a file as bytes (a zipped Wokwi project to import), sent back without JSON encoding.
+#[tauri::command]
+pub fn read_binary_file(path: String) -> Result<tauri::ipc::Response, String> {
+    fs::read(&path)
+        .map(tauri::ipc::Response::new)
+        .map_err(|e| format!("Cannot read {path}: {e}"))
+}
+
 #[tauri::command]
 pub fn write_text_file(path: String, contents: String) -> Result<(), String> {
     write_atomic(Path::new(&path), &contents)

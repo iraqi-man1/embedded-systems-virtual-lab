@@ -3,17 +3,17 @@
  * or learn the basics. Shown over the editor (which stays mounted) at launch
  * and from the Home button; opening any project returns to the editor.
  */
-import { useEffect, useMemo, useState } from 'react';
-import { confirmDiscard, fileTitle, openDocument, openRecent, showProject } from '../../app/fileOps';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { fileTitle, openDocument, openRecent } from '../../app/fileOps';
 import { registry } from '../../app/registry';
 import { APP_VERSION } from '../../app/version';
 import { parseProject, type Project } from '../../core/project/schema';
-import { EXAMPLES, loadExample } from '../../examples';
+import { EXAMPLES, lastTemplate, loadExample, newFromTemplate } from '../../examples';
 import { TEMPLATES, type TemplateInfo } from '../../examples/templates';
-import { formatRelative, LANGUAGES, t as translate } from '../../i18n';
+import { formatRelative, LANGUAGES } from '../../i18n';
 import { rich, useT } from '../../i18n/react';
 import { isTauri, storage } from '../../platform';
-import { useEditor, type RecentProject } from '../../state/editor';
+import { useEditor, type HomeTab, type RecentProject } from '../../state/editor';
 import { useProject } from '../../state/project';
 import { refreshToolchain, useSim } from '../../state/sim';
 import { commands } from '../commands';
@@ -21,14 +21,16 @@ import { Icon } from '../common/Icon';
 import { DropdownMenu } from '../common/Menu';
 import { Tip } from '../common/Tooltip';
 import { ThemeItems } from '../shell/MenuBar';
-import { fitView } from '../workspace/actions';
 import { CircuitPreview } from './CircuitPreview';
 import { ExampleGallery } from './ExampleGallery';
 import { openGuide } from '../guide/open';
 
-type Tab = 'recent' | 'new' | 'examples' | 'learn';
+type Tab = HomeTab;
 
 const leave = () => useEditor.getState().set({ page: null });
+
+/** Where the start screen was scrolled to, per tab (coming back from the guide finds the same place). */
+const scrolled: Partial<Record<Tab, number>> = {};
 
 /** Brand mark (same drawing as the app icon). */
 function Logo({ size = 28 }: { size?: number }) {
@@ -180,15 +182,10 @@ function templatePreview(tpl: TemplateInfo) {
   return p.circuit;
 }
 
-async function createFromTemplate(tpl: TemplateInfo, name: string) {
-  if (!(await confirmDiscard())) return;
-  showProject(tpl.build(registry, name.trim() || translate('Untitled')), null);
-  setTimeout(() => fitView({ instant: true }), 0);
-}
-
-function NewTab() {
+function NewTab({ name, setName }: { name: string; setName: (name: string) => void }) {
   const t = useT();
-  const [name, setName] = useState('');
+  const last = useEditor((s) => s.newTemplate);
+  const current = TEMPLATES.find((x) => x.id === last) ?? TEMPLATES[0];
   return (
     <>
       <div className="new-name">
@@ -200,15 +197,21 @@ function NewTab() {
           value={name}
           placeholder={t('Untitled')}
           onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && void createFromTemplate(TEMPLATES[0], name)}
+          onKeyDown={(e) => e.key === 'Enter' && void newFromTemplate(current, name)}
         />
-        <span className="hint">{t('Choose what to start with:')}</span>
+        <Tip content={t('Creates the project from “{template}” and opens the editor', { template: t(current.title) })} shortcut="Enter">
+          <button className="btn primary" onClick={() => void newFromTemplate(current, name)}>
+            <Icon name="plus" /> {t('Create')}
+          </button>
+        </Tip>
+        <span className="hint">{t('Or click what to start with:')}</span>
       </div>
       <div className="card-grid">
         {TEMPLATES.map((tpl) => (
-          <button key={tpl.id} type="button" className="tpl-card" onClick={() => void createFromTemplate(tpl, name)}>
+          <button key={tpl.id} type="button" className={`tpl-card${tpl === current ? ' current' : ''}`} onClick={() => void newFromTemplate(tpl, name)}>
             <span className="card-canvas">
               <CircuitPreview circuit={templatePreview(tpl)} empty={<Icon name={tpl.icon} size={34} />} />
+              {tpl === current && <span className="tpl-badge">{last ? t('Used last') : t('Default')}</span>}
             </span>
             <span className="card-body">
               <span className="card-title">{t(tpl.title)}</span>
@@ -238,6 +241,7 @@ function LearnTab() {
     [t('Rotate / delete the selection'), 'R / Del'],
     [t('Run / stop the simulation'), 'F5 / Shift+F5'],
     [t('Learn about a part'), t('Rest the mouse on it, or press F1')],
+    [t('Change a part’s value'), t('Double-click it')],
     [t('Find any command'), 'Ctrl+Shift+P'],
   ];
   return (
@@ -342,7 +346,17 @@ export function HomeScreen() {
   const recentCount = useEditor((s) => s.recentProjects.length);
   const language = useEditor((s) => s.language);
   const showAtStart = useEditor((s) => s.showStartScreen);
-  const [tab, setTab] = useState<Tab>(recentCount ? 'recent' : 'new');
+  const tab = useEditor((s) => s.homeTab) ?? (recentCount ? 'recent' : 'new');
+  const setTab = (homeTab: Tab) => useEditor.getState().set({ homeTab });
+  const [name, setName] = useState('');
+  useEditor((s) => s.newTemplate);
+  const template = lastTemplate();
+  const scroller = useRef<HTMLDivElement>(null);
+  // Coming back (from the guide, or the editor) finds the tab where it was left.
+  useLayoutEffect(() => {
+    if (scroller.current) scroller.current.scrollTop = scrolled[tab] ?? 0;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const parts = registry.all();
   const tabs: { id: Tab; label: string; icon: string; count?: number }[] = [
     { id: 'recent', label: t('Recent'), icon: 'history', count: recentCount || undefined },
@@ -392,7 +406,7 @@ export function HomeScreen() {
           </button>
         </div>
       </header>
-      <div className="home-scroll">
+      <div className="home-scroll" ref={scroller} onScroll={(e) => (scrolled[tab] = e.currentTarget.scrollTop)}>
         <section className="home-hero">
           <div className="hero-text">
             <h1>{t('Embedded Systems Virtual Lab')}</h1>
@@ -409,10 +423,16 @@ export function HomeScreen() {
         </section>
         <div className="home-body">
           <aside className="home-side">
-            <button className="btn primary big" onClick={() => setTab('new')}>
-              <Icon name="plus" /> {t('New project')}
-            </button>
-            <Tip content={commands.open.description} shortcut="Ctrl+O" side="right">
+            <Tip content={t('Creates a new project from “{template}” and opens the editor. The New project tab has other starting points.', { template: t(template.title) })} shortcut="Ctrl+N" side="right" direct>
+              <button className="btn primary big new-project" onClick={() => void newFromTemplate(template, name)}>
+                <Icon name="plus" />
+                <span className="new-project-text">
+                  {t('New project')}
+                  <span className="sub">{t(template.title)}</span>
+                </span>
+              </button>
+            </Tip>
+            <Tip content={commands.open.description} shortcut="Ctrl+O" side="right" direct>
               <button className="btn big" onClick={() => void openDocument()}>
                 <Icon name="open" /> {t('Open project…')}
               </button>
@@ -436,7 +456,7 @@ export function HomeScreen() {
             </div>
             <div className="home-panel" role="tabpanel">
               {tab === 'recent' && <RecentTab goto={setTab} />}
-              {tab === 'new' && <NewTab />}
+              {tab === 'new' && <NewTab name={name} setName={setName} />}
               {tab === 'examples' && <ExampleGallery />}
               {tab === 'learn' && <LearnTab />}
             </div>

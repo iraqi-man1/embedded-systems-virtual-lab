@@ -14,6 +14,8 @@
   --z-sim-controls: 20;
   --z-canvas-toolbar: 30;
   --z-panel: 40;
+  /* Panels floating over the window (the detached code editor). */
+  --z-float: 300;
   --z-page: 500;
   --z-dropdown: 1000;
   --z-context: 1100;

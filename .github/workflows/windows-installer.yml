@@ -1,5 +1,5 @@
 # Builds the Windows installers (NSIS .exe and .msi) on every pull request and
-# push to main. On main, the first build of a new version (the "version" in
+# push to main, and tests the built application in its WebView2. On main, the first build of a new version (the "version" in
 # src-tauri/tauri.conf.json, also in package.json and Cargo.toml) publishes a
 # GitHub release v<version> with both installers attached. Every build also
 # keeps the installers as a workflow artifact for testing.
@@ -89,6 +89,38 @@ jobs:
           name: windows-installers-${{ steps.release.outputs.version }}
           path: installers/*
           if-no-files-found: error
+
+      # The built application in its real WebView2: the parts guide and every way
+      # back from it, the start screen, New project, the floating code editor, a
+      # Wokwi project, Arabic. Fails on an empty window or a problem the app
+      # recorded; a failure stops the release.
+      - name: Test the built application (WebView2)
+        shell: bash
+        timeout-minutes: 12
+        run: |
+          npm install --no-save playwright-core@1.56.1
+          node tools/e2e-desktop.mjs --exe src-tauri/target/release/evlab.exe
+
+      # The same interface (the built pages, in Edge): every example run in English
+      # and Arabic across the themes, with the instruments, the language and theme
+      # switched while running, the floating editor, the dialogs and pages.
+      - name: Sweep the interface for errors
+        shell: bash
+        timeout-minutes: 20
+        run: |
+          npx vite preview --port 4173 --strictPort &
+          for i in $(seq 1 60); do curl -sf http://localhost:4173/ > /dev/null && break; sleep 1; done
+          node tools/ui-sweep.mjs --url http://localhost:4173/ --channel msedge
+
+      - name: Keep the application test's screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-test-${{ steps.release.outputs.version }}
+          path: |
+            .toolchain/e2e/
+            .toolchain/sweep/
+          if-no-files-found: ignore
 
       - name: Publish the release
         if: steps.release.outputs.tag != ''

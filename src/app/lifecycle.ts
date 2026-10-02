@@ -3,13 +3,16 @@
  * autosave, the native window title, and project files opened from the
  * operating system (double-click, second launch, drag and drop).
  */
+import { PROJECT_EXTENSION } from '../core/project/schema';
 import { t } from '../i18n';
 import { isTauri, launch } from '../platform';
 import { useEditor } from '../state/editor';
 import { useProject } from '../state/project';
 import { askSaveChanges, dialogOpen } from '../ui/common/Dialog';
-import { clearAutosave, offerRestore, startAutosave } from './autosave';
-import { openDroppedFile, openPath, saveDocument } from './fileOps';
+import { clearAutosave, offerRestore, startAutosave, startFileAutosave } from './autosave';
+import { installHistory } from './history';
+import { openDroppedFile, openPath, saveDocument, saveQuietly } from './fileOps';
+import { isWokwiProject, openWokwiFiles } from './wokwi';
 
 export function windowTitle(name: string, dirty: boolean) {
   return `${dirty ? '● ' : ''}${t('{name} — Embedded Systems Virtual Lab', { name })}`;
@@ -75,7 +78,8 @@ async function installCloseGuard(): Promise<() => void> {
 }
 
 /**
- * Project files dropped anywhere on the window open the project. Other drags
+ * Project files dropped anywhere on the window open the project; a Wokwi
+ * project (its zip, or diagram.json with the code) opens too. Other drags
  * (parts from the library) are left to their own targets.
  */
 function installFileDrop(): () => void {
@@ -88,8 +92,10 @@ function installFileDrop(): () => void {
   const drop = (e: DragEvent) => {
     if (!hasFiles(e)) return;
     e.preventDefault();
-    const file = e.dataTransfer!.files[0];
-    if (file) void openDroppedFile(file);
+    const files = [...e.dataTransfer!.files];
+    const project = files.find((f) => f.name.toLowerCase().endsWith(`.${PROJECT_EXTENSION}`));
+    if (!project && isWokwiProject(files.map((f) => f.name))) void Promise.all(files.map(async (f) => ({ name: f.name, bytes: new Uint8Array(await f.arrayBuffer()) }))).then(openWokwiFiles);
+    else if (project ?? files[0]) void openDroppedFile(project ?? files[0]);
   };
   window.addEventListener('dragover', over);
   window.addEventListener('drop', drop);
@@ -101,7 +107,7 @@ function installFileDrop(): () => void {
 
 /** Called once at start-up. Returns a cleanup function. */
 export function installLifecycle(): () => void {
-  const cleanups: (() => void)[] = [installTitleSync(), installFileDrop()];
+  const cleanups: (() => void)[] = [installTitleSync(), installFileDrop(), installHistory()];
   let disposed = false;
   const keep = (off: () => void) => (disposed ? off() : cleanups.push(off));
   void installCloseGuard().then(keep);
@@ -110,7 +116,7 @@ export function installLifecycle(): () => void {
   // the app was launched with opens next (asking to keep a restored copy).
   void offerRestore().then(async () => {
     if (disposed) return;
-    cleanups.push(startAutosave());
+    cleanups.push(startAutosave(), startFileAutosave(saveQuietly));
     const file = await launch.takeLaunchFile().catch(() => null);
     if (file && !disposed) await openPath(file);
   });

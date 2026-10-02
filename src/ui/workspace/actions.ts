@@ -43,10 +43,47 @@ export function addComponentAtCenter(type: string) {
   return addComponentAt(type, (w / 2 - viewport.x) / viewport.zoom + n * 19.2, (h / 2 - viewport.y) / viewport.zoom + n * 19.2);
 }
 
+/** Locked parts among `ids`. */
+function lockedOf(ids: Iterable<string>): ComponentInstance[] {
+  const set = new Set(ids);
+  return proj().project.circuit.components.filter((c) => c.locked && set.has(c.id));
+}
+
+/** The parts among `ids` that may move or change (locked ones stay). */
+export function unlockedOf(ids: Iterable<string>): string[] {
+  const locked = new Set(lockedOf(ids).map((c) => c.id));
+  return [...ids].filter((id) => !locked.has(id));
+}
+
+/** Says (once in a while) that locked parts stayed where they are. */
+let lockNoticeAt = 0;
+export function noticeLocked(parts: ComponentInstance[]) {
+  if (!parts.length || Date.now() - lockNoticeAt < 4000) return;
+  lockNoticeAt = Date.now();
+  ed().notify(t('{parts} locked: unlock with Ctrl+L to move or delete', { parts: parts.map((c) => c.label).join(', ') }), 'info');
+}
+
+/** Locks the selected parts, or unlocks them when they all are locked already. */
+export function toggleLockSelection() {
+  const ids = new Set(ed().selectedComponents);
+  if (!ids.size) return;
+  const parts = proj().project.circuit.components.filter((c) => ids.has(c.id));
+  const lock = parts.some((c) => !c.locked);
+  proj().edit((c) => {
+    for (const inst of c.components) {
+      if (!ids.has(inst.id)) continue;
+      if (lock) inst.locked = true;
+      else delete inst.locked;
+    }
+  });
+}
+
 export function deleteSelection() {
   const { selectedComponents, selectedWires, selectedAnnotations } = ed();
   if (!selectedComponents.length && !selectedWires.length && !selectedAnnotations.length) return;
-  const comps = new Set(selectedComponents);
+  const locked = lockedOf(selectedComponents);
+  noticeLocked(locked);
+  const comps = new Set(unlockedOf(selectedComponents));
   const wires = new Set(selectedWires);
   const notes = new Set(selectedAnnotations);
   proj().edit((c) => {
@@ -54,11 +91,14 @@ export function deleteSelection() {
     c.wires = c.wires.filter((w) => !wires.has(w.id) && !comps.has(w.from.componentId) && !comps.has(w.to.componentId));
     if (notes.size && c.annotations) c.annotations = c.annotations.filter((a) => !notes.has(a.id));
   });
-  ed().clearSelection();
+  // Locked parts stay, still selected (Ctrl+L unlocks them).
+  if (locked.length) ed().select(locked.map((c) => c.id));
+  else ed().clearSelection();
 }
 
 export function rotateSelection(delta: 90 | -90 = 90) {
-  const ids = new Set(ed().selectedComponents);
+  noticeLocked(lockedOf(ed().selectedComponents));
+  const ids = new Set(unlockedOf(ed().selectedComponents));
   if (!ids.size) return;
   proj().edit((c) => {
     for (const inst of c.components) {
@@ -71,7 +111,8 @@ export function rotateSelection(delta: 90 | -90 = 90) {
 }
 
 export function flipSelection() {
-  const ids = new Set(ed().selectedComponents);
+  noticeLocked(lockedOf(ed().selectedComponents));
+  const ids = new Set(unlockedOf(ed().selectedComponents));
   if (!ids.size) return;
   proj().edit((c) => {
     for (const inst of c.components) {
@@ -142,6 +183,8 @@ function pasteDocument(doc: CircuitDocument, at?: { x: number; y: number }) {
     idMap.set(c.id, id);
     const def = lookup(c.type);
     const inst: ComponentInstance = { ...structuredClone(c), id, x: c.x + dx, y: c.y + dy, label: nextLabel(current, def?.designator ?? 'U') };
+    // A copy is free to move.
+    delete inst.locked;
     current.components.push(inst);
     return inst;
   });
@@ -175,7 +218,8 @@ export function withCarried(ids: Iterable<string>): Set<string> {
 }
 
 export function nudgeSelection(dx: number, dy: number) {
-  const ids = withCarried(ed().selectedComponents);
+  noticeLocked(lockedOf(ed().selectedComponents));
+  const ids = new Set(unlockedOf(withCarried(unlockedOf(ed().selectedComponents))));
   const notes = new Set(ed().selectedAnnotations);
   if (!ids.size && !notes.size) return;
   proj().edit((c) => {
@@ -196,7 +240,8 @@ export function nudgeSelection(dx: number, dy: number) {
 export type Align = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom' | 'hdist' | 'vdist';
 
 export function alignSelection(mode: Align) {
-  const ids = ed().selectedComponents;
+  noticeLocked(lockedOf(ed().selectedComponents));
+  const ids = unlockedOf(ed().selectedComponents);
   if (ids.length < 2) return;
   const c = proj().project.circuit;
   const group = selectionBounds(c, ids)!;

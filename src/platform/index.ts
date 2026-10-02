@@ -117,6 +117,69 @@ export const storage = {
     return fileName;
   },
 
+  /**
+   * Saves several text files: the first where the user chooses, the others
+   * next to it (the browser downloads each). Returns the first file's path, or
+   * null if cancelled.
+   */
+  async exportFiles(files: { name: string; text: string }[], filter: { name: string; extensions: string[] }): Promise<string | null> {
+    if (!files.length) return null;
+    if (isTauri) {
+      const { save } = await import('@tauri-apps/plugin-dialog');
+      const target = await save({ filters: [filter], defaultPath: files[0].name });
+      if (!target) return null;
+      await invoke('write_text_file', { path: target, contents: files[0].text });
+      const sep = target.includes('\\') ? '\\' : '/';
+      const folder = target.slice(0, target.lastIndexOf(sep));
+      for (const f of files.slice(1)) await invoke('write_text_file', { path: `${folder}${sep}${f.name}`, contents: f.text });
+      return target;
+    }
+    for (const f of files) {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([f.text], { type: 'text/plain' }));
+      a.download = f.name;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    }
+    return files[0].name;
+  },
+
+  /** Lets the user pick text files (code to import); empty if cancelled. */
+  async openTextFiles(filter: { name: string; extensions: string[] }): Promise<{ name: string; text: string }[]> {
+    if (isTauri) {
+      const { open } = await import('@tauri-apps/plugin-dialog');
+      const picked = await open({ multiple: true, directory: false, filters: [filter] });
+      const paths = !picked ? [] : Array.isArray(picked) ? picked : [picked];
+      return Promise.all(paths.map(async (path) => ({ name: path.split(/[\\/]/).pop()!, text: await invoke<string>('read_text_file', { path }) })));
+    }
+    return new Promise((resolve) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.multiple = true;
+      input.accept = filter.extensions.map((e) => `.${e}`).join(',');
+      input.onchange = async () => resolve(await Promise.all([...(input.files ?? [])].map(async (f) => ({ name: f.name, text: await f.text() }))));
+      input.click();
+    });
+  },
+
+  /** Lets the user pick files of any kind (a Wokwi project's zip, its diagram and code), read as bytes; empty if cancelled. */
+  async openFiles(filter: { name: string; extensions: string[] }): Promise<{ name: string; bytes: Uint8Array }[]> {
+    if (isTauri) {
+      const { open } = await import('@tauri-apps/plugin-dialog');
+      const picked = await open({ multiple: true, directory: false, filters: [filter] });
+      const paths = !picked ? [] : Array.isArray(picked) ? picked : [picked];
+      return Promise.all(paths.map(async (path) => ({ name: path.split(/[\\/]/).pop()!, bytes: new Uint8Array(await invoke<ArrayBuffer>('read_binary_file', { path })) })));
+    }
+    return new Promise((resolve) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.multiple = true;
+      input.accept = filter.extensions.map((e) => `.${e}`).join(',');
+      input.onchange = async () => resolve(await Promise.all([...(input.files ?? [])].map(async (f) => ({ name: f.name, bytes: new Uint8Array(await f.arrayBuffer()) }))));
+      input.click();
+    });
+  },
+
   /** Saves a binary export (PNG image) where the user chooses. Returns the path, or null if cancelled. */
   async exportBinary(bytes: Uint8Array, fileName: string, filter: { name: string; extensions: string[] }, mime: string): Promise<string | null> {
     if (isTauri) {

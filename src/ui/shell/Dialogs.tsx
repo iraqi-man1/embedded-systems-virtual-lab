@@ -5,10 +5,13 @@ import { useEditor } from '../../state/editor';
 import { refreshToolchain, useSim } from '../../state/sim';
 import { registry } from '../../app/registry';
 import { APP_VERSION } from '../../app/version';
+import { clearErrorLog, errorReport, useErrorLog } from '../../app/errorLog';
+import { formatRelative, tr } from '../../i18n';
 import { commands } from '../commands';
 import { ModalFrame } from '../common/Dialog';
 import { Icon } from '../common/Icon';
 import { ExampleGallery } from '../home/ExampleGallery';
+import { HistoryDialog } from './HistoryDialog';
 import { SettingsDialog } from './SettingsDialog';
 import { ExportDialog } from '../export/ExportDialog';
 
@@ -149,6 +152,8 @@ function ShortcutsDialog() {
     [t('Scroll sideways'), t('Shift + mouse wheel')],
     [t('Zoom on a touchpad'), t('Pinch, or Ctrl + scroll')],
     [t('Part information'), t('Rest the mouse on a part · F1')],
+    [t('Change a part’s value'), t('Double-click it, or select it and press Enter')],
+    [t('Move the code editor anywhere'), t('Drag its tab bar · double-click puts it back')],
     [t('Start a wire'), t('Click a pin (or drag from it)')],
     [t('Add a bend while wiring'), t('Click empty canvas')],
     [t('Cancel wire / probe / selection'), t('Esc or right-click')],
@@ -207,6 +212,67 @@ function AboutDialog() {
   );
 }
 
+/** Help › Report a Problem: what the lab recorded, ready to copy into a report. */
+function ReportDialog() {
+  const t = useT();
+  const errors = useErrorLog((s) => s.errors);
+  const [copied, setCopied] = useState(false);
+  const report = () => {
+    const ed = useEditor.getState();
+    return errorReport(errors, { Language: ed.language, Theme: ed.appliedTheme, Page: ed.page ?? 'editor' });
+  };
+  return (
+    <Modal
+      title={t('Report a Problem')}
+      footer={
+        <>
+          <button className="btn" onClick={clearErrorLog} disabled={!errors.length}>
+            <Icon name="trash" /> {t('Clear the list')}
+          </button>
+          <button
+            className="btn primary"
+            onClick={() =>
+              void navigator.clipboard
+                ?.writeText(report())
+                .then(() => {
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 1500);
+                })
+                .catch(() => undefined)
+            }
+          >
+            <Icon name={copied ? 'check' : 'copy'} /> {copied ? t('Copied') : t('Copy the report')}
+          </button>
+        </>
+      }
+    >
+      <p style={{ marginTop: 0, color: 'var(--text-2)', lineHeight: 1.5 }}>
+        {t('If something does not work as it should, copy this report and send it to your teacher or to the developers, with what you were doing. It lists the problems the lab recorded, the app version and your system; your projects are not included.')}
+      </p>
+      <p className="hint ltr" style={{ userSelect: 'text' }}>
+        github.com/iraqi-man1/embedded-systems-virtual-lab/issues
+      </p>
+      {errors.length ? (
+        <ul className="error-list">
+          {[...errors].reverse().map((e, i) => (
+            <li key={`${e.at}-${i}`}>
+              <div className="error-head">
+                <span className="error-area">{e.area === 'window' ? t('Background') : tr(e.area)}</span>
+                <span className="error-time">{formatRelative(e.at)}</span>
+              </div>
+              <div className="error-msg ltr">{e.message}</div>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <div className="empty-note">
+          <Icon name="ok" /> {t('No problems recorded.')}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
 export function Dialogs() {
   const dialog = useEditor((s) => s.dialog);
   if (dialog === 'examples') return <ExamplesDialog />;
@@ -215,6 +281,8 @@ export function Dialogs() {
   if (dialog === 'about') return <AboutDialog />;
   if (dialog === 'settings') return <SettingsDialog />;
   if (dialog === 'export') return <ExportDialog />;
+  if (dialog === 'report') return <ReportDialog />;
+  if (dialog === 'history') return <HistoryDialog />;
   return null;
 }
 

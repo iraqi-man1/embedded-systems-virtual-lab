@@ -7,7 +7,7 @@ import type { ComponentInstance } from '../core/model/circuit';
 import type { ComponentRegistry } from '../core/registry/registry';
 import { newProject, type Project } from '../core/project/schema';
 import type { MessageKey } from '../i18n';
-import { DEFAULT_MAIN_PY } from '../core/project/firmware';
+import { DEFAULT_MAIN_PY, EMPTY_SKETCH } from '../core/project/firmware';
 import { CircuitBuilder, WIRE } from './builder';
 import { picoBase } from './catalogPico';
 
@@ -20,14 +20,7 @@ export interface TemplateInfo {
   build: (registry: ComponentRegistry, name: string) => Project;
 }
 
-const SKETCH = `void setup() {
-  // Runs once when the board starts.
-}
-
-void loop() {
-  // Runs over and over again.
-}
-`;
+const SKETCH = EMPTY_SKETCH;
 
 const SERIAL_SKETCH = `void setup() {
   // Runs once when the board starts.

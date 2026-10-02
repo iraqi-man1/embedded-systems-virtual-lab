@@ -1,5 +1,8 @@
 /** Application commands shared by menus, toolbar and keyboard shortcuts. */
-import { newDocument, openDocument, saveDocument } from '../app/fileOps';
+import { exportCode, importCode } from '../app/codeFiles';
+import { copyWokwiDiagram, exportWokwi, importWokwi } from '../app/wokwi';
+import { openDocument, saveDocument } from '../app/fileOps';
+import { newFromTemplate } from '../examples';
 import { t, type MessageKey } from '../i18n';
 import { themeInfo, type ThemePref } from './themes';
 import { useEditor, type NoteTool } from '../state/editor';
@@ -23,6 +26,7 @@ import {
   zoomToSelection,
   cutSelection,
   deleteSelection,
+  toggleLockSelection,
   duplicateSelection,
   fitView,
   flipSelection,
@@ -34,6 +38,9 @@ import {
   zoomBy,
 } from './workspace/actions';
 import { closeGuide, openGuideForContext } from './guide/open';
+import { toggleCodeFloat } from './editor/codeDock';
+import { setUiScale, stepUiScale } from './uiScale';
+import { openQuickEdit } from './workspace/QuickEdit';
 import { copyCircuitImage } from './export/copy';
 
 export interface Command {
@@ -121,8 +128,29 @@ const partSelected = () => ed().selectedComponents.length > 0;
 
 export const commands: Record<string, Command> = {
   home: cmd('home', 'Start Screen', 'Recent projects, templates, examples and getting started.', { icon: 'home', run: () => ed().set({ page: 'home', wiring: null }) }),
-  new: cmd('new', 'New Project', 'Start an empty project (asks to save the current one).', { icon: 'new', shortcut: 'Ctrl+N', run: newDocument }),
+  new: cmd('new', 'New Project', 'Start a new project from the template you used last (at first, an empty project). Asks to save the current one.', { icon: 'new', shortcut: 'Ctrl+N', run: () => void newFromTemplate() }),
   open: cmd('open', 'Open Project…', 'Open a .evlab project file.', { icon: 'open', shortcut: 'Ctrl+O', run: () => void openDocument() }),
+  history: cmd('history', 'Version History…', 'Earlier versions of the project, kept each time it was run or saved; bring one back.', { icon: 'history', run: () => ed().set({ dialog: 'history' }) }),
+  exportCode: cmd('exportCode', 'Export Code…', 'Save the code (.ino and its files, or main.py and its modules) to continue in the Arduino IDE or Thonny.', {
+    icon: 'file-down',
+    run: () => void exportCode(),
+  }),
+  importCode: cmd('importCode', 'Import Code…', 'Add .ino, .h, .cpp or .py files to the project; a sketch or main.py replaces the main file.', {
+    icon: 'file-up',
+    run: () => void importCode(),
+  }),
+  importWokwi: cmd('importWokwi', 'Open Wokwi Project…', 'Open a project from wokwi.com: its downloaded zip, or its diagram.json with the code files. You can also drop them on the window.', {
+    icon: 'file-up',
+    run: () => void importWokwi(),
+  }),
+  exportWokwi: cmd('exportWokwi', 'Save for Wokwi…', 'Save the project as a Wokwi project (diagram.json, the code and libraries.txt) to run it on wokwi.com.', {
+    icon: 'file-down',
+    run: () => void exportWokwi(),
+  }),
+  copyWokwi: cmd('copyWokwi', 'Copy diagram.json for Wokwi', 'Copy the circuit as Wokwi’s diagram.json, to paste into a project on wokwi.com.', {
+    icon: 'copy',
+    run: () => void copyWokwiDiagram(),
+  }),
   save: cmd('save', 'Save', 'Save the project (circuit, code and instrument setup).', { icon: 'save', shortcut: 'Ctrl+S', run: () => void saveDocument() }),
   saveAs: cmd('saveAs', 'Save As…', 'Save the project under a new name or folder.', { shortcut: 'Ctrl+Shift+S', run: () => void saveDocument(true) }),
   examples: cmd('examples', 'Examples & Templates…', 'Open a ready-made project: circuit and code that run as they are.', { icon: 'book', run: () => ed().set({ dialog: 'examples' }) }),
@@ -143,6 +171,12 @@ export const commands: Record<string, Command> = {
   paste: cmd('paste', 'Paste', 'Paste the copied parts.', { icon: 'paste', shortcut: 'Ctrl+V', run: () => paste(), enabled: () => !!ed().clipboard }),
   duplicate: cmd('duplicate', 'Duplicate', 'Make a copy of the selected parts next to them.', { icon: 'duplicate', shortcut: 'Ctrl+D', run: duplicateSelection, enabled: oneSelected }),
   delete: cmd('delete', 'Delete', 'Remove the selected parts and wires.', { icon: 'trash', shortcut: 'Del', run: deleteSelection, enabled: hasSelection }),
+  lock: cmd('lock', 'Lock / Unlock', 'Locked parts stay in place: they are not moved, rotated or deleted by accident (a breadboard, a board).', {
+    icon: 'lock',
+    shortcut: 'Ctrl+L',
+    run: toggleLockSelection,
+    enabled: () => ed().selectedComponents.length > 0,
+  }),
   selectAll: cmd('selectAll', 'Select All', null, { shortcut: 'Ctrl+A', run: selectAll }),
   rotate: cmd('rotate', 'Rotate 90° CW', 'Turn the selected parts a quarter turn clockwise.', { icon: 'rotate', shortcut: 'R', run: () => rotateSelection(90), enabled: partSelected }),
   rotateCcw: cmd('rotateCcw', 'Rotate 90° CCW', 'Turn the selected parts a quarter turn counter-clockwise.', { icon: 'rotate-ccw', shortcut: 'Shift+R', run: () => rotateSelection(-90), enabled: partSelected }),
@@ -159,6 +193,9 @@ export const commands: Record<string, Command> = {
   zoomIn: cmd('zoomIn', 'Zoom In', null, { icon: 'zoom-in', shortcut: '+', run: () => zoomBy(1.2) }),
   zoomOut: cmd('zoomOut', 'Zoom Out', null, { icon: 'zoom-out', shortcut: '−', run: () => zoomBy(1 / 1.2) }),
   zoomReset: cmd('zoomReset', 'Actual Size (100%)', null, { shortcut: '0', run: () => setZoom(1) }),
+  uiLarger: cmd('uiLarger', 'Larger Interface', 'Make menus, panels, text and the code editor larger (for a projector or a large screen).', { shortcut: 'Ctrl+Alt+=', run: () => stepUiScale(1) }),
+  uiSmaller: cmd('uiSmaller', 'Smaller Interface', 'Make the whole interface smaller (for a small laptop screen).', { shortcut: 'Ctrl+Alt+−', run: () => stepUiScale(-1) }),
+  uiReset: cmd('uiReset', 'Interface at 100%', null, { shortcut: 'Ctrl+Alt+0', run: () => setUiScale(1) }),
   fit: cmd('fit', 'Fit to Window', 'Zoom so the whole circuit fits in the canvas.', { icon: 'fit', shortcut: 'F', run: () => fitView() }),
   zoomSelection: cmd('zoomSelection', 'Zoom to Selection', null, { icon: 'zoom-in', shortcut: 'Shift+F', run: zoomToSelection }),
   toolText: cmd('toolText', 'Text Note', 'Click the canvas to write a note (Arabic or English).', { icon: 'type', shortcut: 'T', run: () => pickTool('text') }),
@@ -184,6 +221,7 @@ export const commands: Record<string, Command> = {
   toggleInspector: cmd('toggleInspector', 'Properties Panel', 'Show or hide the properties of the selected part or wire.', { icon: 'settings', run: () => ed().setPrefs({ showInspector: !ed().showInspector }) }),
   focusCanvas: cmd('focusCanvas', 'Focus Canvas (hide/restore panels)', 'Hide every panel around the canvas; run again to bring them back.', { icon: 'fit', shortcut: 'Ctrl+`', run: toggleFocusCanvas }),
   toggleCode: cmd('toggleCode', 'Code Editor', 'Show or hide the firmware code editor.', { icon: 'code', run: () => ed().setPrefs({ showCode: !ed().showCode }) }),
+  floatCode: cmd('floatCode', 'Floating Code Editor', 'Take the code editor out into a window you can move anywhere; run again to put it back beside the canvas.', { icon: 'float', run: toggleCodeFloat }),
   toggleDock: cmd('toggleDock', 'Instruments Panel', 'Show or hide the serial monitor, oscilloscope, logic analyzer and other instruments.', { icon: 'panel-bottom', run: () => ed().setPrefs({ showDock: !ed().showDock }) }),
   compile: byLanguage(
     cmd('compile', 'Compile Firmware', 'Build the code for the board with the real compiler and show any errors. While running, flashes the new build.', {
@@ -217,6 +255,8 @@ export const commands: Record<string, Command> = {
   quickAdd: cmd('quickAdd', 'Add a Part…', 'Type a part name and add it to the canvas.', { icon: 'plus', shortcut: 'Ctrl+K', run: () => ed().set({ palette: { mode: 'add' } }) }),
   guide: cmd('guide', 'Parts Guide', 'What each part is, what it is for and how to connect it.', { icon: 'book', shortcut: 'F1', run: () => openGuideForContext() }),
   shortcuts: cmd('shortcuts', 'Keyboard Shortcuts', 'Every mouse gesture and keyboard shortcut.', { icon: 'keyboard', shortcut: '?', run: () => ed().set({ dialog: 'shortcuts' }) }),
+  tour: cmd('tour', 'Take the Tour', 'A quick look around the lab: the parts, the canvas, the code, Run and the instruments.', { icon: 'sparkles', run: () => ed().set({ tourStep: 0, page: null, dialog: null }) }),
+  report: cmd('report', 'Report a Problem…', 'The problems the lab recorded, with the details to copy into a report for your teacher or the developers.', { icon: 'bug', run: () => ed().set({ dialog: 'report' }) }),
   about: cmd('about', 'About', null, { icon: 'info', run: () => ed().set({ dialog: 'about' }) }),
 };
 
@@ -254,6 +294,11 @@ export function installShortcuts(): () => void {
       if (ed().page !== 'guide') openGuideForContext();
       return e.preventDefault();
     }
+    // Back (Alt+← or a keyboard's Back key) leaves the guide like its Back button.
+    if (((e.altKey && k === 'ArrowLeft') || k === 'BrowserBack') && ed().page === 'guide') {
+      closeGuide();
+      return e.preventDefault();
+    }
     // A full-window page (start screen, guide) covers the editor: only its own keys apply.
     if (ed().page) {
       if (ctrl && k.toLowerCase() === 'o') return run('open');
@@ -284,6 +329,14 @@ export function installShortcuts(): () => void {
     if (k === 'F6') return run('pause');
     if (k === 'F10') return run('step');
     if (k === 'F11') return run('stepInstr');
+    // Interface size (outside text fields: Ctrl+Alt is AltGr on some keyboards).
+    if (ctrl && e.altKey && !isTyping(e)) {
+      if (e.code === 'Equal' || e.code === 'NumpadAdd') return run('uiLarger');
+      if (e.code === 'Minus' || e.code === 'NumpadSubtract') return run('uiSmaller');
+      if (e.code === 'Digit0' || e.code === 'Numpad0') return run('uiReset');
+    }
+    // Ctrl+L locks parts (outside text fields, where it keeps its own meaning).
+    if (ctrl && !e.shiftKey && k.toLowerCase() === 'l' && !isTyping(e) && !inMenu(e)) return run('lock');
     // Browser shortcuts that would reload, navigate away, print or open browser UI
     // over the application (the packaged app also disables them in WebView2).
     if (isBrowserShortcut(e)) return e.preventDefault();
@@ -299,6 +352,14 @@ export function installShortcuts(): () => void {
     if (ctrl) return;
     const editor = ed();
     switch (k) {
+      case 'Enter': {
+        // The selected part's main value, in the quick editor under it.
+        if (editor.selectedComponents.length !== 1 || editor.selectedWires.length || editor.selectedAnnotations.length) return;
+        const el = document.querySelector(`.workspace [data-comp="${CSS.escape(editor.selectedComponents[0])}"]`);
+        const r = el?.getBoundingClientRect();
+        if (r && openQuickEdit(editor.selectedComponents[0], r.left + r.width / 2, r.bottom)) e.preventDefault();
+        return;
+      }
       case 'Delete':
       case 'Backspace':
         return run('delete');
@@ -382,6 +443,19 @@ export function installShortcuts(): () => void {
       }
     }
   };
+  // The mouse's Back and Forward buttons would make the webview navigate away from the
+  // application (an empty window); Back leaves the guide like its Back button instead.
+  const mouse = (e: MouseEvent) => {
+    if (e.button !== 3 && e.button !== 4) return;
+    e.preventDefault();
+    if (e.type === 'mouseup' && e.button === 3 && ed().page === 'guide') closeGuide();
+  };
   window.addEventListener('keydown', handler);
-  return () => window.removeEventListener('keydown', handler);
+  window.addEventListener('mousedown', mouse, true);
+  window.addEventListener('mouseup', mouse, true);
+  return () => {
+    window.removeEventListener('keydown', handler);
+    window.removeEventListener('mousedown', mouse, true);
+    window.removeEventListener('mouseup', mouse, true);
+  };
 }

@@ -1,5 +1,7 @@
 * { box-sizing: border-box; }
 html, body, #root { margin: 0; height: 100%; overflow: hidden; }
+/* The window frame never scrolls, only the panels in it: clip (unlike hidden) cannot be scrolled even by a script. */
+body, #root, .app { overflow: clip; }
 body {
   font-family: var(--font-ui);
   font-size: var(--fs-sm);
@@ -98,7 +100,7 @@ input, select, textarea { user-select: text; }
 .left-bottom { min-height: 0; display: flex; flex-direction: column; border-top: 1px solid var(--border); }
 .left-bottom > .panel { flex: 1; }
 .center { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
-.center-top { display: flex; flex: 1; min-height: 0; min-width: 0; }
+.center-top { position: relative; display: flex; flex: 1; min-height: 0; min-width: 0; }
 .panel { display: flex; flex-direction: column; background: var(--bg-panel); min-height: 0; min-width: 0; overflow: hidden; }
 .panel-header { display: flex; align-items: center; gap: 6px; height: 30px; padding-block: 0; padding-inline: 10px 8px; border-bottom: 1px solid var(--border); background: var(--bg-header); flex: none; }
 .panel-header .title { font-size: var(--fs-xs); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-2); }
@@ -307,12 +309,19 @@ input[type='checkbox'] { accent-color: var(--accent); }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
 .btn.primary:hover:not(:disabled) { background: var(--accent-2); }
 .btn.danger { color: var(--err); }
+.btn.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 .btn svg { width: 14px; height: 14px; }
 .btn-row { display: flex; gap: 6px; flex-wrap: wrap; }
 
 /* ---------------------------------------------------------- code editor */
 .code-panel { flex: none; border-inline-start: 1px solid var(--border); }
-.code-tabs { display: flex; align-items: stretch; height: 30px; background: var(--bg-header); border-bottom: 1px solid var(--border); flex: none; }
+.code-tabs { display: flex; align-items: stretch; height: 30px; background: var(--bg-header); border-bottom: 1px solid var(--border); flex: none; cursor: grab; }
+/* The tab bar's free space moves the editor (detached, or out of its place). */
+.code-grip { display: flex; align-items: center; padding: 0 3px 0 5px; color: var(--text-3); opacity: 0.7; }
+.code-tabs:hover .code-grip { opacity: 1; color: var(--text-2); }
+.code-tabs-fill { flex: 1; min-width: 12px; }
+.code-tabs .icon-btn, .code-tabs input { cursor: default; }
+.code-bar-btn { align-self: center; margin-inline-end: 2px; }
 .code-tab { display: flex; align-items: center; gap: 6px; padding: 0 10px; border-inline-end: 1px solid var(--border); color: var(--text-2); cursor: default; font-size: var(--fs-sm); }
 .code-tab.active { background: var(--bg-panel-2); color: var(--text); box-shadow: inset 0 2px 0 var(--accent); }
 .code-tab .x { opacity: 0.5; }
@@ -373,6 +382,7 @@ input[type='checkbox'] { accent-color: var(--accent); }
 .statusbar { display: flex; align-items: center; gap: 14px; height: 24px; padding: 0 10px; background: var(--bg-header); border-top: 1px solid var(--border); font-size: var(--fs-xs); color: var(--text-2); white-space: nowrap; overflow: hidden; }
 .statusbar .item { display: flex; align-items: center; gap: 5px; }
 .statusbar .item svg { width: 12px; height: 12px; }
+.statusbar .item.autosaved { color: var(--ok); animation: fade-in 160ms ease-out; }
 .statusbar .mono { font-family: var(--font-mono); }
 .statusbar .state-running { color: var(--run); font-weight: 600; }
 .statusbar .state-paused { color: var(--warn); font-weight: 600; }
@@ -614,3 +624,122 @@ kbd { direction: ltr; unicode-bidi: plaintext; font-family: var(--font-mono); fo
 .export-checks label { display: flex; align-items: center; gap: 8px; font-size: var(--fs-sm); cursor: pointer; }
 .export-checks label.disabled { opacity: 0.5; cursor: default; }
 @media (max-width: 860px) { .export { grid-template-columns: 1fr; } }
+
+/* ------------------------------------------------------- error boundaries */
+.crash { display: flex; flex: 1; min-width: 0; min-height: 0; align-items: center; justify-content: center; padding: 16px; overflow: auto; background: var(--bg-panel); color: var(--text); }
+.crash-card { display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 460px; text-align: center; }
+.crash-card > svg { color: var(--warn); }
+.crash-card h2 { margin: 0; font-size: var(--fs-md); }
+.crash-card p { margin: 0 0 4px; color: var(--text-2); line-height: 1.5; }
+.crash-card details { width: 100%; text-align: start; color: var(--text-2); }
+.crash-card pre { max-height: 140px; overflow: auto; margin: 6px 0 0; padding: 8px; border-radius: var(--radius); background: var(--bg-panel-2); font: 11px/1.4 var(--font-mono); white-space: pre-wrap; user-select: text; }
+.crash-card .btn-row { justify-content: center; }
+.dock > .crash, .left-top > .crash, .left-bottom > .crash { height: 100%; }
+.crash-page, .crash-app { position: fixed; inset: 0; z-index: var(--z-page); background: var(--bg-app); }
+.crash-bar { flex: none; justify-content: flex-start; gap: 8px; padding: 3px 10px; font-size: var(--fs-xs); background: color-mix(in srgb, var(--warn) 12%, var(--bg-header)); border-bottom: 1px solid var(--border); }
+.crash-bar > svg { color: var(--warn); }
+.crash-bar .btn { height: 22px; }
+/* Help › Report a Problem */
+.error-list { list-style: none; margin: 10px 0 0; padding: 0; max-height: 320px; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+.error-list li { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.error-list li:last-child { border-bottom: 0; }
+.error-head { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 3px; font-size: var(--fs-xs); color: var(--text-3); }
+.error-area { font-weight: 600; color: var(--text-2); }
+.error-msg { font: 11.5px/1.4 var(--font-mono); white-space: pre-wrap; word-break: break-word; user-select: text; }
+
+/* ---------------------------------------------------- floating code editor */
+.float-slot.floating { position: fixed; z-index: var(--z-float); display: flex; flex-direction: column; min-height: 0; background: var(--bg-panel); border: 1px solid var(--border-strong); border-radius: var(--radius-lg); box-shadow: 0 18px 48px rgba(16, 24, 40, 0.28), 0 2px 6px rgba(16, 24, 40, 0.14); overflow: hidden; animation: fade-in 120ms ease-out; }
+.float-slot.floating > .panel { border-inline-start: 0; }
+/* Resize from the edges and corners (inside the frame, above the editor). */
+.float-rs { position: absolute; z-index: 5; }
+.float-rs.n, .float-rs.s { left: 10px; right: 10px; height: 5px; cursor: ns-resize; }
+.float-rs.n { top: 0; }
+.float-rs.s { bottom: 0; }
+.float-rs.e, .float-rs.w { top: 10px; bottom: 10px; width: 5px; cursor: ew-resize; }
+.float-rs.e { right: 0; }
+.float-rs.w { left: 0; }
+.float-rs.ne, .float-rs.nw, .float-rs.se, .float-rs.sw { width: 12px; height: 12px; }
+.float-rs.ne { top: 0; right: 0; cursor: nesw-resize; }
+.float-rs.sw { bottom: 0; left: 0; cursor: nesw-resize; }
+.float-rs.nw { top: 0; left: 0; cursor: nwse-resize; }
+.float-rs.se { bottom: 0; right: 0; cursor: nwse-resize; }
+/* Letting go now docks the editor here. */
+.dock-preview { position: absolute; inset-block: 6px; inset-inline-end: 6px; z-index: var(--z-panel); border: 2px dashed var(--accent); border-radius: var(--radius-lg); background: color-mix(in srgb, var(--accent) 14%, transparent); pointer-events: none; animation: fade-in 100ms ease-out; }
+body.panel-dragging, body.panel-dragging * { cursor: grabbing !important; user-select: none !important; }
+body.panel-resizing, body.panel-resizing * { user-select: none !important; }
+
+/* ------------------------------------------------------ quick value editor */
+.quick-edit { z-index: var(--z-dropdown); width: 300px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-panel-2); box-shadow: var(--shadow); color: var(--text); font-size: var(--fs-sm); outline: none; animation: pop-in 100ms ease-out; }
+.qe-head { display: flex; align-items: center; gap: 7px; margin-bottom: 8px; }
+.qe-head .ref { padding: 0 6px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); font: 600 11px var(--font-mono); }
+.qe-head .name { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qe-label { margin-bottom: 4px; color: var(--text-2); font-size: var(--fs-xs); }
+.qe-row { display: flex; align-items: center; gap: 6px; }
+.qe-row .input { flex: 1; min-width: 0; height: 28px; font-family: var(--font-mono); }
+.qe-row .unit { color: var(--text-3); }
+.qe-value { margin-top: 3px; color: var(--text-3); font-size: var(--fs-xs); }
+.qe-range { width: 100%; margin-top: 8px; }
+.qe-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.qe-chips .chip { padding: 2px 9px; cursor: pointer; }
+.qe-chips .chip:hover { border-color: var(--accent); color: var(--text); }
+.qe-check { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+/* The resistor's colour bands, drawn on a small body. */
+.qe-bands { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: var(--fs-xs); color: var(--text-2); }
+.qe-resistor { display: inline-flex; gap: 3px; align-items: stretch; height: 14px; padding: 0 7px; border-radius: 7px; background: #d9c39a; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18); direction: ltr; }
+.qe-band { width: 4px; box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.25); }
+.qe-band:last-child { margin-inline-start: 4px; }
+.qe-band-names { direction: ltr; }
+:root[dir='rtl'] .qe-band-names { direction: rtl; }
+.qe-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); }
+.qe-foot .hint { color: var(--text-3); font-size: var(--fs-xs); }
+
+/* Locked parts: a padlock at their corner. */
+.lock-badge { position: absolute; display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; transform: translate(-60%, -40%); border-radius: 50%; background: var(--bg-panel-2); border: 1px solid var(--border-strong); color: var(--text-2); box-shadow: var(--shadow); pointer-events: auto; cursor: default; z-index: 2; }
+
+/* Code editor › Snippets: a title and what it does. */
+.dropdown.snippets { max-width: 380px; }
+.dropdown.snippets .item { height: auto; align-items: flex-start; padding-block: 6px; }
+.dropdown.snippets .item > svg { margin-top: 2px; }
+.snip { display: flex; flex-direction: column; gap: 1px; white-space: normal; }
+.snip-title { font-weight: 600; }
+.snip-desc { color: var(--text-3); font-size: var(--fs-xs); line-height: 1.35; }
+.snip-where { color: var(--accent); }
+.dropdown.snippets .item[data-highlighted] .snip-desc, .dropdown.snippets .item[data-highlighted] .snip-where { color: inherit; opacity: 0.85; }
+
+/* File › Version History */
+.history { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: 14px; min-height: 360px; }
+.history-list { list-style: none; margin: 0; padding: 0; max-height: 52vh; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.history-item { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; width: 100%; padding: 8px 10px; border: 0; border-bottom: 1px solid var(--border); background: none; color: var(--text); text-align: start; cursor: pointer; }
+.history-item:hover { background: var(--bg-hover); }
+.history-item.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+:root[dir='rtl'] .history-item.on { box-shadow: inset -3px 0 0 var(--accent); }
+.history-when { font-weight: 600; }
+.history-reason { justify-self: end; }
+.history-reason.run { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 50%, var(--border)); }
+.history-reason.restore { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 50%, var(--border)); }
+.history-size { grid-column: 1 / -1; color: var(--text-3); font-size: var(--fs-xs); }
+.history-preview { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.history-preview .card-canvas { border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.history-code { margin: 0; padding: 8px 10px; max-height: 220px; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-panel-2); font: 11.5px/1.45 var(--font-mono); white-space: pre; user-select: text; }
+.history-file { color: var(--text-3); }
+.history-clock { margin-inline-start: 4px; color: var(--text-3); font-weight: 400; font-size: var(--fs-xs); font-family: var(--font-mono); }
+
+/* Problems: how to fix them, and the part's page in the guide. */
+.problem .fix { display: block; margin-top: 2px; color: var(--text-2); font-size: var(--fs-xs); }
+.problem .fix svg { vertical-align: -2px; color: var(--accent); }
+.link-btn { margin-inline-start: 6px; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; cursor: pointer; }
+.link-btn:hover { text-decoration: underline; }
+.note-fix { margin-top: 2px; color: var(--text-2); font-size: var(--fs-xs); }
+
+/* First-run tour: the part being explained stays bright, the rest dims (without blocking clicks). */
+.tour-shade { position: fixed; z-index: var(--z-dropdown); border-radius: var(--radius-lg); box-shadow: 0 0 0 3px var(--accent), 0 0 0 9999px rgba(10, 16, 24, 0.42); pointer-events: none; transition: left 200ms ease, top 200ms ease, width 200ms ease, height 200ms ease; }
+/* Nothing to point at (the welcome): the whole window dims. */
+.tour-shade.whole { border-radius: 0; box-shadow: none; background: rgba(10, 16, 24, 0.42); }
+.tour-callout { z-index: var(--z-modal); width: 340px; padding: 12px 14px; border: 1px solid var(--accent); border-radius: var(--radius-lg); background: var(--bg-panel-2); box-shadow: var(--shadow); color: var(--text); animation: pop-in 120ms ease-out; }
+.tour-head { display: flex; align-items: center; gap: 7px; color: var(--accent); }
+.tour-title { flex: 1; font-weight: 700; color: var(--text); font-size: var(--fs-md); }
+.tour-count { color: var(--text-3); font: 11px var(--font-mono); }
+.tour-text { margin: 8px 0 12px; color: var(--text-2); line-height: 1.55; }
+.tour-foot { display: flex; align-items: center; gap: 6px; }
+.tour-foot .spacer { flex: 1; }
+@media (prefers-reduced-motion: reduce) { .tour-shade { transition: none; } }

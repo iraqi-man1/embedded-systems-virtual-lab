@@ -121,3 +121,13 @@
 
 /* `code` inside guide sentences. */
 .inline-code { padding: 0 4px; border-radius: 4px; background: var(--bg-hover); font: 0.92em var(--font-mono); white-space: pre-wrap; }
+/* Live readings while simulating: voltage, current, power and the share of the rating. */
+.part-card-live { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 10px; margin-top: 7px; padding: 5px 8px; border-radius: var(--radius); background: color-mix(in srgb, var(--accent) 8%, var(--bg-panel)); font-size: var(--fs-xs); }
+.part-card-live .k { color: var(--text-3); }
+.part-card-live b { font-family: var(--font-mono); font-weight: 600; }
+.live-load { display: inline-flex; align-items: center; gap: 6px; color: var(--text-2); }
+.live-load .bar { position: relative; width: 54px; height: 5px; border-radius: 3px; background: var(--bg-hover); overflow: hidden; }
+.live-load .bar > span { position: absolute; inset-block: 0; inset-inline-start: 0; background: var(--ok); }
+.live-load.high .bar > span { background: var(--warn); }
+.live-load.over { color: var(--err); font-weight: 600; }
+.live-load.over .bar > span { background: var(--err); }

@@ -8,6 +8,7 @@ export type Tool = 'select' | 'probe-logic' | 'probe-scope' | 'probe-meter-red' 
 /** Drawing a text note, an arrow or a frame on the canvas. */
 export type NoteTool = 'text' | 'arrow' | 'rect';
 export type DockTab = 'serial' | 'plotter' | 'scope' | 'logic' | 'meter' | 'mcu' | 'problems' | 'output';
+export type HomeTab = 'recent' | 'new' | 'examples' | 'learn';
 export type Theme = ThemePref;
 
 export interface Toast {
@@ -37,6 +38,8 @@ interface Prefs {
   /** Last light and dark themes chosen (the quick light/dark toggle switches between them). */
   themeLight: ThemeId;
   themeDark: ThemeId;
+  /** Size of the whole interface (0.8–1.5). */
+  uiScale: number;
   /** Code editor font size (px) and soft wrapping of long lines. */
   editorFontSize: number;
   editorWordWrap: boolean;
@@ -54,6 +57,10 @@ interface Prefs {
   showInspector: boolean;
   showCode: boolean;
   showDock: boolean;
+  /** The code editor floats over the window (dragged out of its place) instead of sitting beside the canvas. */
+  codeFloating: boolean;
+  /** Where the floating code editor was left, in window pixels (null: next to its place). */
+  codeFloatRect: { x: number; y: number; w: number; h: number } | null;
   wireColor: string;
   sound: boolean;
   /** Coloured dots on IC/MCU pins while simulating (high/low/floating). */
@@ -66,6 +73,8 @@ interface Prefs {
   serialTimestamps: boolean;
   /** Serial monitor: text or hex dump. */
   serialView: 'text' | 'hex';
+  /** Serial monitor: lines sent, newest first (↑ and ↓ bring them back). */
+  serialHistory: string[];
   /** Collapsed library categories ('__fav', '__recent' for the pinned sections). */
   libraryCollapsed: string[];
   /** Library shows simulated parts only. */
@@ -74,6 +83,12 @@ interface Prefs {
   rightDragPan: boolean;
   /** Open on the start screen (recent projects, templates, examples). */
   showStartScreen: boolean;
+  /** The first-run tour was seen (finished or skipped). */
+  tourDone: boolean;
+  /** Save the project file by itself a moment after each change (once the project has a file). */
+  autosaveFile: boolean;
+  /** Template that New Project starts from: the one used last ('' until one is chosen: the empty project). */
+  newTemplate: string;
   /** Resting the mouse on a part shows what it is and what it is for. */
   hoverCards: boolean;
   /** Overview of the whole circuit in the corner of the canvas (key M). */
@@ -91,6 +106,7 @@ export function defaultPrefs(): Prefs {
     theme: 'system',
     themeLight: 'light',
     themeDark: 'dark',
+    uiScale: 1,
     editorFontSize: 13,
     editorWordWrap: false,
     favorites: ['evlab.arduino-uno', 'evlab.breadboard-half', 'evlab.resistor', 'evlab.led', 'evlab.pushbutton', 'evlab.potentiometer'],
@@ -106,6 +122,8 @@ export function defaultPrefs(): Prefs {
     showInspector: true,
     showCode: true,
     showDock: true,
+    codeFloating: false,
+    codeFloatRect: null,
     wireColor: '#2ecc71',
     sound: true,
     showLogicLevels: false,
@@ -113,10 +131,14 @@ export function defaultPrefs(): Prefs {
     serialClearOnRun: true,
     serialTimestamps: false,
     serialView: 'text',
+    serialHistory: [],
     libraryCollapsed: ['Communication', 'Integrated Circuits', 'Actuators', 'Sensors'],
     librarySimOnly: false,
     rightDragPan: true,
     showStartScreen: true,
+    newTemplate: '',
+    autosaveFile: true,
+    tourDone: false,
     hoverCards: true,
     showMinimap: true,
     wheelAction: 'zoom',
@@ -143,6 +165,8 @@ interface EditorState extends Prefs {
   appliedTheme: ThemeId;
   /** Full-window page shown over the editor (null = the editor). */
   page: null | 'home' | 'guide';
+  /** Tab of the start screen (kept while the guide or the editor is shown; null: chosen on opening). */
+  homeTab: HomeTab | null;
   /** Part shown in the parts guide (null: the overview). */
   guideType: string | null;
   /** Where the guide's Back button goes. */
@@ -162,12 +186,20 @@ interface EditorState extends Prefs {
   dockTab: DockTab;
   clipboard: CircuitDocument | null;
   contextMenu: ContextMenuState | null;
-  dialog: null | 'examples' | 'toolchain' | 'shortcuts' | 'about' | 'project' | 'settings' | 'export';
+  dialog: null | 'examples' | 'toolchain' | 'shortcuts' | 'about' | 'project' | 'settings' | 'export' | 'report' | 'history';
   toasts: Toast[];
   /** Open command palette: run commands, or add a part (optionally at a canvas point). */
   palette: null | { mode: 'commands' | 'add' | 'find'; at?: { x: number; y: number } };
   /** Component type being dragged from the library (drop preview). */
   dragType: string | null;
+  /** The floating code editor is being dragged over its place: letting go docks it. */
+  codeDocking: boolean;
+  /** Step of the tour being shown (null: none). */
+  tourStep: number | null;
+  /** When the project file was last saved by itself (status bar). */
+  autoSavedAt: number | null;
+  /** Quick value editor open on a part, at a point of the window. */
+  quickEdit: { id: string; x: number; y: number } | null;
   /** Line to reveal in the code editor (set by the Problems panel). */
   revealLine: { file: string; line: number; nonce: number } | null;
 
@@ -193,6 +225,7 @@ export const useEditor = create<EditorState>((set, get) => ({
   ...initialPrefs,
   appliedTheme: resolveTheme(initialPrefs.theme, systemPrefersDark()),
   page: initialPrefs.showStartScreen ? 'home' : null,
+  homeTab: null,
   guideType: null,
   guideReturn: null,
   selectedComponents: [],
@@ -210,6 +243,10 @@ export const useEditor = create<EditorState>((set, get) => ({
   dialog: null,
   toasts: [],
   dragType: null,
+  codeDocking: false,
+  quickEdit: null,
+  autoSavedAt: null,
+  tourStep: null,
   palette: null,
   revealLine: null,
 

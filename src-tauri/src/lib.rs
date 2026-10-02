@@ -37,6 +37,63 @@ fn disable_browser_accelerators(window: &tauri::WebviewWindow) {
     });
 }
 
+/// Creates the main window from its configuration (`create: false` in
+/// tauri.conf.json). On Windows, `EVLAB_WEBVIEW_DEBUG_PORT` opens the WebView2
+/// DevTools port on localhost, so a test can drive the real application
+/// (tools/e2e-desktop.mjs); WebView2 ignores its own environment variable for
+/// this because the window passes its browser arguments explicitly.
+fn main_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<tauri::WebviewWindow<R>> {
+    use tauri::Manager;
+    let config = app
+        .config()
+        .app
+        .windows
+        .iter()
+        .find(|w| w.label == "main")
+        .cloned()
+        .expect("tauri.conf.json defines the main window");
+    #[cfg(windows)]
+    let config = {
+        let mut config = config;
+        if let Some(port) = std::env::var("EVLAB_WEBVIEW_DEBUG_PORT").ok().and_then(|p| p.parse::<u16>().ok()) {
+            // wry's own defaults, plus the port.
+            config.additional_browser_args = Some(format!(
+                "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --remote-debugging-port={port}"
+            ));
+        }
+        config
+    };
+    if let Some(window) = app.get_webview_window(&config.label) {
+        return Ok(window);
+    }
+    tauri::WebviewWindowBuilder::from_config(app, &config)?.build()
+}
+
+/// Whether the main window may show `url`: only the application itself
+/// (`tauri://localhost`, or `http(s)://tauri.localhost` on Windows) and, in
+/// debug builds, the development server.
+fn is_app_url(url: &tauri::Url) -> bool {
+    url.scheme() == "tauri"
+        || url.host_str() == Some("tauri.localhost")
+        || (cfg!(debug_assertions) && matches!(url.host_str(), Some("localhost") | Some("127.0.0.1")))
+}
+
+/// The window shows the application and nothing else. Any other navigation
+/// (the mouse's Back button reaching the webview's empty first page, a file
+/// dropped outside the drop handler, a link) would replace the whole interface
+/// with an empty or foreign page, so it is cancelled.
+fn navigation_guard<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
+    tauri::plugin::Builder::new("navigation-guard")
+        .on_navigation(|_webview, url| {
+            let allowed = is_app_url(url);
+            if !allowed {
+                eprintln!("navigation to {url} blocked");
+            }
+            allowed
+        })
+        .build()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let cwd = std::env::current_dir().unwrap_or_default();
@@ -55,18 +112,17 @@ pub fn run() {
             }
         }))
         .plugin(tauri_plugin_dialog::init())
+        .plugin(navigation_guard())
         .manage(AppState {
             build_lock: Mutex::new(()),
             launch_file: Mutex::new(launch_file),
         })
-        .setup(|_app| {
+        .setup(|app| {
+            let window = main_window(app.handle())?;
             #[cfg(all(windows, not(debug_assertions)))]
-            {
-                use tauri::Manager;
-                if let Some(window) = _app.get_webview_window("main") {
-                    disable_browser_accelerators(&window);
-                }
-            }
+            disable_browser_accelerators(&window);
+            #[cfg(not(all(windows, not(debug_assertions))))]
+            let _ = window;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -75,6 +131,7 @@ pub fn run() {
             toolchain::compile_firmware,
             project_io::take_launch_file,
             project_io::read_text_file,
+            project_io::read_binary_file,
             project_io::write_text_file,
             project_io::write_binary_file,
             project_io::autosave_write,
@@ -85,4 +142,19 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running Embedded Systems Virtual Lab");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_app_url;
+
+    #[test]
+    fn only_the_application_is_shown() {
+        for ok in ["tauri://localhost/", "http://tauri.localhost/", "https://tauri.localhost/index.html#x"] {
+            assert!(is_app_url(&ok.parse().unwrap()), "{ok}");
+        }
+        for blocked in ["about:blank", "file:///C:/Users/me/project.evlab", "https://example.com/", "data:text/html,hi"] {
+            assert!(!is_app_url(&blocked.parse().unwrap()), "{blocked}");
+        }
+    }
 }

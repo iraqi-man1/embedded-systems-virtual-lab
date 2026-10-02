@@ -30,12 +30,14 @@ interface ItemProps {
   disabled?: boolean;
   danger?: boolean;
   onSelect?: () => void;
+  /** What the item is, for tools that drive the interface in any language (data-id). */
+  id?: string;
 }
 
-export function MenuItem({ label, icon, shortcut, disabled, danger, onSelect }: ItemProps) {
+export function MenuItem({ label, icon, shortcut, disabled, danger, onSelect, id }: ItemProps) {
   const P = usePrims();
   return (
-    <P.Item className={`item${danger ? ' danger' : ''}`} disabled={disabled} onSelect={onSelect}>
+    <P.Item className={`item${danger ? ' danger' : ''}`} disabled={disabled} onSelect={onSelect} data-id={id}>
       {icon ? <Icon name={icon} /> : <span className="icon-space" />}
       <span className="text">{label}</span>
       {shortcut && <span className="kbd">{shortcut}</span>}
@@ -43,10 +45,10 @@ export function MenuItem({ label, icon, shortcut, disabled, danger, onSelect }: 
   );
 }
 
-export function MenuCheckItem({ label, checked, shortcut, disabled, onSelect }: Omit<ItemProps, 'icon'> & { checked: boolean }) {
+export function MenuCheckItem({ label, checked, shortcut, disabled, onSelect, id }: Omit<ItemProps, 'icon'> & { checked: boolean }) {
   const P = usePrims();
   return (
-    <P.CheckboxItem className="item" checked={checked} disabled={disabled} onSelect={onSelect}>
+    <P.CheckboxItem className="item" checked={checked} disabled={disabled} onSelect={onSelect} data-id={id}>
       <span className="icon-space check">{checked ? '✓' : ''}</span>
       <span className="text">{label}</span>
       {shortcut && <span className="kbd">{shortcut}</span>}
@@ -83,11 +85,11 @@ export function MenuSwatches({ colors, active, onPick }: { colors: { value: stri
   );
 }
 
-export function SubMenu({ label, icon, children, disabled }: { label: ReactNode; icon?: string; children: ReactNode; disabled?: boolean }) {
+export function SubMenu({ label, icon, children, disabled, id }: { label: ReactNode; icon?: string; children: ReactNode; disabled?: boolean; id?: string }) {
   const P = usePrims();
   return (
     <P.Sub>
-      <P.SubTrigger className="item" disabled={disabled}>
+      <P.SubTrigger className="item" disabled={disabled} data-id={id}>
         {icon ? <Icon name={icon} /> : <span className="icon-space" />}
         <span className="text">{label}</span>
         <Icon name="chevron-right" className="sub-arrow" />

@@ -6,7 +6,9 @@ import { useState, type ReactNode } from 'react';
 import { WIRE_COLORS } from '../../core/model/circuit';
 import { LANGUAGES, tr, type MessageKey } from '../../i18n';
 import { useT } from '../../i18n/react';
+import { isTauri } from '../../platform';
 import { useEditor } from '../../state/editor';
+import { setUiScale, UI_SCALES } from '../uiScale';
 import { setTheme } from '../commands';
 import { confirmDialog } from '../common/Dialog';
 import { ModalFrame } from '../common/Dialog';
@@ -101,6 +103,9 @@ export function SettingsDialog() {
         <Row label={t('Start screen at launch')} description={t('Open on the start screen with recent projects, templates and examples.')}>
           <Switch checked={s.showStartScreen} label={t('Start screen at launch')} onChange={(showStartScreen) => set({ showStartScreen })} />
         </Row>
+        <Row label={t('Save automatically')} description={t('Once a project has been saved to a file, save it again by itself a moment after each change.')}>
+          <Switch checked={s.autosaveFile} label={t('Save automatically')} onChange={(autosaveFile) => set({ autosaveFile })} />
+        </Row>
         <Row label={t('Sound')} description={t('Play the tones of buzzers and speakers while simulating.')}>
           <Switch checked={s.sound} label={t('Sound')} onChange={(sound) => set({ sound })} />
         </Row>
@@ -109,6 +114,15 @@ export function SettingsDialog() {
   } else if (tab === 'appearance') {
     body = (
       <>
+        <Row label={t('Interface size')} description={t('Larger for a projector or a large screen, smaller for a small laptop screen. Ctrl+Alt+= and Ctrl+Alt+− change it anywhere.')}>
+          <Segmented
+            value={String(s.uiScale)}
+            label={t('Interface size')}
+            options={UI_SCALES.map((z) => ({ value: String(z), label: `${Math.round(z * 100)}%` }))}
+            onChange={(v) => setUiScale(Number(v))}
+          />
+        </Row>
+        {!isTauri && <div className="set-note">{t('In a browser, use the browser’s own zoom (Ctrl and + or −) instead.')}</div>}
         <div className="set-note">{t('The theme colours the whole application, the canvas and the code editor. Parts keep their real colours.')}</div>
         <ThemeGallery />
       </>

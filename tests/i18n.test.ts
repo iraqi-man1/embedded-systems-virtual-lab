@@ -74,3 +74,16 @@ describe('t / tr', () => {
     expect(s).not.toMatch(/[٠-٩]/);
   });
 });
+
+describe('Arduino editor help', () => {
+  it('explains every function in English and Arabic', async () => {
+    const { ARDUINO_API } = await import('../src/ui/editor/arduinoLanguage');
+    expect(ARDUINO_API.length).toBeGreaterThan(40);
+    for (const e of ARDUINO_API) {
+      expect(e.doc[0], e.name).toBeTruthy();
+      expect(e.doc[1], e.name).toMatch(/[؀-ۿ]/);
+      // Monaco shows the help as markdown: no invisible direction marks.
+      expect(e.doc[1], e.name).not.toMatch(/[‎‏‪-‮⁦-⁩]/);
+    }
+  });
+});
