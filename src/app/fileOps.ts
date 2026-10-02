@@ -35,7 +35,7 @@ export function showProject(project: Project, path: string | null) {
 
 export async function newDocument() {
   if (!(await confirmDiscard())) return;
-  showProject(newProject(), null);
+  showProject(newProject(t('Untitled')), null);
 }
 
 /** File name without folders and extension. */

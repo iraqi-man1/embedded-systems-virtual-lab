@@ -10,6 +10,7 @@ import { APP_VERSION } from '../../app/version';
 import { commands } from '../commands';
 import { ModalFrame } from '../common/Dialog';
 import { Icon } from '../common/Icon';
+import { SettingsDialog } from './SettingsDialog';
 
 function Modal({ title, small, children, footer }: { title: string; small?: boolean; children: React.ReactNode; footer?: React.ReactNode }) {
   return (
@@ -259,6 +260,7 @@ export function Dialogs() {
   if (dialog === 'toolchain') return <ToolchainDialog />;
   if (dialog === 'shortcuts') return <ShortcutsDialog />;
   if (dialog === 'about') return <AboutDialog />;
+  if (dialog === 'settings') return <SettingsDialog />;
   return null;
 }
 

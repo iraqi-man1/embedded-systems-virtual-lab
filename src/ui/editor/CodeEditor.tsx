@@ -66,7 +66,9 @@ export function CodeEditor() {
   const files = useProject((s) => s.project.firmware.files);
   const revision = useProject((s) => s.revision);
   const projectCreated = useProject((s) => s.project.meta.created);
-  const theme = useEditor((s) => s.theme);
+  const theme = useEditor((s) => s.appliedTheme);
+  const fontSize = useEditor((s) => s.editorFontSize);
+  const wordWrap = useEditor((s) => s.editorWordWrap);
   const revealLine = useEditor((s) => s.revealLine);
   const compile = useSim((s) => s.compile);
   const simState = useSim((s) => s.state);
@@ -82,7 +84,8 @@ export function CodeEditor() {
     const ed = monaco.editor.create(host.current!, {
       automaticLayout: true,
       fontFamily: 'Cascadia Mono, Consolas, monospace',
-      fontSize: 13,
+      fontSize: useEditor.getState().editorFontSize,
+      wordWrap: useEditor.getState().editorWordWrap ? 'on' : 'off',
       minimap: { enabled: false },
       scrollBeyondLastLine: false,
       tabSize: 2,
@@ -91,7 +94,7 @@ export function CodeEditor() {
       fixedOverflowWidgets: true,
       // Project files dropped on the editor open the project (window handler).
       dropIntoEditor: { enabled: false },
-      theme: useEditor.getState().theme === 'dark' ? 'evlab-dark' : 'evlab-light',
+      theme: `evlab-${useEditor.getState().appliedTheme}`,
     });
     editorRef.current = ed;
     // Ctrl+B / F5 inside the editor are handled globally; keep Ctrl+S from typing.
@@ -131,8 +134,12 @@ export function CodeEditor() {
   }, [active, files]);
 
   useEffect(() => {
-    monaco.editor.setTheme(theme === 'dark' ? 'evlab-dark' : 'evlab-light');
+    monaco.editor.setTheme(`evlab-${theme}`);
   }, [theme]);
+
+  useEffect(() => {
+    editorRef.current?.updateOptions({ fontSize, wordWrap: wordWrap ? 'on' : 'off' });
+  }, [fontSize, wordWrap]);
 
   // Compiler diagnostics -> markers.
   useEffect(() => {

@@ -5,6 +5,7 @@
 import * as monaco from 'monaco-editor';
 import EditorWorker from 'monaco-editor/editor/editor.worker?worker';
 import { registerArduinoLanguage } from './arduinoLanguage';
+import { THEMES } from '../themes';
 
 declare global {
   interface Window {
@@ -14,27 +15,26 @@ declare global {
 
 window.MonacoEnvironment = { getWorker: () => new EditorWorker() };
 
-monaco.editor.defineTheme('evlab-light', {
-  base: 'vs',
-  inherit: true,
-  rules: [
-    { token: 'keyword', foreground: '0b55b8', fontStyle: 'bold' },
-    { token: 'number', foreground: 'a0522d' },
-    { token: 'comment', foreground: '6a8a5a', fontStyle: 'italic' },
-    { token: 'string', foreground: 'b5450f' },
-  ],
-  colors: { 'editor.background': '#ffffff', 'editorGutter.background': '#f7f8fa', 'editorLineNumber.foreground': '#9aa3ae' },
-});
-monaco.editor.defineTheme('evlab-dark', {
-  base: 'vs-dark',
-  inherit: true,
-  rules: [
-    { token: 'keyword', foreground: '6cb6ff', fontStyle: 'bold' },
-    { token: 'number', foreground: 'f0b27a' },
-    { token: 'comment', foreground: '7f9c78', fontStyle: 'italic' },
-  ],
-  colors: { 'editor.background': '#1b1e23', 'editorGutter.background': '#1b1e23', 'editorLineNumber.foreground': '#5c6570' },
-});
+// One editor theme per application theme (styles/theme.css + ui/themes.ts).
+for (const th of THEMES) {
+  const e = th.editor;
+  monaco.editor.defineTheme(`evlab-${th.id}`, {
+    base: e.base,
+    inherit: true,
+    rules: [
+      { token: 'keyword', foreground: e.keyword, fontStyle: 'bold' },
+      { token: 'number', foreground: e.number },
+      { token: 'comment', foreground: e.comment, fontStyle: 'italic' },
+      { token: 'string', foreground: e.string },
+    ],
+    colors: {
+      'editor.background': e.background,
+      'editor.foreground': e.foreground,
+      'editorGutter.background': e.gutter,
+      'editorLineNumber.foreground': e.lineNumber,
+    },
+  });
+}
 
 registerArduinoLanguage(monaco);
 

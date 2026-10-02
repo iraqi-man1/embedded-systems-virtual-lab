@@ -1,6 +1,7 @@
 /** Application commands shared by menus, toolbar and keyboard shortcuts. */
 import { newDocument, openDocument, saveDocument } from '../app/fileOps';
 import { t, type MessageKey } from '../i18n';
+import { themeInfo, type ThemePref } from './themes';
 import { useEditor } from '../state/editor';
 import { flushCoalesced, useProject } from '../state/project';
 import {
@@ -63,6 +64,18 @@ function toggleFocusCanvas() {
   }
 }
 const hasSelection = () => ed().selectedComponents.length + ed().selectedWires.length > 0;
+
+/** Chooses a theme and remembers it as the light or dark choice of the quick toggle. */
+export function setTheme(pref: ThemePref) {
+  if (pref === 'system') return ed().setPrefs({ theme: pref });
+  ed().setPrefs({ theme: pref, ...(themeInfo(pref).base === 'dark' ? { themeDark: pref } : { themeLight: pref }) });
+}
+
+/** Switches between the last light and the last dark theme. */
+function toggleDark() {
+  const s = ed();
+  setTheme(themeInfo(s.appliedTheme).base === 'dark' ? s.themeLight : s.themeDark);
+}
 const simState = () => useSim.getState().state;
 
 /** A command whose label and description follow the interface language. */
@@ -132,7 +145,12 @@ export const commands: Record<string, Command> = {
     icon: 'languages',
     run: () => ed().setPrefs({ language: ed().language === 'ar' ? 'en' : 'ar' }),
   }),
-  theme: cmd('theme', 'Toggle Dark Theme', 'Switch between a light and a dark look.', { icon: 'moon', run: () => ed().setPrefs({ theme: ed().theme === 'dark' ? 'light' : 'dark' }) }),
+  theme: cmd('theme', 'Toggle Dark Theme', 'Switch between your light and dark themes.', { icon: 'moon', run: toggleDark }),
+  settings: cmd('settings', 'Settings…', 'Language, theme, mouse and canvas behaviour, code editor and simulation options.', {
+    icon: 'settings',
+    shortcut: 'Ctrl+,',
+    run: () => ed().set({ dialog: 'settings' }),
+  }),
   toggleLibrary: cmd('toggleLibrary', 'Component Library', 'Show or hide the list of parts you can drag onto the canvas.', { icon: 'panel-left', run: () => ed().setPrefs({ showLibrary: !ed().showLibrary }) }),
   toggleInspector: cmd('toggleInspector', 'Properties Panel', 'Show or hide the properties of the selected part or wire.', { icon: 'settings', run: () => ed().setPrefs({ showInspector: !ed().showInspector }) }),
   focusCanvas: cmd('focusCanvas', 'Focus Canvas (hide/restore panels)', 'Hide every panel around the canvas; run again to bring them back.', { icon: 'fit', shortcut: 'Ctrl+`', run: toggleFocusCanvas }),
@@ -201,6 +219,7 @@ export function installShortcuts(): () => void {
     if (ctrl && e.shiftKey && k.toLowerCase() === 'p') return run('palette');
     if (ctrl && !e.shiftKey && k.toLowerCase() === 'k') return run('quickAdd');
     if (ctrl && (e.code === 'Backquote' || k === '`')) return run('focusCanvas');
+    if (ctrl && k === ',') return run('settings');
     if (k === 'F5') return run(ctrl ? 'reset' : e.shiftKey ? 'stop' : 'run');
     if (k === 'F6') return run('pause');
     if (k === 'F10') return run('step');

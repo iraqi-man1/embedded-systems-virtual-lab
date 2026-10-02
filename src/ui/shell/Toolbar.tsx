@@ -10,6 +10,7 @@ import { Icon } from '../common/Icon';
 import { DropdownMenu, MenuCheckItem, MenuItem, MenuLabel, MenuSeparator, MenuSwatches, SubMenu } from '../common/Menu';
 import { Tip } from '../common/Tooltip';
 import { cycleWireColor, setWireColor } from '../workspace/actions';
+import { themeInfo } from '../themes';
 
 function useCommandRefresh() {
   useSim((s) => s.state); // re-render on simulation state changes
@@ -166,7 +167,7 @@ export function Toolbar() {
   const starting = useSim((s) => s.starting);
   const settings = useProject((s) => s.project.simulation);
   const wireColor = useEditor((s) => s.wireColor);
-  const theme = useEditor((s) => s.theme);
+  const darkBase = useEditor((s) => themeInfo(s.appliedTheme).base === 'dark');
   const panels = useEditor((s) => [s.showLibrary, s.showInspector, s.showCode, s.showDock].join());
   const panelOn = Object.fromEntries(panels.split(',').map((x, i) => [VIEW_TOGGLES[i], x === 'true'])) as Record<string, boolean>;
   useCommandRefresh();
@@ -285,9 +286,9 @@ export function Toolbar() {
       {shown('view') && (
         <div className="group" data-group="view">
           <Btn id="language" />
-          <Tip content={theme === 'dark' ? t('Switch to light theme') : t('Switch to dark theme')}>
+          <Tip content={darkBase ? t('Switch to light theme') : t('Switch to dark theme')}>
             <button className="tb-btn" aria-label={t('Toggle theme')} onClick={commands.theme.run}>
-              <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
+              <Icon name={darkBase ? 'sun' : 'moon'} />
             </button>
           </Tip>
           {VIEW_TOGGLES.map((id) => (
@@ -343,7 +344,7 @@ export function Toolbar() {
             {hidden.includes('view') && (
               <>
                 <MenuSeparator />
-                <MenuCheckItem label={t('Dark theme')} checked={theme === 'dark'} onSelect={commands.theme.run} />
+                <MenuCheckItem label={t('Dark theme')} checked={darkBase} onSelect={commands.theme.run} />
                 {VIEW_TOGGLES.map((id) => (
                   <MenuCheckItem key={id} label={commands[id].label} checked={panelOn[id]} onSelect={commands[id].run} />
                 ))}

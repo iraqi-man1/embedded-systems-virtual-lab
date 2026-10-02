@@ -2,10 +2,11 @@
 import { create } from 'zustand';
 import type { CircuitDocument, PinRef, Point } from '../core/model/circuit';
 import { detectLanguage, setLanguage, type Lang } from '../i18n';
+import { resolveTheme, systemPrefersDark, type ThemeId, type ThemePref } from '../ui/themes';
 
 export type Tool = 'select' | 'probe-logic' | 'probe-scope' | 'probe-meter-red' | 'probe-meter-black';
 export type DockTab = 'serial' | 'plotter' | 'scope' | 'logic' | 'meter' | 'mcu' | 'problems' | 'output';
-export type Theme = 'light' | 'dark';
+export type Theme = ThemePref;
 
 export interface Toast {
   id: number;
@@ -29,7 +30,14 @@ const MAX_RECENT_PROJECTS = 10;
 interface Prefs {
   /** Interface language (Arabic switches the layout to right-to-left). */
   language: Lang;
+  /** Colour theme, or 'system' to follow the operating system. */
   theme: Theme;
+  /** Last light and dark themes chosen (the quick light/dark toggle switches between them). */
+  themeLight: ThemeId;
+  themeDark: ThemeId;
+  /** Code editor font size (px) and soft wrapping of long lines. */
+  editorFontSize: number;
+  editorWordWrap: boolean;
   favorites: string[];
   recent: string[];
   recentProjects: RecentProject[];
@@ -68,10 +76,13 @@ const PREFS_KEY = 'evlab.prefs.v1';
 
 /** Preferences of a fresh installation. Every key here is persisted. */
 export function defaultPrefs(): Prefs {
-  const dark = typeof matchMedia !== 'undefined' && matchMedia('(prefers-color-scheme: dark)').matches;
   return {
     language: detectLanguage(),
-    theme: dark ? 'dark' : 'light',
+    theme: 'system',
+    themeLight: 'light',
+    themeDark: 'dark',
+    editorFontSize: 13,
+    editorWordWrap: false,
     favorites: ['evlab.arduino-uno', 'evlab.breadboard-half', 'evlab.resistor', 'evlab.led', 'evlab.pushbutton', 'evlab.potentiometer'],
     recent: [],
     recentProjects: [],
@@ -114,6 +125,8 @@ function loadPrefs(): Prefs {
 }
 
 interface EditorState extends Prefs {
+  /** Theme currently shown (resolves 'system'). */
+  appliedTheme: ThemeId;
   selectedComponents: string[];
   selectedWires: string[];
   viewport: { x: number; y: number; zoom: number };
@@ -125,7 +138,7 @@ interface EditorState extends Prefs {
   dockTab: DockTab;
   clipboard: CircuitDocument | null;
   contextMenu: ContextMenuState | null;
-  dialog: null | 'examples' | 'toolchain' | 'shortcuts' | 'about' | 'project';
+  dialog: null | 'examples' | 'toolchain' | 'shortcuts' | 'about' | 'project' | 'settings';
   toasts: Toast[];
   /** Open command palette: run commands, or add a part (optionally at a canvas point). */
   palette: null | { mode: 'commands' | 'add'; at?: { x: number; y: number } };
@@ -136,6 +149,8 @@ interface EditorState extends Prefs {
 
   set(partial: Partial<EditorState>): void;
   setPrefs(partial: Partial<Prefs>): void;
+  /** Restores default settings; keeps the language, favourites and recent lists. */
+  resetPrefs(): void;
   select(components: string[], wires?: string[]): void;
   clearSelection(): void;
   toggleFavorite(type: string): void;
@@ -148,8 +163,11 @@ interface EditorState extends Prefs {
 
 let toastSeq = 0;
 
+const initialPrefs = loadPrefs();
+
 export const useEditor = create<EditorState>((set, get) => ({
-  ...loadPrefs(),
+  ...initialPrefs,
+  appliedTheme: resolveTheme(initialPrefs.theme, systemPrefersDark()),
   selectedComponents: [],
   selectedWires: [],
   viewport: { x: 80, y: 60, zoom: 1 },
@@ -177,6 +195,10 @@ export const useEditor = create<EditorState>((set, get) => ({
     } catch {
       /* storage unavailable: preferences stay in memory */
     }
+  },
+  resetPrefs() {
+    const { language, favorites, recent, recentProjects } = get();
+    get().setPrefs({ ...defaultPrefs(), language, favorites, recent, recentProjects });
   },
   select(components, wires = []) {
     set({ selectedComponents: components, selectedWires: wires });

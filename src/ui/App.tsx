@@ -17,6 +17,7 @@ import { MenuBar } from './shell/MenuBar';
 import { StatusBar } from './shell/StatusBar';
 import { Toolbar } from './shell/Toolbar';
 import { Workspace } from './workspace/Workspace';
+import { applyTheme, resolveTheme, systemPrefersDark } from './themes';
 
 type SizeKey = 'libraryWidth' | 'inspectorHeight' | 'codeWidth' | 'dockHeight';
 
@@ -57,9 +58,27 @@ function Splitter({ k, dir, invert, min, max, onCollapse }: { k: SizeKey; dir: '
 
 const CHROME_HEIGHT = 28 + 40 + 24; // menu bar + toolbar + status bar
 
+/** Follows the theme preference (and the operating system's light/dark setting for 'system'). */
+function useAppliedTheme() {
+  const pref = useEditor((s) => s.theme);
+  const [systemDark, setSystemDark] = useState(systemPrefersDark);
+  useEffect(() => {
+    if (typeof matchMedia === 'undefined') return;
+    const mq = matchMedia('(prefers-color-scheme: dark)');
+    const onChange = () => setSystemDark(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  const theme = resolveTheme(pref, systemDark);
+  useEffect(() => {
+    applyTheme(theme);
+    if (useEditor.getState().appliedTheme !== theme) useEditor.getState().set({ appliedTheme: theme });
+  }, [theme]);
+}
+
 export function App() {
   useT();
-  const theme = useEditor((s) => s.theme);
+  useAppliedTheme();
   const showLibrary = useEditor((s) => s.showLibrary);
   const showInspector = useEditor((s) => s.showInspector);
   const showCode = useEditor((s) => s.showCode);
@@ -68,10 +87,6 @@ export function App() {
   const inspectorHeight = useEditor((s) => s.inspectorHeight);
   const codeWidth = useEditor((s) => s.codeWidth);
   const dockHeight = useEditor((s) => s.dockHeight);
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-  }, [theme]);
 
   // Clamp panel sizes to the window so the canvas always keeps usable space.
   const [win, setWin] = useState({ w: window.innerWidth, h: window.innerHeight });

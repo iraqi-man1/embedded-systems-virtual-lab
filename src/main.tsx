@@ -12,8 +12,9 @@ import { t } from './i18n';
 import { packages } from './platform';
 import { useEditor } from './state/editor';
 import { App } from './ui/App';
+import { applyTheme } from './ui/themes';
 
-document.documentElement.dataset.theme = useEditor.getState().theme;
+applyTheme(useEditor.getState().appliedTheme);
 
 // Disable the WebView's default context menu outside text fields (desktop feel).
 window.addEventListener('contextmenu', (e) => {
