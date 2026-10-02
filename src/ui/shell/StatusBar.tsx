@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { GRID } from '../../core/model/component';
 import type { MessageKey } from '../../i18n';
 import { useT } from '../../i18n/react';
@@ -50,6 +51,27 @@ function BuildItem() {
   );
 }
 
+/** "Saved" for a few seconds after the project file saved itself. */
+function AutoSavedItem() {
+  const t = useT();
+  const at = useEditor((s) => s.autoSavedAt);
+  const dirty = useProject((s) => s.dirty);
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (!at) return;
+    const id = window.setTimeout(() => tick((n) => n + 1), 4000);
+    return () => window.clearTimeout(id);
+  }, [at]);
+  if (!at || dirty || Date.now() - at > 4000) return null;
+  return (
+    <Tip content={t('The project file saves itself after each change (Settings › Save automatically)')} side="top" direct>
+      <span className="item autosaved">
+        <Icon name="ok" /> {t('Saved')}
+      </span>
+    </Tip>
+  );
+}
+
 export function StatusBar() {
   const t = useT();
   const state = useSim((s) => s.state);
@@ -89,6 +111,7 @@ export function StatusBar() {
       {tool !== 'select' && <span className="item" style={{ color: 'var(--accent)' }}>{t('Probe mode — click a pin (Esc to cancel)')}</span>}
       {tool === 'select' && state !== 'stopped' && <span className="item hint">{t('Click parts to interact · Alt+drag moves them')}</span>}
       <span className="spacer" />
+      <AutoSavedItem />
       <span className="item">{t('{parts} parts · {wires} wires', { parts: comps, wires })}</span>
       <span className="item mono">
         X {(cursor.x / GRID).toFixed(1)} Y {(cursor.y / GRID).toFixed(1)} (0.1″)

@@ -382,6 +382,7 @@ input[type='checkbox'] { accent-color: var(--accent); }
 .statusbar { display: flex; align-items: center; gap: 14px; height: 24px; padding: 0 10px; background: var(--bg-header); border-top: 1px solid var(--border); font-size: var(--fs-xs); color: var(--text-2); white-space: nowrap; overflow: hidden; }
 .statusbar .item { display: flex; align-items: center; gap: 5px; }
 .statusbar .item svg { width: 12px; height: 12px; }
+.statusbar .item.autosaved { color: var(--ok); animation: fade-in 160ms ease-out; }
 .statusbar .mono { font-family: var(--font-mono); }
 .statusbar .state-running { color: var(--run); font-weight: 600; }
 .statusbar .state-paused { color: var(--warn); font-weight: 600; }

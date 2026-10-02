@@ -101,6 +101,9 @@ export function SettingsDialog() {
         <Row label={t('Start screen at launch')} description={t('Open on the start screen with recent projects, templates and examples.')}>
           <Switch checked={s.showStartScreen} label={t('Start screen at launch')} onChange={(showStartScreen) => set({ showStartScreen })} />
         </Row>
+        <Row label={t('Save automatically')} description={t('Once a project has been saved to a file, save it again by itself a moment after each change.')}>
+          <Switch checked={s.autosaveFile} label={t('Save automatically')} onChange={(autosaveFile) => set({ autosaveFile })} />
+        </Row>
         <Row label={t('Sound')} description={t('Play the tones of buzzers and speakers while simulating.')}>
           <Switch checked={s.sound} label={t('Sound')} onChange={(sound) => set({ sound })} />
         </Row>

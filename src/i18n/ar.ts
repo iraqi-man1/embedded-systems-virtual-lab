@@ -858,6 +858,10 @@ export const AR = {
   'Replace': 'استبدال',
   'The imported files replace {files} in the project.': 'الملفات المستوردة تحلّ محلّ {files} في المشروع.',
   'The project has no code to export.': 'لا توجد في المشروع شيفرة لتصديرها.',
+  'Once a project has been saved to a file, save it again by itself a moment after each change.': 'بعد حفظ المشروع في ملف مرة واحدة، يُحفظ من تلقاء نفسه بعد كل تغيير بلحظات.',
+  'Save automatically': 'الحفظ التلقائي',
+  'Saved': 'تم الحفظ',
+  'The project file saves itself after each change (Settings › Save automatically)': 'يُحفظ ملف المشروع تلقائياً بعد كل تغيير (الإعدادات › الحفظ التلقائي)',
   // ---------------------------------------------------- command descriptions
   'Save the code (.ino and its files, or main.py and its modules) to continue in the Arduino IDE or Thonny.': 'احفظ الشيفرة (‎.ino وملفاته، أو main.py ووحداته) لتكمل العمل في Arduino IDE أو Thonny.',
   'Add .ino, .h, .cpp or .py files to the project; a sketch or main.py replaces the main file.': 'أضف ملفات ‎.ino أو ‎.h أو ‎.cpp أو ‎.py إلى المشروع؛ المخطط أو main.py يحلّ محلّ الملف الرئيسي.',

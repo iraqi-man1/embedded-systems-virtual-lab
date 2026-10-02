@@ -107,6 +107,29 @@ export async function openRecent(path: string) {
   openProjectText(text, path);
 }
 
+/**
+ * Saves the project to its file without asking or announcing it (autosave).
+ * False when it has no file yet, or the save failed (the next change tries again).
+ */
+export async function saveQuietly(): Promise<boolean> {
+  const { project, filePath, dirty } = useProject.getState();
+  if (!filePath || !dirty || !isTauri) return false;
+  const text = serializeProject({ ...project, view: useEditor.getState().viewport });
+  try {
+    await storage.saveProject(text, filePath, project.meta.name);
+    // A change made while writing stays unsaved (and schedules the next save).
+    if (useProject.getState().project !== project || useProject.getState().filePath !== filePath) return false;
+    useProject.getState().markSaved(filePath);
+    storage.keepRecentCopy(filePath, text, useEditor.getState().recentProjects.map((r) => r.path));
+    useEditor.getState().set({ autoSavedAt: Date.now() });
+    void clearAutosave();
+    return true;
+  } catch (e) {
+    console.warn('Autosave to the project file failed', e);
+    return false;
+  }
+}
+
 export async function saveDocument(saveAs = false): Promise<boolean> {
   const { project, filePath } = useProject.getState();
   // Persist the current view with the project.

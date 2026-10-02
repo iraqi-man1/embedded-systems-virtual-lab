@@ -8,8 +8,8 @@ import { isTauri, launch } from '../platform';
 import { useEditor } from '../state/editor';
 import { useProject } from '../state/project';
 import { askSaveChanges, dialogOpen } from '../ui/common/Dialog';
-import { clearAutosave, offerRestore, startAutosave } from './autosave';
-import { openDroppedFile, openPath, saveDocument } from './fileOps';
+import { clearAutosave, offerRestore, startAutosave, startFileAutosave } from './autosave';
+import { openDroppedFile, openPath, saveDocument, saveQuietly } from './fileOps';
 
 export function windowTitle(name: string, dirty: boolean) {
   return `${dirty ? '● ' : ''}${t('{name} — Embedded Systems Virtual Lab', { name })}`;
@@ -110,7 +110,7 @@ export function installLifecycle(): () => void {
   // the app was launched with opens next (asking to keep a restored copy).
   void offerRestore().then(async () => {
     if (disposed) return;
-    cleanups.push(startAutosave());
+    cleanups.push(startAutosave(), startFileAutosave(saveQuietly));
     const file = await launch.takeLaunchFile().catch(() => null);
     if (file && !disposed) await openPath(file);
   });
