@@ -51,7 +51,9 @@ requires a different architecture: the AVR/RP2040 emulators are JavaScript, and 
 | Technology | Licence | Verdict | Notes |
 |---|---|---|---|
 | **avr8js** 0.21 (Wokwi) | MIT | ✅ | Cycle-accurate AVR core (ATmega328P/2560, ATtiny85) with GPIO, timers/PWM, USART, SPI, TWI, ADC, EEPROM, watchdog peripherals. Runs in a Web Worker. Used for Arduino Uno/Nano/Mega. |
-| **rp2040js** 1.4 (Wokwi) | MIT | 🔜 | RP2040 (Cortex-M0+) emulator. Fits the same `McuEmulator` interface; next board family after AVR. |
+| **rp2040js** 1.4 (Wokwi) | MIT | ✅ | RP2040 (Cortex-M0+) emulator behind the same `McuEmulator` interface; runs the Raspberry Pi Pico with MicroPython (§7b). Our adapter adds serial-flash programming (for the MicroPython file system) and a USB-CDC host that only sends when it has data. |
+| RP2040 boot ROM B1 | BSD-3-Clause (Raspberry Pi) | ✅ | Binary as published with rp2040js; bundled in `src/core/sim/mcu/rp2040/bootrom.ts` with its attribution. |
+| **uf2** 2.0 (npm) | MIT | ✅ | Decodes the UF2 firmware image into the emulated flash. |
 | **Renode** (Antmicro) | MIT | 🔜 | Full-system emulator for Cortex-M (STM32, nRF52…), RISC-V, and other platforms. Integration plan: Rust backend launches `renode --console --disable-xwt`, drives it over its monitor socket, and bridges GPIO via the Renode external-control API / socket peripherals. Requires .NET runtime bundled with Renode portable builds. |
 | QEMU (incl. Espressif fork for ESP32) | GPL-2.0 | 🔜 (separate process only) | The only practical open emulator for Xtensa ESP32. Acceptable **only** as an unmodified, separately distributed executable invoked over IPC; never linked. |
 | simavr | GPL-3.0 | ❌ | Mature AVR simulator, but GPL would contaminate the core if linked; avr8js covers the same ground under MIT. |
@@ -88,6 +90,14 @@ requires a different architecture: the AVR/RP2040 emulators are JavaScript, and 
 Verified on this machine: `pio run` with `platform = atmelavr`, `board = uno`,
 `framework = arduino` produced a valid `firmware.hex` (2 224 B flash) fully locally.
 
+## 7b. Python on microcontrollers
+
+| Technology | Licence | Verdict | Notes |
+|---|---|---|---|
+| **MicroPython** 1.27 (`RPI_PICO` build) | MIT (core); bundled third-party parts BSD-3-Clause (pico-sdk, littlefs), MIT (TinyUSB) | ✅ | The official, unmodified firmware runs on the emulated RP2040. Shipped as `public/firmware/micropython-rpi-pico.uf2` with its `LICENSE` beside it; rebuilt from the tagged sources with `tools/build-micropython.sh` (Arm GNU toolchain). The (L)GPL files listed in MicroPython's licence tree are build scripts only and are not part of the image. |
+| CircuitPython | MIT | ❌ (for now) | Similar, but MicroPython is the Pico's reference Python and what most course material uses. |
+| Python on the AVR (Uno) | — | ❌ | The ATmega328P (2 KB RAM) cannot host a Python interpreter; Arduino boards stay C++. |
+
 ## 8. Instruments / protocol decoding
 
 | Technology | Licence | Verdict | Notes |
@@ -99,6 +109,8 @@ Verified on this machine: `pio run` with `platform = atmelavr`, `board = uno`,
 
 - The application core (our code) can be released under any licence; every adopted
   in-process dependency is MIT / Apache-2.0 / ISC / BSD.
+- Firmware images run inside the emulator (MicroPython, the RP2040 boot ROM) are MIT /
+  BSD-3-Clause and ship with their licence text.
 - GPL tools (avr-gcc, QEMU) are only ever executed as separate programs.
 - Share-alike asset libraries (Fritzing, KiCad) must be distributed as separately licensed
   component packs, which the plugin/package architecture supports natively.

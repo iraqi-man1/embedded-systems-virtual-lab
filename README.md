@@ -4,52 +4,83 @@ An offline, native desktop laboratory for designing, wiring, programming, simula
 debugging embedded systems. Drag an Arduino, a breadboard, a resistor and an LED onto the
 canvas, wire them, write Blink, press **Run** — the sketch is compiled with the real AVR GCC
 toolchain and executed on a cycle-accurate ATmega328P emulator that drives the simulated
-circuit.
+circuit. Prefer Python? Put a **Raspberry Pi Pico** on the canvas: the real MicroPython
+firmware runs on an emulated RP2040, with an interactive `>>>` prompt in the Serial Monitor.
 
-Built with Tauri 2, React, TypeScript, avr8js, Wokwi Elements, Monaco Editor and PlatformIO.
+The interface is available in **English and Arabic** (right-to-left).
+
+Built with Tauri 2, React, TypeScript, avr8js, rp2040js, MicroPython, Wokwi Elements, Monaco
+Editor and PlatformIO.
 
 **[⬇ Download the Windows installer](../../releases/latest)**
 
 ![I²C LCD example running: firmware drives an LCD over the emulated TWI bus while a potentiometer is read on A0](docs/images/screenshot-dark.png)
 
-| Light theme — traffic light running on a breadboard | 23 ready-to-run example projects |
+| Python on a Raspberry Pi Pico — ADC and PWM, values in the REPL | 27 ready-to-run examples on the start screen |
 |---|---|
-| ![Traffic light example in the light theme](docs/images/screenshot-light.png) | ![Examples and templates gallery](docs/images/screenshot-examples.png) |
+| ![MicroPython potentiometer dimmer running on a simulated Pico](docs/images/screenshot-python.png) | ![Example gallery on the start screen](docs/images/screenshot-examples.png) |
+
+| Light theme — traffic light running on a breadboard | Arabic interface — the Parts Guide |
+|---|---|
+| ![Traffic light example in the light theme](docs/images/screenshot-light.png) | ![Parts Guide page for the Raspberry Pi Pico in Arabic](docs/images/screenshot-arabic.png) |
 
 ## Highlights
 
-- **Workspace**: infinite pan/zoom canvas, drag-and-drop library, rotate/flip/duplicate,
-  multi-select, align/distribute, undo/redo, copy/paste, context menus, keyboard shortcuts,
-  grid snapping, orthogonal wires with editable bends, junctions, net labels, wire colours and
-  labels, A* auto-routing.
+- **Start screen**: recent projects with live previews, new projects from templates (Uno, Nano,
+  Pico, breadboards with powered rails, digital logic), the example gallery and a Learn tab.
+- **Two languages**: English and Arabic, switchable at any time; Arabic mirrors the interface
+  right-to-left while the canvas, code and numbers stay left-to-right.
+- **Eight themes**: light, dark, midnight, Nord, Dracula, Solarized, blueprint and high
+  contrast, each with a matching code-editor theme; a Settings dialog (Ctrl+,) explains every
+  option.
+- **Help where you look**: every button, setting and part explains itself on hover; the
+  **Parts Guide** (F1) covers all 140 parts — what it is, what it is for, how to wire it step
+  by step, every pin and the matching Arduino Uno and Raspberry Pi Pico pins, example code.
+- **Workspace**: infinite canvas — pan by dragging with the right (or middle) mouse button,
+  minimap (`M`), edge scrolling while dragging, arrow keys, wheel or touchpad mode; drag-and-drop
+  library, rotate/flip/duplicate, multi-select, align/distribute, undo/redo, copy/paste,
+  context menus, grid snapping, orthogonal wires with editable bends, junctions, net labels,
+  wire colours and labels, A* auto-routing.
+- **Notes and search**: text notes, arrows and frames on the canvas (`T`, `A`, `B`); Find
+  (Ctrl+F) jumps to a part, a net or a note.
+- **Export**: the circuit as a PNG up to 768 DPI (8×) or an SVG, white, themed or transparent,
+  whole circuit or selection; Copy as Image (Ctrl+Shift+C).
 - **Fast to drive from the keyboard**: command palette (Ctrl+Shift+P), quick add a part
   (Ctrl+K or double-click the canvas), recent projects, `.evlab` file association and drag and
   drop, live build state in the status bar.
 - **Breadboards that understand connectivity**: legs dropped on holes connect automatically;
   hover a hole to see every connected hole highlighted.
-- **Component library**: 140 parts across 12 categories; 76 have simulation models (54 full,
-  22 partial), including NeoPixels, an SSD1306 OLED, MPU-6050, DS1307, IR remote/receiver,
-  keypad, rotary encoder, DC and stepper motors with L298N/A4988 drivers. Every part shows
-  whether it is *fully simulated*, *partially simulated* or *visual-only*.
+- **Component library**: 140 parts across 12 categories; 77 have simulation models (55 full,
+  22 partial), including the Raspberry Pi Pico, NeoPixels, an SSD1306 OLED, MPU-6050, DS1307,
+  IR remote/receiver, keypad, rotary encoder, DC and stepper motors with L298N/A4988 drivers.
+  Every part shows whether it is *fully simulated*, *partially simulated* or *visual-only*.
 - **Interactive simulation**: drag the obstacle in front of an ultrasonic sensor, tilt an IMU,
   move a joystick, turn an encoder, press keypad and IR-remote keys, set temperature/light/gas
   with on-canvas sliders; parts show live feedback (beams, waves, glows, readouts).
-- **Real firmware**: Monaco editor with Arduino completions and hover docs, multi-file sketches,
-  automatic library resolution, PlatformIO compilation, compiler errors as editor markers.
+- **Real firmware (Arduino C++)**: Monaco editor with Arduino completions and hover docs,
+  multi-file sketches, automatic library resolution, PlatformIO compilation, compiler errors as
+  editor markers.
+- **Python (MicroPython on the Raspberry Pi Pico)**: no compiler needed — Run copies `main.py`
+  and your modules to the board's file system and starts it; the Serial Monitor is the REPL
+  (Ctrl+C / Ctrl+D); tracebacks appear in Problems and on their line in the editor;
+  completions and hover help (English and Arabic) for `machine`, `time` and `neopixel`; GPIO,
+  PWM, ADC, I2C (incl. `SoftI2C` and `I2C.scan()`), SPI and NeoPixels drive the circuit.
 - **Simulation**: run, pause, step (1 ms / instruction), reset, stop, 0.01×–4× or max speed;
   live interaction with buttons, knobs, switches and sensors.
-- **Instruments**: serial monitor (bidirectional, timestamps, hex view, save log), serial
+- **Instruments**: serial monitor (bidirectional, UTF-8, timestamps, hex view, save log), serial
   plotter, oscilloscope with trigger and measurements, 8-channel logic analyzer with UART
   decoding and VCD export, multimeter (V / Ω / A), signal generator.
-- **Debugging**: MCU panel with pin modes, levels, voltages and PWM duty, PC/SP/SREG, R0–R31 and
-  flash/RAM use; voltage badges on wires (View › Show Voltages, `V`); Ctrl+B while running
-  flashes the new build into the board without stopping the rest of the circuit.
+- **Debugging**: MCU panel with pin modes, levels, voltages and PWM duty, PC/SP and the flags,
+  R0–R31 (AVR) or R0–R12/LR (ARM) and flash/RAM use; voltage badges on wires (View › Show
+  Voltages, `V`); Ctrl+B while running flashes the new build (or uploads the new Python files)
+  into the board without stopping the rest of the circuit.
 - **Electrical checks**: shorts, supply conflicts, unconnected required pins, floating inputs,
   undefined logic levels, pin/supply over-current, LED over-current and reverse bias.
-- **Projects**: versioned `.evlab` files with crash-recovery autosave; 23 example projects
+- **Projects**: versioned `.evlab` files with crash-recovery autosave; 27 example projects
   (Blink, button, PWM, traffic light, RGB, UART console, LDR, thermistor, transistor, MOSFET,
   HC-SR04, DHT22, servo, LCD, I²C LCD, SPI shift register, buzzer, relay, logic half adder,
-  keypad lock, encoder + NeoPixel ring, MPU-6050 + OLED spirit level…), searchable by tag.
+  keypad lock, encoder + NeoPixel ring, MPU-6050 + OLED spirit level, and four MicroPython
+  projects on the Pico), searchable by tag.
 - **Extensible**: components, behaviour models, MCU emulators and toolchains are registered,
   not hard-coded; JSON component packages load from the user's packages folder.
 
@@ -58,9 +89,29 @@ Built with Tauri 2, React, TypeScript, avr8js, Wokwi Elements, Monaco Editor and
 1. Download `EmbeddedSystemsVirtualLab_0.2.0_x64-setup.exe` (or the `.msi`) from the
    [Releases page](../../releases/latest) and run it. Windows 10/11 x64; the installer is not
    code-signed yet, so SmartScreen may ask you to confirm ("More info" → "Run anyway").
-2. On first compile the app offers to install the firmware toolchain (PlatformIO, ~300 MB,
-   needs Python 3.9+ and internet once). Afterwards everything works offline.
-3. Open **Examples** and press **F5**.
+2. The start screen opens: pick an example, a template or a recent project. Switch the
+   language (EN | ع) and the theme from its top bar.
+3. Python projects on the Raspberry Pi Pico run straight away. For Arduino projects, the first
+   compile offers to install the firmware toolchain (PlatformIO, ~300 MB, needs Python 3.9+ and
+   internet once); afterwards everything works offline.
+4. Press **F5** to run. Rest the mouse on anything to learn what it does; **F1** opens the Parts
+   Guide.
+
+### Essential shortcuts
+
+| Action | Keys |
+|---|---|
+| Pan the canvas | drag with the right mouse button (or Space + drag, middle button) |
+| Zoom / fit | mouse wheel · `F` fit · `0` 100 % · `M` minimap |
+| Add a part | Ctrl+K, or double-click the canvas |
+| Rotate / flip / delete | `R` · `H` · Del |
+| Text note / arrow / frame | `T` · `A` · `B` |
+| Find on the canvas | Ctrl+F |
+| Compile (Arduino) or upload (Python) | Ctrl+B |
+| Run / pause / stop | F5 · F6 · Shift+F5 |
+| Parts Guide | F1 |
+| Export image / copy as image | Ctrl+Shift+E · Ctrl+Shift+C |
+| Every command | Ctrl+Shift+P · `?` lists all shortcuts |
 
 ## Development
 
@@ -98,7 +149,7 @@ Build the installers (`src-tauri/target/release/bundle/{nsis,msi}`):
 npm run app:build
 ```
 
-Tests (unit, simulation, examples):
+Tests (unit, simulation, examples — including MicroPython running on the emulated Pico):
 
 ```bash
 npm test
@@ -116,6 +167,23 @@ Rust backend tests (the ignored one compiles firmware with `.toolchain/`):
 cargo test --manifest-path src-tauri/Cargo.toml -- --include-ignored
 ```
 
+Floating-UI check (menus, popovers, dialogs stay inside the window, in both themes and in
+Arabic), against the running dev server:
+
+```bash
+node tools/ui-floating-check.mjs
+```
+
+The MicroPython firmware for the Pico is committed in `public/firmware/`. To rebuild it from
+the official sources (Linux or WSL, Arm GNU toolchain):
+
+```bash
+tools/build-micropython.sh
+```
+
+Interface text: English strings are the keys; every new string needs its Arabic translation in
+`src/i18n/ar.ts` (the type checker reports missing ones).
+
 ## Documentation
 
 - [Technology research & licences](docs/01-technology-research.md)
@@ -123,6 +191,7 @@ cargo test --manifest-path src-tauri/Cargo.toml -- --include-ignored
 - [Component packages (extending the library)](docs/03-component-packages.md)
 - [Simulation fidelity & limitations](docs/04-simulation-fidelity.md)
 - [UI regression checklist (floating UI, layering)](docs/05-ui-regression-checklist.md)
+- [Roadmap](docs/06-roadmap.md)
 - Architecture decisions: [desktop shell](docs/adr/ADR-001-desktop-shell.md),
   [MCU emulation](docs/adr/ADR-002-mcu-emulation.md),
   [real-time solver](docs/adr/ADR-003-realtime-circuit-solver.md),
@@ -134,12 +203,18 @@ cargo test --manifest-path src-tauri/Cargo.toml -- --include-ignored
 src/core/        Circuit model, component model, registry, netlist, ERC, project format,
                  simulation kernel (solver, engine, MCU emulators, behaviour models),
                  instruments (decoders), toolchain types        — no UI code
-src/components/  Built-in component package (definitions, generated SVG visuals, breadboards)
-src/examples/    Example projects (built from real geometry)
+src/components/  Built-in component package (definitions, generated SVG visuals, breadboards,
+                 the Parts Guide content in English and Arabic)
+src/examples/    Example projects and new-project templates (built from real geometry)
+src/i18n/        Interface languages: English keys, Arabic catalogue, right-to-left switch
 src/state/       Stores: project + history, editor, simulation client (Web Worker)
-src/ui/          Desktop UI: workspace canvas, library, inspector, Monaco editor, instruments
+src/ui/          Desktop UI: start screen, workspace canvas, library, inspector, Monaco editor
+                 (Arduino and MicroPython help), instruments, Parts Guide, image export
 src/platform/    Tauri / browser service adapters
-src-tauri/       Rust backend: PlatformIO toolchain, project IO, package discovery
-tests/           Vitest suites driving real compiled firmware (fixtures/*.ino → *.hex)
-tools/           Dev-only Vite toolchain shim, Wokwi geometry measurement, fixture builder
+public/firmware/ MicroPython for the simulated Raspberry Pi Pico (with its licence)
+src-tauri/       Rust backend: PlatformIO toolchain, project and image IO, package discovery
+tests/           Vitest suites driving real compiled firmware (fixtures/*.ino → *.hex) and
+                 MicroPython on the emulated RP2040
+tools/           Dev-only Vite toolchain shim, Wokwi geometry measurement, fixture builder,
+                 MicroPython build script, floating-UI check
 ```

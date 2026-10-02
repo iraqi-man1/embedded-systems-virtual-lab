@@ -19,6 +19,7 @@
 ```
 ┌───────────────────────────── Desktop UI (React) ─────────────────────────────┐
 │ Library │ Workspace canvas │ Code editor (Monaco) │ Inspector │ Instruments   │
+│ Start screen │ Parts guide │ Settings │ Export   ·   i18n (English / Arabic)  │
 │                 state/ (zustand stores: document+history, editor, sim, ui)   │
 └───────▲──────────────────────────▲───────────────────────────▲───────────────┘
         │ ComponentRegistry        │ SimulationClient           │ Platform services
@@ -28,11 +29,13 @@
 │ core/circuit   │  │  analog/  MNA solver       │  │  storage   (Tauri | web)  │
 │  geometry      │  │  mcu/     McuEmulator API  │  │  plugins   (Tauri)        │
 │  netlist       │  │    avr/   avr8js adapter   │  └───────────▲──────────────┘
-│  erc (static)  │  │  models/  behaviour models │              │ Tauri IPC
-│ core/project   │  │ core/instruments (decoders)│  ┌───────────┴──────────────┐
+│  erc (static)  │  │    rp2040/ rp2040js +      │              │
+│ core/project   │  │      MicroPython host      │              │
+│                │  │  models/  behaviour models │              │ Tauri IPC
+│                │  │ core/instruments (decoders)│  ┌───────────┴──────────────┐
 └────────────────┘  └────────────────────────────┘  │ src-tauri (Rust)          │
                                                     │  toolchain: PlatformIO    │
-  components/  ← built-in component package         │  project file IO          │
+  components/  ← built-in component package         │  project / image file IO  │
   examples/    ← example projects (data)            │  plugin directory scan    │
                                                     │  (future) ngspice, Renode │
                                                     └───────────────────────────┘
@@ -42,12 +45,13 @@
 |---|---|---|
 | Circuit Model | `src/core/model/circuit.ts`, `src/core/circuit/*` | Document (instances, wires, junctions), world geometry of pins, netlist (union-find incl. breadboard internals & pin-in-socket insertion), static ERC. |
 | Component Model | `src/core/model/component.ts`, `src/core/registry/*` | `ComponentDefinition` schema, `ComponentPackage`, registry with search/categories. |
-| MCU Emulator | `src/core/sim/mcu/*` | `McuEmulator` interface; AVR implementation over avr8js. RP2040 (rp2040js) and Renode bridges plug in here. |
+| MCU Emulator | `src/core/sim/mcu/*` | `McuEmulator` interface; AVR over avr8js; RP2040 over rp2040js (serial-flash emulation, USB host, MicroPython file upload). Renode bridges would plug in here. |
 | Analog Simulation | `src/core/sim/analog/*` | Real-time quasi-static MNA solver (islands, PWL diodes). ngspice backend (offline analyses) planned behind `AnalysisBackend`. |
 | Firmware Toolchain | `src/core/toolchain/*`, `src-tauri/src/toolchain.rs` | `FirmwareToolchain` interface; PlatformIO implementation in Rust; diagnostics parsing. |
 | Instruments | `src/core/instruments/*`, `src/ui/instruments/*` | Capture buffers (serial, logic, analog), decoders, renderers. Probes reference pins; the engine resolves them to nets. |
 | Project Storage | `src/core/project/*`, `src/platform/storage.ts` | Versioned `.evlab` JSON format, migrations, Tauri FS / browser fallback. |
-| Desktop UI | `src/ui/*`, `src/state/*` | Panels, canvas, editor, theming, shortcuts. |
+| Desktop UI | `src/ui/*`, `src/state/*` | Panels, canvas, editor, theming, shortcuts; start screen (`ui/home`), parts guide (`ui/guide`, content in `components/builtin/guide`), image export (`ui/export`). |
+| Languages | `src/i18n/*` | `t(key)` with the English text as key and a typed Arabic catalogue (a missing translation is a compile error); `tr()` for text from data; `<html dir>` switches the layout to right-to-left. |
 
 ## Key data structures
 
@@ -82,6 +86,18 @@
   diagnostics back to the UI. The UI applies visual state straight to the element instances,
   bypassing React reconciliation for speed.
 
+## Interpreter boards (MicroPython)
+
+A board whose `mcu.runtime` is set (the Raspberry Pi Pico) runs an interpreter instead of a
+compiled sketch. `state/sim.ts` fetches the interpreter image named by the definition
+(`public/firmware/*.uf2`, bundled with the app) once and passes it with the project's `.py`
+files as `SimSetup.program`; `Rp2040Emulator.loadProgram` writes the UF2 into the emulated
+flash and boots it, and `MicroPythonHost` — playing the computer on the other end of the USB
+cable — enters the raw REPL, writes the files to the board's file system and soft-resets, so
+`main.py` runs as on a real board. The project's language follows its target board
+(`core/project/firmware.ts`): `sketch.ino` + C/C++ files are compiled for AVR boards, `main.py`
++ modules are uploaded to the Pico; a project can keep both.
+
 ## Extensibility
 
 - **Component packages**: `ComponentPackage { id, name, version, components[], models? }`.
@@ -91,7 +107,7 @@
   core.
 - **Model registry** in the worker: models are looked up by id; packages with code models
   ship an ES module registered in the worker (planned: sandboxed dynamic import).
-- **MCU emulators** register by core family (`avr`, future `rp2040`, `renode`).
+- **MCU emulators** register by core family (`avr`, `rp2040`; future `renode`).
 - **Toolchains** register by language/board family; PlatformIO covers most boards.
 - **Instruments** are panels consuming generic capture streams; decoders are pure functions.
 

@@ -1,19 +1,22 @@
 **Requirements:** Windows 10/11 x64 with Microsoft Edge WebView2 (preinstalled on Windows 11; the installer fetches it if missing). The installers are **not code-signed yet**. If Windows SmartScreen warns, choose **More info → Run anyway**.
 
-**Compiling firmware:** on the first compile the app offers to install its toolchain (PlatformIO + AVR GCC, private to the app). This needs **Python 3.9+** on the PATH and an internet connection **once**; after that, compiling and simulating work offline.
+**Compiling Arduino code:** on the first compile the app offers to install its toolchain (PlatformIO + AVR GCC, private to the app). This needs **Python 3.9+** on the PATH and an internet connection **once**; after that, compiling and simulating work offline. **Python on the Raspberry Pi Pico needs nothing extra** — MicroPython ships with the app.
 
 ## What's new
 
-- **Your work is safe:** crash-recovery autosave, Save / Don't save / Cancel when closing, F5 and Ctrl+R no longer reload the app, and the window title shows unsaved changes.
-- **Interactive simulation:** drag the obstacle in front of an HC-SR04, tilt an IMU, move a joystick, turn knobs and encoders, press keypad and IR-remote keys, and set temperature, light and gas with on-canvas sliders; parts show live feedback.
-- **76 simulated parts** (54 full, 22 partial). New: 4×4 keypad, KY-040 encoder, SSD1306 OLED, MPU-6050, DS1307, IR remote and receiver, NeoPixels (strip, ring, matrix), DC motor with L298N, steppers with A4988 and ULN2003.
-- **Faster to work with:** a wider canvas (Properties under the library), command palette (Ctrl+Shift+P), quick add (Ctrl+K or double-click the canvas), recent projects, `.evlab` files open with a double-click or by dropping them on the window, a drop preview with the breadboard holes highlighted, re-attachable wire ends, and editable wire colours (keys 1–9).
-- **Debugging:** Ctrl+B while running flashes the new build into the board without stopping the circuit; an MCU panel with pin states, PWM duty, registers and memory use; voltage badges on wires (V); serial monitor timestamps, hex view and log saving.
-- **23 example projects**, searchable by tag, including a keypad lock, an encoder-driven NeoPixel ring and an MPU-6050 + OLED spirit level.
+- **Python:** program a simulated **Raspberry Pi Pico** in MicroPython — the real firmware runs on an RP2040 emulator. Run copies your `.py` files to the board, the Serial Monitor is an interactive `>>>` REPL (Ctrl+C / Ctrl+D), errors appear in Problems and on their line in the editor, and the editor completes and explains `machine`, `time` and `neopixel`. Four Pico examples and a Pico template.
+- **Start screen:** recent projects with live previews, new projects from templates, the example gallery and a Learn tab.
+- **عربي / English:** the whole interface in Arabic (right-to-left) or English, switchable at any time.
+- **Eight themes** (light, dark, midnight, Nord, Dracula, Solarized, blueprint, high contrast) and a Settings dialog.
+- **Help where you look:** hover a button, a setting or a part for a short explanation; the **Parts Guide** (F1) explains every part — what it is for, how to wire it step by step, every pin, and which Uno or Pico pin to use.
+- **Canvas navigation:** pan by dragging with the right mouse button, a minimap (M), scrolling at the edges while dragging, arrow keys, and a scroll mode for the mouse wheel that suits touchpads.
+- **Notes on the canvas:** text (T), arrows (A) and frames (B), saved with the project; **Find** (Ctrl+F) jumps to a part, a net or a note.
+- **Export:** save the circuit as a PNG up to 768 DPI or as an SVG, or copy it as an image (Ctrl+Shift+C) to paste into a report.
+- **77 simulated parts** (55 full, 22 partial) and **27 example projects**.
 
 ## Known limitations
 
-- ESP32, ESP8266, RP2040/Pico, STM32 and RISC-V boards are visual-only for now.
+- ESP32, ESP8266, STM32 and RISC-V boards are visual-only for now; the Pico runs MicroPython only (no Arduino C++ yet).
 - Capacitors, inductors and 555 timers are not simulated in real time.
 - Hardware UART/SPI/I²C pins are simulated at protocol level, so the logic analyzer cannot see them.
 
