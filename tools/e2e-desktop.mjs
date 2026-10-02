@@ -1,15 +1,16 @@
 // Drives the desktop application through the flows that once left the window
 // empty: the parts guide and every way back from it (its Back button, Esc,
-// Alt+←, the mouse's Back button), the start screen and New project, in
-// English and Arabic. After each step the window must show the expected page
-// (checked in the page and on a screenshot), and at the end no problem may be
-// recorded in Help › Report a Problem. Screenshots go to .toolchain/e2e/.
+// Alt+←, the mouse's Back button), the start screen, New project and the
+// floating code editor, in English and Arabic. After each step the window
+// must show the expected page (checked in the page and on a screenshot), and
+// at the end no problem may be recorded in Help › Report a Problem.
+// Screenshots go to .toolchain/e2e/.
 //
 //   node tools/e2e-desktop.mjs --exe src-tauri/target/release/evlab.exe   (Windows: the real app and its WebView2)
 //   node tools/e2e-desktop.mjs --url http://localhost:1420/              (development: any Chromium)
 //
 // Needs playwright-core (or playwright); --url also needs a Chromium build.
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
@@ -57,6 +58,26 @@ let browser;
 let page;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/** Windows: what is on the screen and which WebView2 is installed, when the app cannot be reached. */
+function windowsDiagnostics() {
+  const ps = (script) => {
+    try {
+      return execFileSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8', timeout: 30000 }).trim();
+    } catch (e) {
+      return `(failed: ${e.message.split('\n')[0]})`;
+    }
+  };
+  console.log('WebView2 runtime:', ps(`(Get-ItemProperty 'HKLM:\\SOFTWARE\\WOW6432Node\\Microsoft\\EdgeUpdate\\Clients\\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}' -ErrorAction SilentlyContinue).pv`));
+  console.log('Processes:', ps("Get-Process | Where-Object { $_.ProcessName -match 'evlab|msedgewebview2|WerFault' } | ForEach-Object { $_.ProcessName + ' ' + $_.Id + ' ' + $_.MainWindowTitle } | Out-String"));
+  const shot = join(out, 'desktop.png').replace(/\//g, '\\');
+  console.log(
+    'Desktop screenshot:',
+    ps(
+      `Add-Type -AssemblyName System.Windows.Forms,System.Drawing; $b=[System.Windows.Forms.SystemInformation]::VirtualScreen; $bmp=New-Object System.Drawing.Bitmap $b.Width,$b.Height; $g=[System.Drawing.Graphics]::FromImage($bmp); $g.CopyFromScreen($b.Left,$b.Top,0,0,$bmp.Size); $bmp.Save('${shot}'); "$($b.Width)x$($b.Height) saved"`,
+    ),
+  );
+}
+
 if (exe) {
   const port = 9333;
   app = spawn(resolve(exe), [], {
@@ -72,7 +93,8 @@ if (exe) {
     if (!ready) await sleep(500);
   }
   if (!ready) {
-    console.error('The application did not open its WebView2 debugging port.');
+    console.error(`The application did not open its WebView2 debugging port (still running: ${app.exitCode === null}).`);
+    windowsDiagnostics();
     app.kill();
     process.exit(1);
   }
@@ -85,7 +107,8 @@ if (exe) {
     if (!page) await sleep(500);
   }
   if (!page) {
-    console.error('No application page found.');
+    console.error('No application page found:', browser.contexts().flatMap((c) => c.pages()).map((p) => p.url()));
+    windowsDiagnostics();
     app.kill();
     process.exit(1);
   }
@@ -198,6 +221,41 @@ async function browseParts(step) {
   return showing('guide', `${step}: a part page`);
 }
 
+/** The code editor: detached with its button, moved by its tab bar, then dragged back to its place. */
+async function floatingEditor(step) {
+  await click('.code-bar-btn', `${step}: detach`);
+  await sleep(300);
+  const floating = await page.evaluate(() => {
+    const slot = document.querySelector('.code-slot.floating');
+    if (!slot) return 'not floating';
+    const r = slot.getBoundingClientRect();
+    const top = document.elementFromPoint(r.left + r.width / 2, r.top + 12);
+    if (!slot.contains(top)) return `covered by ${top?.className}`;
+    if (r.left < 0 || r.top < 0 || r.right > innerWidth + 0.5 || r.bottom > innerHeight + 0.5) return 'outside the window';
+    return document.querySelector('.code-slot .monaco-editor') ? '' : 'the editor is missing';
+  });
+  check(`${step}: the editor floats on top, inside the window`, !floating, floating);
+  const bar = await page.locator('.code-tabs-fill').boundingBox();
+  const [w, h, rtl] = await page.evaluate(() => [innerWidth, innerHeight, document.documentElement.dir === 'rtl']);
+  await page.mouse.move(bar.x + 8, bar.y + 8);
+  await page.mouse.down();
+  await page.mouse.move(w / 2, h / 2, { steps: 6 });
+  await page.mouse.up();
+  await showing('editor', `${step}: moved`);
+  // Back to its place: drag the bar to the edge (left in Arabic).
+  const bar2 = await page.locator('.code-tabs-fill').boundingBox();
+  const area = await page.locator('.center-top').boundingBox();
+  await page.mouse.move(bar2.x + 8, bar2.y + 8);
+  await page.mouse.down();
+  await page.mouse.move(rtl ? area.x + 10 : area.x + area.width - 10, area.y + area.height / 2, { steps: 8 });
+  const preview = await page.locator('.dock-preview').count();
+  await page.mouse.up();
+  await sleep(300);
+  const docked = await page.evaluate(() => !!document.querySelector('.code-slot:not(.floating) .monaco-editor'));
+  check(`${step}: dragged back, it docks in its place`, preview === 1 && docked, `preview ${preview}, docked ${docked}`);
+  await showing('editor', `${step}: docked`);
+}
+
 // ------------------------------------------------------------------ steps
 try {
   await page.waitForSelector('.home', { timeout: 30000 });
@@ -235,6 +293,8 @@ try {
   await mouseBack();
   await showing('editor', 'mouse Back button in the editor');
 
+  await floatingEditor('code editor');
+
   // Add to canvas from a part page.
   await page.keyboard.press('F1');
   await browseParts('add to canvas');
@@ -251,6 +311,7 @@ try {
   await browseParts('arabic guide');
   await click('.guide .home-top .btn', 'guide back');
   await showing('editor', 'arabic: back from the guide');
+  await floatingEditor('arabic code editor');
 } catch (e) {
   check('steps ran to the end', false, e.message.split('\n')[0]);
   await showing('editor', 'after the failure').catch(() => undefined);
