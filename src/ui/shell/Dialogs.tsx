@@ -126,6 +126,8 @@ function ShortcutsDialog() {
     [t('Command palette'), 'Ctrl+Shift+P'],
     [t('Add a part'), t('Ctrl+K or double-click the canvas')],
     [t('Search the library'), '/'],
+    [t('Find in the circuit'), 'Ctrl+F'],
+    [t('Text note / arrow / frame'), 'T / A / B'],
     [t('New / Open / Save'), 'Ctrl+N / Ctrl+O / Ctrl+S'],
     [t('Undo / Redo'), 'Ctrl+Z / Ctrl+Y'],
     [t('Copy / Cut / Paste / Duplicate'), 'Ctrl+C / X / V / D'],

@@ -43,7 +43,7 @@ export function sortedCategories() {
 }
 
 /** Library search, also by the Arabic names and uses from the parts guide. */
-function searchParts(query: string): ComponentDefinition[] {
+export function searchParts(query: string): ComponentDefinition[] {
   const found = registry.search(query);
   if (!/[\u0600-\u06ff]/.test(query)) return found;
   const words = query.trim().split(/\s+/);

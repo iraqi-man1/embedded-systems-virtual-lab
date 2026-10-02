@@ -499,3 +499,18 @@ export function noteToFront(id: string, front = true) {
     else list.unshift(a);
   });
 }
+
+/**
+ * Brings a world rectangle into view (Find): glides to it at the current
+ * zoom when it fits, otherwise zooms out just enough to show it.
+ */
+export function revealRect(r: { x: number; y: number; width: number; height: number }) {
+  const { w, h } = canvasSize();
+  const { zoom } = ed().viewport;
+  const pad = 80;
+  const fit = Math.min((w - pad * 2) / Math.max(1, r.width), (h - pad * 2) / Math.max(1, r.height));
+  const z = Math.max(0.15, Math.min(zoom, fit, 2));
+  const cx = r.x + r.width / 2;
+  const cy = r.y + r.height / 2;
+  animateViewport({ zoom: z, x: w / 2 - cx * z, y: h / 2 - cy * z }, 260);
+}

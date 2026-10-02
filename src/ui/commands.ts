@@ -190,6 +190,7 @@ export const commands: Record<string, Command> = {
   probeScope: cmd('probeScope', 'Probe with Oscilloscope', 'Click a pin to show its voltage over time on the oscilloscope.', { icon: 'waves', run: () => ed().set({ tool: 'probe-scope' }) }),
   toolchain: cmd('toolchain', 'Firmware Toolchain…', 'Install or check the compiler used to build Arduino code.', { icon: 'wrench', run: () => ed().set({ dialog: 'toolchain' }) }),
   palette: cmd('palette', 'Command Palette…', 'Search and run any command by name.', { icon: 'command', shortcut: 'Ctrl+Shift+P', run: () => ed().set({ palette: { mode: 'commands' } }) }),
+  find: cmd('find', 'Find on Canvas…', 'Find a part, net, wire label or note by name and jump to it.', { icon: 'search', shortcut: 'Ctrl+F', run: () => ed().set({ palette: { mode: 'find' } }) }),
   quickAdd: cmd('quickAdd', 'Add a Part…', 'Type a part name and add it to the canvas.', { icon: 'plus', shortcut: 'Ctrl+K', run: () => ed().set({ palette: { mode: 'add' } }) }),
   guide: cmd('guide', 'Parts Guide', 'What each part is, what it is for and how to connect it.', { icon: 'book', shortcut: 'F1', run: () => openGuideForContext() }),
   shortcuts: cmd('shortcuts', 'Keyboard Shortcuts', 'Every mouse gesture and keyboard shortcut.', { icon: 'keyboard', shortcut: '?', run: () => ed().set({ dialog: 'shortcuts' }) }),
@@ -251,6 +252,8 @@ export function installShortcuts(): () => void {
     if (ctrl && k.toLowerCase() === 'b') return run('compile');
     if (ctrl && e.shiftKey && k.toLowerCase() === 'p') return run('palette');
     if (ctrl && !e.shiftKey && k.toLowerCase() === 'k') return run('quickAdd');
+    // Ctrl+F finds in the circuit; in the code editor it stays the editor's own find.
+    if (ctrl && !e.shiftKey && k.toLowerCase() === 'f' && !isTyping(e)) return run('find');
     if (ctrl && (e.code === 'Backquote' || k === '`')) return run('focusCanvas');
     if (ctrl && k === ',') return run('settings');
     if (k === 'F5') return run(ctrl ? 'reset' : e.shiftKey ? 'stop' : 'run');

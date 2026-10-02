@@ -165,7 +165,7 @@ interface EditorState extends Prefs {
   dialog: null | 'examples' | 'toolchain' | 'shortcuts' | 'about' | 'project' | 'settings';
   toasts: Toast[];
   /** Open command palette: run commands, or add a part (optionally at a canvas point). */
-  palette: null | { mode: 'commands' | 'add'; at?: { x: number; y: number } };
+  palette: null | { mode: 'commands' | 'add' | 'find'; at?: { x: number; y: number } };
   /** Component type being dragged from the library (drop preview). */
   dragType: string | null;
   /** Line to reveal in the code editor (set by the Problems panel). */
