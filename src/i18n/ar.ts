@@ -954,6 +954,8 @@ export const AR = {
   'Look for a wire from + straight to −, or a part with nothing limiting its current.': 'ابحث عن سلك من + إلى − مباشرة، أو قطعة لا يحدّ تيارها شيء.',
   '{label}: {a} A forward current exceeds its {max} A rating.': '{label}: تيار أمامي {a} A يتجاوز حدّه المقنَّن {max} A.',
   'Add a resistor in series, or use a diode rated for more current.': 'أضف مقاومة على التوالي، أو استخدم ثنائياً مقنَّناً لتيار أكبر.',
+  'Arduino sketch skeleton': 'هيكل مخطط Arduino',
+  'Non-blocking timer using millis()': 'مؤقت لا يوقف البرنامج باستخدام millis()‎',
   // ---------------------------------------------------- command descriptions
   'Earlier versions of the project, kept each time it was run or saved; bring one back.': 'نسخ سابقة من المشروع تُحفظ في كل تشغيل أو حفظ؛ استعد أيّاً منها.',
   'Make menus, panels, text and the code editor larger (for a projector or a large screen).': 'كبّر القوائم واللوحات والنصوص ومحرر الشيفرة (لجهاز العرض أو الشاشة الكبيرة).',
