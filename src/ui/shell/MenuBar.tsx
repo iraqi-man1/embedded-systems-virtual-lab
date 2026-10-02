@@ -59,7 +59,7 @@ function RecentItems() {
 
 const MENUS: { name: MessageKey; items: Entry[] }[] = [
   { name: 'File', items: ['home', '-', 'new', 'open', { sub: 'Open Recent', icon: 'history', render: () => <RecentItems /> }, '-', 'save', 'saveAs', '-', 'exportImage', 'copyImage', '-', 'examples', '-', 'settings'] },
-  { name: 'Edit', items: ['undo', 'redo', '-', 'cut', 'copy', 'paste', 'duplicate', 'delete', '-', 'selectAll', 'find', '-', 'rotate', 'rotateCcw', 'flip', '-', 'quickAdd', 'palette'] },
+  { name: 'Edit', items: ['undo', 'redo', '-', 'cut', 'copy', 'paste', 'duplicate', 'delete', '-', 'selectAll', 'find', '-', 'rotate', 'rotateCcw', 'flip', 'lock', '-', 'quickAdd', 'palette'] },
   {
     name: 'Arrange',
     items: [

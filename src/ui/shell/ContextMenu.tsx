@@ -8,7 +8,7 @@ import { commands } from '../commands';
 import { MenuItem, MenuLabel, MenuSeparator, MenuSwatches, SubMenu } from '../common/Menu';
 import { openGuide } from '../guide/open';
 import { assignProbe } from '../instruments/probes';
-import { autoRouteWires, bringToFront, clearWirePoints, editTextNote, noteToFront, paste, setNetWireColor, setWireColor } from '../workspace/actions';
+import { autoRouteWires, bringToFront, clearWirePoints, editTextNote, noteToFront, paste, setNetWireColor, setWireColor, toggleLockSelection } from '../workspace/actions';
 import { newText } from '../../core/circuit/annotations';
 import { nanoid } from 'nanoid';
 
@@ -44,6 +44,12 @@ export function CanvasMenuItems() {
         <MenuItem label={t('Bring to Front')} icon="front" onSelect={() => inst && bringToFront(inst.id, true)} />
         <MenuItem label={t('Send to Back')} icon="back" onSelect={() => inst && bringToFront(inst.id, false)} />
         <MenuSeparator />
+        <MenuItem
+          label={inst?.locked ? t('Unlock') : t('Lock in place')}
+          icon={inst?.locked ? 'unlock' : 'lock'}
+          shortcut="Ctrl+L"
+          onSelect={toggleLockSelection}
+        />
         <MenuItem label={t('Properties…')} icon="settings" onSelect={() => useEditor.getState().setPrefs({ showInspector: true })} />
         <MenuItem label={t('Open in Parts Guide')} icon="book" shortcut="F1" onSelect={() => inst && openGuide(inst.type)} />
         <MenuSeparator />

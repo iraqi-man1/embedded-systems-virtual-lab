@@ -24,6 +24,7 @@ import {
   zoomToSelection,
   cutSelection,
   deleteSelection,
+  toggleLockSelection,
   duplicateSelection,
   fitView,
   flipSelection,
@@ -146,6 +147,12 @@ export const commands: Record<string, Command> = {
   paste: cmd('paste', 'Paste', 'Paste the copied parts.', { icon: 'paste', shortcut: 'Ctrl+V', run: () => paste(), enabled: () => !!ed().clipboard }),
   duplicate: cmd('duplicate', 'Duplicate', 'Make a copy of the selected parts next to them.', { icon: 'duplicate', shortcut: 'Ctrl+D', run: duplicateSelection, enabled: oneSelected }),
   delete: cmd('delete', 'Delete', 'Remove the selected parts and wires.', { icon: 'trash', shortcut: 'Del', run: deleteSelection, enabled: hasSelection }),
+  lock: cmd('lock', 'Lock / Unlock', 'Locked parts stay in place: they are not moved, rotated or deleted by accident (a breadboard, a board).', {
+    icon: 'lock',
+    shortcut: 'Ctrl+L',
+    run: toggleLockSelection,
+    enabled: () => ed().selectedComponents.length > 0,
+  }),
   selectAll: cmd('selectAll', 'Select All', null, { shortcut: 'Ctrl+A', run: selectAll }),
   rotate: cmd('rotate', 'Rotate 90° CW', 'Turn the selected parts a quarter turn clockwise.', { icon: 'rotate', shortcut: 'R', run: () => rotateSelection(90), enabled: partSelected }),
   rotateCcw: cmd('rotateCcw', 'Rotate 90° CCW', 'Turn the selected parts a quarter turn counter-clockwise.', { icon: 'rotate-ccw', shortcut: 'Shift+R', run: () => rotateSelection(-90), enabled: partSelected }),
@@ -296,6 +303,8 @@ export function installShortcuts(): () => void {
     if (k === 'F11') return run('stepInstr');
     // Browser shortcuts that would reload, navigate away, print or open browser UI
     // over the application (the packaged app also disables them in WebView2).
+    // Ctrl+L locks parts (outside text fields, where it keeps its own meaning).
+    if (ctrl && !e.shiftKey && k.toLowerCase() === 'l' && !isTyping(e) && !inMenu(e)) return run('lock');
     if (isBrowserShortcut(e)) return e.preventDefault();
     if (isTyping(e) || inMenu(e)) return;
     if (ctrl && !e.shiftKey && k.toLowerCase() === 'z') return run('undo');

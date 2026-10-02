@@ -12,7 +12,7 @@ import { coalescedEdit, useProject } from '../../state/project';
 import { sendInput, useSim } from '../../state/sim';
 import { Icon } from '../common/Icon';
 import { Tip } from '../common/Tooltip';
-import { clearWirePoints, deleteSelection, flipSelection, rotateSelection, setNetWireColor, setWireColor, autoRouteWires } from '../workspace/actions';
+import { clearWirePoints, deleteSelection, flipSelection, rotateSelection, setNetWireColor, setWireColor, autoRouteWires, toggleLockSelection } from '../workspace/actions';
 import { pinLabel } from '../instruments/probes';
 import { openGuide } from '../guide/open';
 import { NoteInspector } from './NoteInspector';
@@ -165,17 +165,22 @@ function ComponentInspector({ inst, def }: { inst: ComponentInstance; def: Compo
         ))}
         <div className="btn-row" style={{ marginTop: 8 }}>
           <Tip content={t('Rotate 90° clockwise')} shortcut="R" direct>
-            <button className="btn" onClick={() => rotateSelection(90)}>
+            <button className="btn" onClick={() => rotateSelection(90)} disabled={inst.locked}>
               <Icon name="rotate" /> {t('Rotate')}
             </button>
           </Tip>
           <Tip content={t('Flip horizontally')} shortcut="H" direct>
-            <button className="btn" onClick={flipSelection}>
+            <button className="btn" onClick={flipSelection} disabled={inst.locked}>
               <Icon name="flip" /> {t('Flip')}
             </button>
           </Tip>
+          <Tip content={inst.locked ? t('Locked: it stays in place (Ctrl+L unlocks)') : t('Lock in place (Ctrl+L)')} direct>
+            <button className={`btn${inst.locked ? ' active' : ''}`} onClick={toggleLockSelection} aria-pressed={!!inst.locked} aria-label={inst.locked ? t('Unlock') : t('Lock in place')}>
+              <Icon name={inst.locked ? 'lock' : 'unlock'} />
+            </button>
+          </Tip>
           <Tip content={t('Delete')} shortcut="Del" direct>
-            <button className="btn danger" onClick={deleteSelection} aria-label={t('Delete')}>
+            <button className="btn danger" onClick={deleteSelection} aria-label={t('Delete')} disabled={inst.locked}>
               <Icon name="trash" />
             </button>
           </Tip>
