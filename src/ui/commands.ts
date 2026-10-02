@@ -26,6 +26,7 @@ import {
   fitView,
   flipSelection,
   nudgeSelection,
+  panBy,
   paste,
   rotateSelection,
   selectAll,
@@ -136,8 +137,9 @@ export const commands: Record<string, Command> = {
   zoomIn: cmd('zoomIn', 'Zoom In', null, { icon: 'zoom-in', shortcut: '+', run: () => zoomBy(1.2) }),
   zoomOut: cmd('zoomOut', 'Zoom Out', null, { icon: 'zoom-out', shortcut: '−', run: () => zoomBy(1 / 1.2) }),
   zoomReset: cmd('zoomReset', 'Actual Size (100%)', null, { shortcut: '0', run: () => setZoom(1) }),
-  fit: cmd('fit', 'Fit to Window', 'Zoom so the whole circuit fits in the canvas.', { icon: 'fit', shortcut: 'F', run: fitView }),
+  fit: cmd('fit', 'Fit to Window', 'Zoom so the whole circuit fits in the canvas.', { icon: 'fit', shortcut: 'F', run: () => fitView() }),
   zoomSelection: cmd('zoomSelection', 'Zoom to Selection', null, { icon: 'zoom-in', shortcut: 'Shift+F', run: zoomToSelection }),
+  minimap: cmd('minimap', 'Show Minimap', 'An overview of the whole circuit: click or drag in it to move around.', { icon: 'map', shortcut: 'M', run: () => ed().setPrefs({ showMinimap: !ed().showMinimap }) }),
   grid: cmd('grid', 'Show Grid', 'Dots every 0.1 inch (the breadboard pitch) on the canvas.', { icon: 'grid', shortcut: 'G', run: () => ed().setPrefs({ showGrid: !ed().showGrid }) }),
   snap: cmd('snap', 'Snap to Grid', 'Parts and wire bends land on the 0.1 inch grid.', { icon: 'magnet', run: () => ed().setPrefs({ snap: !ed().snap }) }),
   sound: cmd('sound', 'Sound (buzzers)', 'Play the tones of buzzers and speakers while simulating.', { run: () => ed().setPrefs({ sound: !ed().sound }) }),
@@ -281,6 +283,9 @@ export function installShortcuts(): () => void {
       case 'g':
       case 'G':
         return run('grid');
+      case 'm':
+      case 'M':
+        return run('minimap');
       case 'v':
       case 'V':
         return run('voltages');
@@ -319,7 +324,12 @@ export function installShortcuts(): () => void {
       case 'ArrowRight':
       case 'ArrowUp':
       case 'ArrowDown': {
-        if (!editor.selectedComponents.length) return;
+        if (!editor.selectedComponents.length) {
+          // Nothing selected: the arrows move the view (faster with Shift).
+          const d = e.shiftKey ? 240 : 48;
+          panBy(k === 'ArrowLeft' ? d : k === 'ArrowRight' ? -d : 0, k === 'ArrowUp' ? d : k === 'ArrowDown' ? -d : 0);
+          return e.preventDefault();
+        }
         const step = e.shiftKey ? 9.6 * 5 : 9.6;
         nudgeSelection(k === 'ArrowLeft' ? -step : k === 'ArrowRight' ? step : 0, k === 'ArrowUp' ? -step : k === 'ArrowDown' ? step : 0);
         return e.preventDefault();

@@ -325,8 +325,55 @@ export function bringToFront(id: string, front = true) {
   });
 }
 
-export function fitView() {
-  zoomToComponents(proj().project.circuit.components.map((x) => x.id));
+type Viewport = { x: number; y: number; zoom: number };
+
+const canvasSize = () => {
+  const el = document.querySelector('.workspace') as HTMLElement | null;
+  return { w: el?.clientWidth || 800, h: el?.clientHeight || 600, el };
+};
+
+let animation = 0;
+
+/**
+ * Moves the view smoothly to `target` (zoom changes geometrically around a
+ * gliding centre, so the motion looks straight). Instant with reduced motion,
+ * and abandoned as soon as anything else moves the view.
+ */
+export function animateViewport(target: Viewport, ms = 220) {
+  cancelAnimationFrame(animation);
+  const from = ed().viewport;
+  const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduce || ms <= 0 || (from.x === target.x && from.y === target.y && from.zoom === target.zoom)) {
+    ed().set({ viewport: target });
+    return;
+  }
+  const { w, h } = canvasSize();
+  const centre = (v: Viewport) => ({ x: (w / 2 - v.x) / v.zoom, y: (h / 2 - v.y) / v.zoom });
+  const c0 = centre(from);
+  const c1 = centre(target);
+  const t0 = performance.now();
+  let last = from;
+  const step = (now: number) => {
+    if (ed().viewport !== last) return; // the user took over (wheel, pan…)
+    const k = Math.min(1, (now - t0) / ms);
+    const e = 1 - Math.pow(1 - k, 3);
+    const zoom = k >= 1 ? target.zoom : Math.exp(Math.log(from.zoom) + (Math.log(target.zoom) - Math.log(from.zoom)) * e);
+    const cx = c0.x + (c1.x - c0.x) * e;
+    const cy = c0.y + (c1.y - c0.y) * e;
+    last = k >= 1 ? target : { zoom, x: w / 2 - cx * zoom, y: h / 2 - cy * zoom };
+    ed().set({ viewport: last });
+    if (k < 1) animation = requestAnimationFrame(step);
+  };
+  animation = requestAnimationFrame(step);
+}
+
+/** Fits the whole circuit in the canvas (`instant` when a project has just been opened). */
+export function fitView(opts?: { instant?: boolean }) {
+  zoomToComponents(
+    proj().project.circuit.components.map((x) => x.id),
+    1.6,
+    !opts?.instant,
+  );
 }
 
 /** Zooms to the selection (Shift+F), or to the whole circuit when nothing is selected. */
@@ -337,36 +384,50 @@ export function zoomToSelection() {
 }
 
 /** Centres the given parts in the canvas at the largest zoom (≤ maxZoom) that shows them all. */
-export function zoomToComponents(ids: string[], maxZoom = 1.6) {
+export function zoomToComponents(ids: string[], maxZoom = 1.6, animate = true) {
   const c = proj().project.circuit;
-  const el = document.querySelector('.workspace') as HTMLElement | null;
+  const { w, h, el } = canvasSize();
   if (!el) return;
   const b = selectionBounds(c, ids, true);
+  const go = (v: Viewport) => (animate ? animateViewport(v) : ed().set({ viewport: v }));
   if (!b) {
-    ed().set({ viewport: { x: 80, y: 60, zoom: 1 } });
+    go({ x: 80, y: 60, zoom: 1 });
     return;
   }
   const pad = 60;
-  const zoom = Math.max(0.15, Math.min(maxZoom, Math.min((el.clientWidth - pad * 2) / b.width, (el.clientHeight - pad * 2) / b.height)));
-  ed().set({
-    viewport: {
-      zoom,
-      x: el.clientWidth / 2 - (b.x + b.width / 2) * zoom,
-      y: el.clientHeight / 2 - (b.y + b.height / 2) * zoom,
-    },
-  });
+  const zoom = Math.max(0.15, Math.min(maxZoom, Math.min((w - pad * 2) / b.width, (h - pad * 2) / b.height)));
+  go({ zoom, x: w / 2 - (b.x + b.width / 2) * zoom, y: h / 2 - (b.y + b.height / 2) * zoom });
 }
 
 /** Sets the zoom level, keeping the centre of the canvas in place. */
 export function setZoom(level: number) {
-  const el = document.querySelector('.workspace') as HTMLElement | null;
+  const { w, h } = canvasSize();
   const { viewport } = ed();
-  const cx = (el?.clientWidth ?? 800) / 2;
-  const cy = (el?.clientHeight ?? 600) / 2;
+  const cx = w / 2;
+  const cy = h / 2;
   const zoom = Math.max(0.1, Math.min(6, level));
-  ed().set({ viewport: { zoom, x: cx - (cx - viewport.x) * (zoom / viewport.zoom), y: cy - (cy - viewport.y) * (zoom / viewport.zoom) } });
+  animateViewport({ zoom, x: cx - (cx - viewport.x) * (zoom / viewport.zoom), y: cy - (cy - viewport.y) * (zoom / viewport.zoom) }, 160);
 }
 
 export function zoomBy(factor: number) {
   setZoom(ed().viewport.zoom * factor);
+}
+
+/** Moves the view by a number of screen pixels (arrow keys). */
+export function panBy(dx: number, dy: number) {
+  cancelAnimationFrame(animation);
+  const v = ed().viewport;
+  ed().set({ viewport: { ...v, x: v.x + dx, y: v.y + dy } });
+}
+
+/** Centres the view on a world point, keeping the zoom (minimap). */
+export function centerOn(x: number, y: number, animate = false) {
+  const { w, h } = canvasSize();
+  const { zoom } = ed().viewport;
+  const v = { zoom, x: w / 2 - x * zoom, y: h / 2 - y * zoom };
+  if (animate) animateViewport(v, 180);
+  else {
+    cancelAnimationFrame(animation);
+    ed().set({ viewport: v });
+  }
 }

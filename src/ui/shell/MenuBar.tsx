@@ -71,7 +71,7 @@ const MENUS: { name: MessageKey; items: Entry[] }[] = [
   },
   {
     name: 'View',
-    items: ['zoomIn', 'zoomOut', 'zoomReset', 'fit', 'zoomSelection', { sub: 'Zoom', render: () => <ZoomItems /> }, '-', 'grid', 'snap', 'logicLevels', 'voltages', '-', 'toggleLibrary', 'toggleInspector', 'toggleCode', 'toggleDock', 'focusCanvas', '-', 'sound', { sub: 'Theme', icon: 'palette', render: () => <ThemeItems /> }, 'theme', 'language'],
+    items: ['zoomIn', 'zoomOut', 'zoomReset', 'fit', 'zoomSelection', { sub: 'Zoom', render: () => <ZoomItems /> }, 'minimap', '-', 'grid', 'snap', 'logicLevels', 'voltages', '-', 'toggleLibrary', 'toggleInspector', 'toggleCode', 'toggleDock', 'focusCanvas', '-', 'sound', { sub: 'Theme', icon: 'palette', render: () => <ThemeItems /> }, 'theme', 'language'],
   },
   {
     name: 'Simulation',
@@ -82,6 +82,7 @@ const MENUS: { name: MessageKey; items: Entry[] }[] = [
 
 const TOGGLES: Record<string, () => boolean> = {
   grid: () => useEditor.getState().showGrid,
+  minimap: () => useEditor.getState().showMinimap,
   snap: () => useEditor.getState().snap,
   theme: () => themeInfo(useEditor.getState().appliedTheme).base === 'dark',
   sound: () => useEditor.getState().sound,
@@ -97,7 +98,7 @@ function CommandEntry({ id }: { id: string }) {
   useT();
   const c = commands[id];
   // Toggles reflect the current preferences.
-  useEditor((s) => [s.showGrid, s.snap, s.appliedTheme, s.sound, s.showLibrary, s.showInspector, s.showCode, s.showDock, s.showLogicLevels, s.showVoltages].join());
+  useEditor((s) => [s.showGrid, s.showMinimap, s.snap, s.appliedTheme, s.sound, s.showLibrary, s.showInspector, s.showCode, s.showDock, s.showLogicLevels, s.showVoltages].join());
   const disabled = !!c.enabled && !c.enabled();
   if (TOGGLES[id]) return <MenuCheckItem label={c.label} checked={TOGGLES[id]()} shortcut={c.shortcut} disabled={disabled} onSelect={c.run} />;
   return <MenuItem label={c.label} icon={c.icon} shortcut={c.shortcut} disabled={disabled} onSelect={c.run} />;

@@ -183,7 +183,7 @@ function templatePreview(tpl: TemplateInfo) {
 async function createFromTemplate(tpl: TemplateInfo, name: string) {
   if (!(await confirmDiscard())) return;
   showProject(tpl.build(registry, name.trim() || translate('Untitled')), null);
-  setTimeout(fitView, 0);
+  setTimeout(() => fitView({ instant: true }), 0);
 }
 
 function NewTab() {

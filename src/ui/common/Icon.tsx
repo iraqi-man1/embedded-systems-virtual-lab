@@ -99,6 +99,7 @@ import {
   Zap,
   ZoomIn,
   ZoomOut,
+  Map as MapIcon,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -181,6 +182,7 @@ const ICONS: Record<string, LucideIcon> = {
   zap: Zap,
   'zoom-in': ZoomIn,
   'zoom-out': ZoomOut,
+  map: MapIcon,
   'chevrons-right': ChevronsRight,
   'palette': Palette,
   'more': Ellipsis,

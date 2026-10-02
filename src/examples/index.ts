@@ -13,6 +13,6 @@ export async function loadExample(id: string) {
   useEditor.getState().set({ dialog: null });
   if (!(await confirmDiscard(t('Your project has unsaved changes. Save them before opening the example?')))) return;
   showProject(ex.build(registry), null);
-  setTimeout(fitView, 0);
+  setTimeout(() => fitView({ instant: true }), 0);
   useEditor.getState().notify(t('Opened example "{title}". Press Run (F5) to compile and simulate.', { title: exampleTitle(ex) }), 'info');
 }

@@ -564,3 +564,11 @@ kbd { direction: ltr; unicode-bidi: plaintext; font-family: var(--font-mono); fo
 .theme-split { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
 .theme-name { font-weight: 600; }
 .theme-desc { color: var(--text-3); font-size: var(--fs-xs); line-height: 1.4; }
+
+/* Minimap (bottom right of the canvas, above the zoom controls). */
+.canvas-minimap { position: absolute; z-index: var(--z-canvas-toolbar); right: 10px; bottom: 48px; padding: 4px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: color-mix(in srgb, var(--bg-panel-2) 92%, transparent); box-shadow: var(--shadow); cursor: pointer; touch-action: none; animation: fade-in 140ms ease-out; }
+.canvas-minimap svg { display: block; overflow: hidden; }
+.canvas-minimap .mm-board { fill: color-mix(in srgb, var(--text) 7%, transparent); stroke: color-mix(in srgb, var(--text) 25%, transparent); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.canvas-minimap .mm-part { fill: color-mix(in srgb, var(--text) 30%, transparent); }
+.canvas-minimap .mm-wire { fill: none; stroke-width: 1.2; vector-effect: non-scaling-stroke; opacity: 0.85; }
+.canvas-minimap .mm-view { fill: color-mix(in srgb, var(--accent) 12%, transparent); stroke: var(--accent); stroke-width: 1.5; vector-effect: non-scaling-stroke; cursor: grab; }

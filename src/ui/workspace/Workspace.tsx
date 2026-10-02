@@ -33,6 +33,7 @@ import { SimControlsLayer } from './SimControls';
 import { useWireToolbarVisible, WireToolbar } from './WireToolbar';
 import { ContextMenuGate, type HeldMenu } from './contextMenuGate';
 import { PartHoverCard, usePartHover } from './PartHoverCard';
+import { Minimap } from './Minimap';
 
 type Drag =
   /** `button` 2: right-button pan, which only starts once the pointer moved past the threshold. */
@@ -45,6 +46,14 @@ type Drag =
   | { kind: 'wire-end'; wireId: string; end: 'from' | 'to' };
 
 const DRAG_THRESHOLD = 4;
+
+/** Drags that scroll the canvas when the pointer nears its edge. */
+const AUTO_PAN = new Set<Drag['kind']>(['move', 'marquee', 'handle', 'wire-end', 'pin']);
+/** Width of the edge band (px) and the fastest scroll (px per frame). */
+const EDGE = 32;
+const EDGE_SPEED = 14;
+
+type PointerSnapshot = Pick<React.PointerEvent, 'clientX' | 'clientY' | 'buttons' | 'pointerId' | 'target'>;
 
 function wireColorFor(a: IndexedPin | undefined, b: IndexedPin | undefined, fallback: string) {
   const kinds = [a?.pin.kind, b?.pin.kind];
@@ -114,6 +123,7 @@ export function Workspace() {
   const [gate] = useState(() => new ContextMenuGate(DRAG_THRESHOLD));
   const [hover, setHover] = useState<IndexedPin | null>(null);
   const partHover = usePartHover();
+  const showMinimap = useEditor((s) => s.showMinimap);
   const [cursor, setCursor] = useState<Point>({ x: 0, y: 0 });
   const [marquee, setMarquee] = useState<Overlay['marquee']>(null);
   const [dragging, setDragging] = useState(false);
@@ -343,7 +353,44 @@ export function Workspace() {
     el.setPointerCapture(e.pointerId);
   };
 
-  const onPointerMove = (e: React.PointerEvent) => {
+  // Edge auto-pan: while dragging near the edge, scroll and re-apply the drag at the new position.
+  const lastMove = useRef<PointerSnapshot | null>(null);
+  const edgeFrame = useRef(0);
+  const moveRef = useRef<(e: PointerSnapshot) => void>(() => {});
+  const edgeVelocity = (cx: number, cy: number) => {
+    const r = ref.current?.getBoundingClientRect();
+    if (!r) return { dx: 0, dy: 0 };
+    const axis = (p: number, lo: number, hi: number) => {
+      if (p < lo + EDGE) return EDGE_SPEED * Math.min(1.5, (lo + EDGE - p) / EDGE);
+      if (p > hi - EDGE) return -EDGE_SPEED * Math.min(1.5, (p - (hi - EDGE)) / EDGE);
+      return 0;
+    };
+    return { dx: axis(cx, r.left, r.right), dy: axis(cy, r.top, r.bottom) };
+  };
+  const autoPanActive = () => {
+    const d = drag.current;
+    return !!d && AUTO_PAN.has(d.kind) && (d.kind !== 'move' || d.moved) && (d.kind !== 'pin' || d.dragging);
+  };
+  const autoPanTick = () => {
+    const lm = lastMove.current;
+    const v = lm && autoPanActive() ? edgeVelocity(lm.clientX, lm.clientY) : { dx: 0, dy: 0 };
+    if (!lm || (!v.dx && !v.dy)) {
+      edgeFrame.current = 0;
+      return;
+    }
+    const ed = useEditor.getState();
+    ed.set({ viewport: { ...ed.viewport, x: ed.viewport.x + v.dx, y: ed.viewport.y + v.dy } });
+    moveRef.current(lm);
+    edgeFrame.current = requestAnimationFrame(autoPanTick);
+  };
+  useEffect(() => () => cancelAnimationFrame(edgeFrame.current), []);
+
+  const onPointerMove = (e: PointerSnapshot) => {
+    lastMove.current = { clientX: e.clientX, clientY: e.clientY, buttons: e.buttons, pointerId: e.pointerId, target: e.target };
+    if (!edgeFrame.current && autoPanActive()) {
+      const v = edgeVelocity(e.clientX, e.clientY);
+      if (v.dx || v.dy) edgeFrame.current = requestAnimationFrame(autoPanTick);
+    }
     const world = toWorld(e.clientX, e.clientY);
     const ed = useEditor.getState();
     setCursor(world);
@@ -436,6 +483,8 @@ export function Workspace() {
         break;
     }
   };
+
+  moveRef.current = onPointerMove;
 
   const onPointerUp = (e: React.PointerEvent) => {
     const d = drag.current;
@@ -591,11 +640,21 @@ export function Workspace() {
       const cx = e.clientX - r.left;
       const cy = e.clientY - r.top;
       const { x, y, zoom } = ed.viewport;
-      if (e.shiftKey && !e.ctrlKey) {
-        ed.set({ viewport: { zoom, x: x - e.deltaY, y } });
+      const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? r.height : 1;
+      const dx = e.deltaX * unit;
+      const dy = e.deltaY * unit;
+      // Touchpad pinches arrive as Ctrl+wheel: always a zoom.
+      const pinch = e.ctrlKey || e.metaKey;
+      if (!pinch && (ed.wheelAction === 'scroll' || e.shiftKey || Math.abs(dx) > Math.abs(dy))) {
+        // Shift turns a mouse wheel sideways (some systems already report it as deltaX).
+        const sx = dx || (e.shiftKey ? dy : 0);
+        const sy = e.shiftKey && !dx ? 0 : dy;
+        ed.set({ viewport: { zoom, x: x - sx, y: y - sy } });
         return;
       }
-      const nz = Math.max(0.1, Math.min(6, zoom * Math.pow(1.0015, -e.deltaY)));
+      // Small steps (touchpads, pinches) need a stronger factor than mouse-wheel notches.
+      const base = Math.abs(dy) < 40 ? 1.01 : 1.0015;
+      const nz = Math.max(0.1, Math.min(6, zoom * Math.pow(base, -dy)));
       ed.set({ viewport: { zoom: nz, x: cx - (cx - x) * (nz / zoom), y: cy - (cy - y) * (nz / zoom) } });
     };
     el.addEventListener('wheel', onWheel, { passive: false });
@@ -937,6 +996,7 @@ export function Workspace() {
           {t('Drawing wire — click a pin to finish, click the canvas to add a bend, Esc or right-click to cancel')}
         </div>
       )}
+      {showMinimap && <Minimap />}
       <div className="zoom-ctl" onPointerDown={(e) => e.stopPropagation()}>
         <Tip content={t('Zoom out')} shortcut="−" side="top">
           <button className="icon-btn" aria-label={t('Zoom out')} onClick={() => zoomBy(1 / 1.2)}>
@@ -954,7 +1014,7 @@ export function Workspace() {
         >
           <ZoomItems />
           <MenuSeparator />
-          <MenuItem label={t('Fit to window')} icon="fit" shortcut="F" onSelect={fitView} />
+          <MenuItem label={t('Fit to window')} icon="fit" shortcut="F" onSelect={() => fitView()} />
           <MenuItem label={t('Zoom to selection')} icon="zoom-in" shortcut="Shift+F" onSelect={zoomToSelection} disabled={!selectedComponents.length} />
         </DropdownMenu>
         <Tip content={t('Zoom in')} shortcut="+" side="top">
@@ -962,8 +1022,13 @@ export function Workspace() {
             <Icon name="zoom-in" />
           </button>
         </Tip>
+        <Tip content={t('Minimap')} shortcut="M" side="top">
+          <button className={`icon-btn${showMinimap ? ' on' : ''}`} aria-label={t('Minimap')} aria-pressed={showMinimap} onClick={() => useEditor.getState().setPrefs({ showMinimap: !showMinimap })}>
+            <Icon name="map" />
+          </button>
+        </Tip>
         <Tip content={t('Fit to view')} shortcut="F" side="top">
-          <button className="icon-btn" aria-label={t('Fit to view')} onClick={fitView}>
+          <button className="icon-btn" aria-label={t('Fit to view')} onClick={() => fitView()}>
             <Icon name="fit" />
           </button>
         </Tip>

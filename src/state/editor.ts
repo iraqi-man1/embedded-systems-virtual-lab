@@ -74,6 +74,10 @@ interface Prefs {
   showStartScreen: boolean;
   /** Resting the mouse on a part shows what it is and what it is for. */
   hoverCards: boolean;
+  /** Overview of the whole circuit in the corner of the canvas (key M). */
+  showMinimap: boolean;
+  /** What the mouse wheel does: zoom (Shift scrolls sideways) or scroll (Ctrl zooms, for touchpads). */
+  wheelAction: 'zoom' | 'scroll';
 }
 
 const PREFS_KEY = 'evlab.prefs.v1';
@@ -112,6 +116,8 @@ export function defaultPrefs(): Prefs {
     rightDragPan: true,
     showStartScreen: true,
     hoverCards: true,
+    showMinimap: true,
+    wheelAction: 'zoom',
   };
 }
 

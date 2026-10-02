@@ -138,6 +138,20 @@ export function SettingsDialog() {
         <Row label={t('Pan with the right mouse button')} description={t('Drag with the right button to move around; a right click without moving still opens the menu.')}>
           <Switch checked={s.rightDragPan} label={t('Pan with the right mouse button')} onChange={(rightDragPan) => set({ rightDragPan })} />
         </Row>
+        <Row label={t('Mouse wheel')} description={t('Zoom: the wheel zooms at the cursor and Shift + wheel scrolls sideways. Scroll: the wheel moves the view and Ctrl + wheel zooms, which suits touchpads.')}>
+          <Segmented
+            value={s.wheelAction}
+            label={t('Mouse wheel')}
+            options={[
+              { value: 'zoom', label: t('Zoom') },
+              { value: 'scroll', label: t('Scroll') },
+            ]}
+            onChange={(wheelAction) => set({ wheelAction })}
+          />
+        </Row>
+        <Row label={t('Show minimap')} description={t('An overview of the circuit in the corner of the canvas while part of it is out of view: click or drag in it to move around (key M).')}>
+          <Switch checked={s.showMinimap} label={t('Show minimap')} onChange={(showMinimap) => set({ showMinimap })} />
+        </Row>
         <Row label={t('Part info on hover')} description={t('Resting the mouse on a part shows what it is and what it is for. F1 opens its page in the parts guide.')}>
           <Switch checked={s.hoverCards} label={t('Part info on hover')} onChange={(hoverCards) => set({ hoverCards })} />
         </Row>
