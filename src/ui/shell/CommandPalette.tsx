@@ -6,6 +6,8 @@
 import { useMemo, useState } from 'react';
 import { Command } from 'cmdk';
 import { registry } from '../../app/registry';
+import { tr, type MessageKey } from '../../i18n';
+import { rich, useT } from '../../i18n/react';
 import { useEditor } from '../../state/editor';
 import { commands } from '../commands';
 import { Icon } from '../common/Icon';
@@ -22,24 +24,25 @@ const SYNONYMS: Record<string, string[]> = {
   quickAdd: ['insert part', 'new component'],
 };
 
-const SUPPORT = { full: 'simulated', partial: 'partial', 'visual-only': 'visual only' } as const;
+const SUPPORT: Record<'full' | 'partial' | 'visual-only', MessageKey> = { full: 'simulated', partial: 'partial', 'visual-only': 'visual only' };
 
 function close() {
   useEditor.getState().set({ palette: null });
 }
 
 function CommandList() {
+  const t = useT();
   const list = Object.values(commands);
   return (
     <>
-      <Command.Empty>No matching command.</Command.Empty>
+      <Command.Empty>{t('No matching command.')}</Command.Empty>
       {list.map((c) => {
         const enabled = !c.enabled || c.enabled();
         return (
           <Command.Item
             key={c.id}
             value={`${c.label} ${c.id}`}
-            keywords={SYNONYMS[c.id]}
+            keywords={[...(SYNONYMS[c.id] ?? []), ...(c.en && c.en !== c.label ? [c.en] : [])]}
             disabled={!enabled}
             onSelect={() => {
               close();
@@ -57,6 +60,7 @@ function CommandList() {
 }
 
 function PartList({ query, at }: { query: string; at?: { x: number; y: number } }) {
+  const t = useT();
   const recent = useEditor((s) => s.recent);
   const favorites = useEditor((s) => s.favorites);
   const results = useMemo(() => {
@@ -69,8 +73,8 @@ function PartList({ query, at }: { query: string; at?: { x: number; y: number } 
   }, [query, recent, favorites]);
   return (
     <>
-      <Command.Empty>No part matches “{query}”.</Command.Empty>
-      {!query.trim() && results.length > 0 && <div className="cmdk-hint">Recently used and favourites — type to search all {registry.all().length} parts</div>}
+      <Command.Empty>{t('No part matches “{query}”.', { query })}</Command.Empty>
+      {!query.trim() && results.length > 0 && <div className="cmdk-hint">{t('Recently used and favourites — type to search all {n} parts', { n: registry.all().length })}</div>}
       {results.map((d) => (
         <Command.Item
           key={d.type}
@@ -84,10 +88,10 @@ function PartList({ query, at }: { query: string; at?: { x: number; y: number } 
           <Icon name="box" />
           <span className="text">{d.name}</span>
           <span className="meta">
-            {d.category}
-            {d.subcategory ? ` › ${d.subcategory}` : ''}
+            {tr(d.category)}
+            {d.subcategory ? ` › ${tr(d.subcategory)}` : ''}
           </span>
-          <span className={`dot ${d.simulation.support}`} role="img" aria-label={SUPPORT[d.simulation.support]} />
+          <span className={`dot ${d.simulation.support}`} role="img" aria-label={t(SUPPORT[d.simulation.support])} />
         </Command.Item>
       ))}
     </>
@@ -101,6 +105,7 @@ export function CommandPalette() {
 }
 
 function Palette({ palette }: { palette: NonNullable<ReturnType<typeof useEditor.getState>['palette']> }) {
+  const t = useT();
   const [query, setQuery] = useState('');
   const adding = palette.mode === 'add';
   return (
@@ -109,7 +114,7 @@ function Palette({ palette }: { palette: NonNullable<ReturnType<typeof useEditor
       onOpenChange={(open) => {
         if (!open) close();
       }}
-      label={adding ? 'Add a part' : 'Command palette'}
+      label={adding ? t('Add a part') : t('Command palette')}
       shouldFilter={!adding}
       loop
       overlayClassName="cmdk-overlay"
@@ -120,25 +125,18 @@ function Palette({ palette }: { palette: NonNullable<ReturnType<typeof useEditor
         <Command.Input
           value={query}
           onValueChange={setQuery}
-          placeholder={adding ? (palette.at ? 'Add a part here…' : 'Add a part…') : 'Type a command…'}
+          placeholder={adding ? (palette.at ? t('Add a part here…') : t('Add a part…')) : t('Type a command…')}
           autoFocus
         />
-        <span className="cmdk-mode">{adding ? 'Parts' : 'Commands'}</span>
+        <span className="cmdk-mode">{adding ? t('Parts') : t('Commands')}</span>
       </div>
       <Command.List>{adding ? <PartList query={query} at={palette.at} /> : <CommandList />}</Command.List>
       <div className="cmdk-foot">
-        <span>
-          <kbd>↑</kbd>
-          <kbd>↓</kbd> choose
-        </span>
-        <span>
-          <kbd>Enter</kbd> {adding ? 'add' : 'run'}
-        </span>
-        <span>
-          <kbd>Esc</kbd> close
-        </span>
+        <span>{rich(t('{keys} choose'), { keys: <><kbd>↑</kbd><kbd>↓</kbd></> })}</span>
+        <span>{rich(adding ? t('{key} add') : t('{key} run'), { key: <kbd>Enter</kbd> })}</span>
+        <span>{rich(t('{key} close'), { key: <kbd>Esc</kbd> })}</span>
         <span className="grow" />
-        <span>{adding ? 'Ctrl+Shift+P: commands' : 'Ctrl+K: add a part'}</span>
+        <span>{adding ? t('Ctrl+Shift+P: commands') : t('Ctrl+K: add a part')}</span>
       </div>
     </Command.Dialog>
   );

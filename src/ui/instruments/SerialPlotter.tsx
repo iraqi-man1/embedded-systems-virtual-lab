@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { t } from '../../i18n';
+import { useT } from '../../i18n/react';
 import { captures } from '../../state/captures';
 import { clearSerial } from '../../state/sim';
 import { Icon } from '../common/Icon';
@@ -6,6 +8,7 @@ import { cssVar, useCanvas } from './useCanvas';
 import { CHANNEL_COLORS } from './probes';
 
 export function SerialPlotter() {
+  useT();
   const [windowSize, setWindow] = useState(500);
   const [, force] = useState(0);
   const ref = useCanvas(
@@ -28,7 +31,7 @@ export function SerialPlotter() {
         ctx.fillStyle = cssVar('--text-3');
         ctx.font = '12px Segoe UI, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('Print numbers with Serial.println(value) or "name:value" pairs to plot them.', w / 2, h / 2);
+        ctx.fillText(t('Print numbers with Serial.println(value) or "name:value" pairs to plot them.'), w / 2, h / 2);
         return;
       }
       if (max === min) {
@@ -77,14 +80,14 @@ export function SerialPlotter() {
   return (
     <div className="dock-body">
       <div className="inst-bar">
-        <span style={{ color: 'var(--text-2)' }}>Plots numbers printed on the serial port, one line per sample.</span>
+        <span style={{ color: 'var(--text-2)' }}>{t('Plots numbers printed on the serial port, one line per sample.')}</span>
         <span className="grow" />
         <label>
-          Window
+          {t('Window')}
           <select className="tb-select" value={windowSize} onChange={(e) => setWindow(Number(e.target.value))}>
             {[100, 250, 500, 1000, 2000].map((n) => (
               <option key={n} value={n}>
-                {n} samples
+                {t('{n} samples', { n })}
               </option>
             ))}
           </select>
@@ -97,7 +100,7 @@ export function SerialPlotter() {
           }}
         >
           <Icon name="eraser" />
-          <span className="label">Clear</span>
+          <span className="label">{t('Clear')}</span>
         </button>
       </div>
       <div className="canvas-host">

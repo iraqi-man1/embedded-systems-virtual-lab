@@ -8,6 +8,7 @@ import './styles/theme.css';
 import './styles/app.css';
 import './ui/editor/monacoSetup';
 import { registerExternalPackages } from './app/registry';
+import { t } from './i18n';
 import { packages } from './platform';
 import { useEditor } from './state/editor';
 import { App } from './ui/App';
@@ -24,8 +25,8 @@ void packages.discover().then((found) => {
   if (!found.length) return;
   const errors = registerExternalPackages(found);
   const ed = useEditor.getState();
-  ed.notify(`Loaded ${found.length - errors.length} component package(s).`, 'info');
-  for (const err of errors) ed.notify(`Package error: ${err}`, 'warning');
+  ed.notify(t('Loaded {n} component package(s).', { n: found.length - errors.length }), 'info');
+  for (const err of errors) ed.notify(t('Package error: {error}', { error: err }), 'warning');
 });
 
 createRoot(document.getElementById('root')!).render(<App />);

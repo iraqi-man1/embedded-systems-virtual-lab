@@ -1,4 +1,6 @@
 import { fileTitle, openRecent } from '../../app/fileOps';
+import type { MessageKey } from '../../i18n';
+import { useT } from '../../i18n/react';
 import { useEditor } from '../../state/editor';
 import { useProject } from '../../state/project';
 import { commands } from '../commands';
@@ -7,7 +9,7 @@ import { Tip } from '../common/Tooltip';
 import { setZoom } from '../workspace/actions';
 import { AlignItems, SpeedItems, WireColorItems } from './Toolbar';
 
-type Entry = string | '-' | { sub: string; icon?: string; render: () => React.ReactNode };
+type Entry = string | '-' | { sub: MessageKey; icon?: string; render: () => React.ReactNode };
 
 const ZOOMS = [0.25, 0.5, 0.75, 1, 1.5, 2, 3];
 
@@ -17,27 +19,28 @@ export function ZoomItems() {
   return (
     <>
       {ZOOMS.map((z) => (
-        <MenuCheckItem key={z} label={`${z * 100}%`} checked={Math.abs(zoom - z) < 1e-3} onSelect={() => setZoom(z)} />
+        <MenuCheckItem key={z} label={<span className="ltr">{z * 100}%</span>} checked={Math.abs(zoom - z) < 1e-3} onSelect={() => setZoom(z)} />
       ))}
     </>
   );
 }
 
 function RecentItems() {
+  const t = useT();
   const recent = useEditor((s) => s.recentProjects);
-  if (!recent.length) return <MenuItem label="No recent projects" disabled onSelect={() => {}} />;
+  if (!recent.length) return <MenuItem label={t('No recent projects')} disabled onSelect={() => {}} />;
   return (
     <>
       {recent.map((r, i) => (
         <MenuItem key={r.path} label={`${i + 1}  ${fileTitle(r.path)}`} shortcut={r.name !== fileTitle(r.path) ? r.name : undefined} onSelect={() => void openRecent(r.path)} />
       ))}
       <MenuSeparator />
-      <MenuItem label="Clear recent list" icon="trash" onSelect={() => useEditor.getState().forgetProject()} />
+      <MenuItem label={t('Clear recent list')} icon="trash" onSelect={() => useEditor.getState().forgetProject()} />
     </>
   );
 }
 
-const MENUS: { name: string; items: Entry[] }[] = [
+const MENUS: { name: MessageKey; items: Entry[] }[] = [
   { name: 'File', items: ['new', 'open', { sub: 'Open Recent', icon: 'history', render: () => <RecentItems /> }, '-', 'save', 'saveAs', '-', 'examples'] },
   { name: 'Edit', items: ['undo', 'redo', '-', 'cut', 'copy', 'paste', 'duplicate', 'delete', '-', 'selectAll', '-', 'rotate', 'rotateCcw', 'flip', '-', 'quickAdd', 'palette'] },
   {
@@ -51,7 +54,7 @@ const MENUS: { name: string; items: Entry[] }[] = [
   },
   {
     name: 'View',
-    items: ['zoomIn', 'zoomOut', 'zoomReset', 'fit', 'zoomSelection', { sub: 'Zoom', render: () => <ZoomItems /> }, '-', 'grid', 'snap', 'logicLevels', 'voltages', '-', 'toggleLibrary', 'toggleInspector', 'toggleCode', 'toggleDock', 'focusCanvas', '-', 'sound', 'theme'],
+    items: ['zoomIn', 'zoomOut', 'zoomReset', 'fit', 'zoomSelection', { sub: 'Zoom', render: () => <ZoomItems /> }, '-', 'grid', 'snap', 'logicLevels', 'voltages', '-', 'toggleLibrary', 'toggleInspector', 'toggleCode', 'toggleDock', 'focusCanvas', '-', 'sound', 'theme', 'language'],
   },
   {
     name: 'Simulation',
@@ -74,6 +77,7 @@ const TOGGLES: Record<string, () => boolean> = {
 };
 
 function CommandEntry({ id }: { id: string }) {
+  useT();
   const c = commands[id];
   // Toggles reflect the current preferences.
   useEditor((s) => [s.showGrid, s.snap, s.theme, s.sound, s.showLibrary, s.showInspector, s.showCode, s.showDock, s.showLogicLevels, s.showVoltages].join());
@@ -83,6 +87,7 @@ function CommandEntry({ id }: { id: string }) {
 }
 
 export function MenuBar() {
+  const t = useT();
   const name = useProject((s) => s.project.meta.name);
   const dirty = useProject((s) => s.dirty);
   const path = useProject((s) => s.filePath);
@@ -94,18 +99,18 @@ export function MenuBar() {
           <rect x="136" y="136" width="240" height="240" rx="24" fill="#1d4f6e" stroke="#5ad1ff" strokeWidth="14" />
           <path d="M190 300l44-88 40 64 22-36 26 60" fill="none" stroke="#ffd166" strokeWidth="20" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-        Virtual Lab
+        {t('Virtual Lab')}
       </div>
       <MenuBarRoot>
         {MENUS.map((m) => (
-          <MenuBarMenu key={m.name} label={m.name}>
+          <MenuBarMenu key={m.name} label={t(m.name)}>
             {m.items.map((it, i) =>
               it === '-' ? (
                 <MenuSeparator key={i} />
               ) : typeof it === 'string' ? (
                 <CommandEntry key={it} id={it} />
               ) : (
-                <SubMenu key={it.sub} label={it.sub} icon={it.icon}>
+                <SubMenu key={it.sub} label={t(it.sub)} icon={it.icon}>
                   {it.render()}
                 </SubMenu>
               ),
@@ -113,11 +118,11 @@ export function MenuBar() {
           </MenuBarMenu>
         ))}
       </MenuBarRoot>
-      <Tip content={path ?? 'Not saved yet'} align="end" direct>
+      <Tip content={path ?? t('Not saved yet')} align="end" direct>
         <div className="menu-title">
           {name}
           {dirty ? ' •' : ''}
-          {path ? ` — ${path}` : ' — unsaved'}
+          {path ? ` — ${path}` : ` — ${t('unsaved')}`}
         </div>
       </Tip>
     </div>

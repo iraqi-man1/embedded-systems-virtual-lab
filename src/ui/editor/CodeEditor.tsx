@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { monaco } from './monacoSetup';
 import { lookup } from '../../app/registry';
+import { t } from '../../i18n';
+import { useT } from '../../i18n/react';
 import { useEditor } from '../../state/editor';
 import { useProject } from '../../state/project';
 import { compileFirmware, findTargetBoard, useBuildState, useSim } from '../../state/sim';
@@ -10,13 +12,14 @@ import { Tip } from '../common/Tooltip';
 
 /** Why a file name can't be used, or null when it can. */
 function fileNameError(name: string, others: string[]): string | null {
-  if (!/^[A-Za-z0-9_-]+\.(h|hpp|c|cpp)$/.test(name)) return 'Use letters, digits, - or _ and end in .h, .hpp, .c or .cpp';
-  if (others.includes(name)) return 'A file with this name already exists';
+  if (!/^[A-Za-z0-9_-]+\.(h|hpp|c|cpp)$/.test(name)) return t('Use letters, digits, - or _ and end in .h, .hpp, .c or .cpp');
+  if (others.includes(name)) return t('A file with this name already exists');
   return null;
 }
 
 /** Inline name field for a new or renamed file: Enter applies, Esc cancels. */
 function FileNameInput({ initial, others, onDone }: { initial: string; others: string[]; onDone: (name: string | null) => void }) {
+  useT();
   const [value, setValue] = useState(initial);
   const error = fileNameError(value.trim(), others);
   const done = useRef(false);
@@ -26,7 +29,7 @@ function FileNameInput({ initial, others, onDone }: { initial: string; others: s
     onDone(name);
   };
   return (
-    <Tip content={error ?? 'Enter to apply · Esc to cancel'} direct>
+    <Tip content={error ?? t('Enter to apply · Esc to cancel')} direct>
       <div className={`code-tab editing${error ? ' invalid' : ''}`}>
         <Icon name="code" size={13} />
         <input
@@ -34,7 +37,7 @@ function FileNameInput({ initial, others, onDone }: { initial: string; others: s
           value={value}
           autoFocus
           spellCheck={false}
-          aria-label="File name"
+          aria-label={t('File name')}
           aria-invalid={!!error}
           size={Math.max(8, value.length + 1)}
           onFocus={(e) => e.currentTarget.setSelectionRange(0, value.lastIndexOf('.') > 0 ? value.lastIndexOf('.') : value.length)}
@@ -57,6 +60,7 @@ const languageFor = (name: string) => (/\.(c)$/.test(name) ? 'c' : 'cpp');
 let applyingFromProject = false;
 
 export function CodeEditor() {
+  useT();
   const host = useRef<HTMLDivElement>(null);
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const files = useProject((s) => s.project.firmware.files);
@@ -182,18 +186,18 @@ export function CodeEditor() {
   const boards = circuit.components.filter((c) => lookup(c.type)?.mcu);
   const statusText =
     compile.status === 'compiling'
-      ? 'Compiling…'
+      ? t('Compiling…')
       : buildState === 'modified'
         ? simState !== 'stopped'
-          ? 'The board runs the previous build'
-          : 'Code changed since the last build — Ctrl+B to compile'
+          ? t('The board runs the previous build')
+          : t('Code changed since the last build — Ctrl+B to compile')
         : compile.status === 'success'
-          ? `Built · flash ${compile.flashBytes ?? '?'} B · RAM ${compile.ramBytes ?? '?'} B`
+          ? t('Built · flash {flash} B · RAM {ram} B', { flash: compile.flashBytes ?? '?', ram: compile.ramBytes ?? '?' })
           : compile.status === 'error'
-            ? 'Build failed — see Problems'
+            ? t('Build failed — see Problems')
             : targetDef
               ? `${targetDef.mcu?.chip ?? ''} · PlatformIO ${targetDef.mcu?.toolchain.board ?? ''}`
-              : 'No programmable board in the circuit';
+              : t('No programmable board in the circuit');
 
   return (
     <div className="panel code-panel" style={{ flex: 1 }}>
@@ -205,7 +209,7 @@ export function CodeEditor() {
             <Tip
               key={f.name}
               direct
-              content={`${f.name === 'sketch.ino' ? 'Main sketch' : 'Double-click to rename'}${compile.built && compile.built[f.name] !== f.content ? ' · changed since the last build' : ''}`}
+              content={`${f.name === 'sketch.ino' ? t('Main sketch') : t('Double-click to rename')}${compile.built && compile.built[f.name] !== f.content ? ` · ${t('changed since the last build')}` : ''}`}
             >
               <div
                 className={`code-tab${f.name === active ? ' active' : ''}`}
@@ -214,15 +218,22 @@ export function CodeEditor() {
               >
                 <Icon name="code" size={13} />
                 {f.name}
-                {compile.built && compile.built[f.name] !== f.content && <span className="mod-dot" aria-label="Changed since the last build" />}
+                {compile.built && compile.built[f.name] !== f.content && <span className="mod-dot" aria-label={t('Changed since the last build')} />}
                 {f.name !== 'sketch.ino' && (
                   <span
                     className="x"
                     role="button"
-                    aria-label={`Remove ${f.name}`}
+                    aria-label={t('Remove {file}', { file: f.name })}
                     onClick={async (e) => {
                       e.stopPropagation();
-                      if (await confirmDialog({ title: `Remove ${f.name}?`, message: 'The file and its contents are removed from the project.', confirmLabel: 'Remove', danger: true }))
+                      if (
+                        await confirmDialog({
+                          title: t('Remove {file}?', { file: f.name }),
+                          message: t('The file and its contents are removed from the project.'),
+                          confirmLabel: t('Remove'),
+                          danger: true,
+                        })
+                      )
                         useProject.getState().removeFile(f.name);
                     }}
                   >
@@ -234,17 +245,17 @@ export function CodeEditor() {
           ),
         )}
         {naming && naming.from === null && <FileNameInput initial={newFileName()} others={names} onDone={finishNaming} />}
-        <Tip content="Add a source file (.h, .c, .cpp)" direct>
-          <button className="icon-btn" style={{ alignSelf: 'center', marginLeft: 4 }} aria-label="Add file" onClick={() => setNaming({ from: null })} disabled={!!naming}>
+        <Tip content={t('Add a source file (.h, .c, .cpp)')} direct>
+          <button className="icon-btn" style={{ alignSelf: 'center', marginInlineStart: 4 }} aria-label={t('Add file')} onClick={() => setNaming({ from: null })} disabled={!!naming}>
             <Icon name="plus" />
           </button>
         </Tip>
       </div>
       <div className="code-toolbar">
-        <Tip content={simState !== 'stopped' ? 'Compile and flash the running board' : 'Compile the firmware'} shortcut="Ctrl+B">
+        <Tip content={simState !== 'stopped' ? t('Compile and flash the running board') : t('Compile the firmware')} shortcut="Ctrl+B">
           <button className="tb-btn" onClick={() => void compileFirmware()} disabled={compile.status === 'compiling'}>
             <Icon name="build" />
-            <span className="label">Compile</span>
+            <span className="label">{t('Compile')}</span>
           </button>
         </Tip>
         {boards.length > 1 && (
@@ -252,7 +263,7 @@ export function CodeEditor() {
             className="tb-select"
             value={target?.id ?? ''}
             onChange={(e) => useProject.getState().updateProject((p) => void (p.firmware.target = e.target.value))}
-            aria-label="Board that runs this firmware"
+            aria-label={t('Board that runs this firmware')}
           >
             {boards.map((b) => (
               <option key={b.id} value={b.id}>
@@ -262,10 +273,10 @@ export function CodeEditor() {
           </select>
         )}
         {simState !== 'stopped' && buildState === 'modified' && (
-          <Tip content="Compile and flash the running board; the rest of the circuit keeps running" shortcut="Ctrl+B">
+          <Tip content={t('Compile and flash the running board; the rest of the circuit keeps running')} shortcut="Ctrl+B">
             <button className="tb-btn accent" onClick={() => void compileFirmware()}>
               <Icon name="reset" />
-              <span className="label">Rebuild &amp; restart board</span>
+              <span className="label">{t('Rebuild & restart board')}</span>
             </button>
           </Tip>
         )}

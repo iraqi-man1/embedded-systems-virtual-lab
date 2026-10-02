@@ -10,6 +10,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import * as RD from '@radix-ui/react-dialog';
 import { create } from 'zustand';
+import { t } from '../../i18n';
+import { useT } from '../../i18n/react';
 import { Icon } from './Icon';
 
 export interface DialogButton {
@@ -50,8 +52,8 @@ export async function confirmDialog(opts: { title: string; message?: ReactNode; 
     title: opts.title,
     message: opts.message,
     buttons: [
-      { id: 'cancel', label: 'Cancel' },
-      { id: 'ok', label: opts.confirmLabel ?? 'OK', variant: opts.danger ? 'danger' : 'primary' },
+      { id: 'cancel', label: t('Cancel') },
+      { id: 'ok', label: opts.confirmLabel ?? t('OK'), variant: opts.danger ? 'danger' : 'primary' },
     ],
     cancelId: 'cancel',
     defaultId: 'ok',
@@ -64,12 +66,12 @@ export type SaveChoice = 'save' | 'discard' | 'cancel';
 /** Save / Don't save / Cancel before an action that would discard unsaved changes. */
 export async function askSaveChanges(opts: { title?: string; message?: ReactNode; discardLabel?: string } = {}): Promise<SaveChoice> {
   const r = await ask({
-    title: opts.title ?? 'Save changes?',
-    message: opts.message ?? 'Your project has unsaved changes. Do you want to save them first?',
+    title: opts.title ?? t('Save changes?'),
+    message: opts.message ?? t('Your project has unsaved changes. Do you want to save them first?'),
     buttons: [
-      { id: 'cancel', label: 'Cancel' },
-      { id: 'discard', label: opts.discardLabel ?? "Don't save", variant: 'danger' },
-      { id: 'save', label: 'Save', variant: 'primary' },
+      { id: 'cancel', label: t('Cancel') },
+      { id: 'discard', label: opts.discardLabel ?? t("Don't save"), variant: 'danger' },
+      { id: 'save', label: t('Save'), variant: 'primary' },
     ],
     cancelId: 'cancel',
     defaultId: 'save',
@@ -90,8 +92,8 @@ export async function promptText(opts: {
     title: opts.title,
     message: opts.message,
     buttons: [
-      { id: 'cancel', label: 'Cancel' },
-      { id: 'ok', label: opts.confirmLabel ?? 'OK', variant: 'primary' },
+      { id: 'cancel', label: t('Cancel') },
+      { id: 'ok', label: opts.confirmLabel ?? t('OK'), variant: 'primary' },
     ],
     cancelId: 'cancel',
     defaultId: 'ok',
@@ -117,6 +119,7 @@ export function ModalFrame({
   /** Focus a specific element instead of the first focusable one. */
   initialFocus?: React.RefObject<HTMLElement | null>;
 }) {
+  const tt = useT();
   return (
     <RD.Root open onOpenChange={(open) => !open && onClose()}>
       <RD.Portal>
@@ -135,7 +138,7 @@ export function ModalFrame({
             <RD.Title asChild>
               <h2>{title}</h2>
             </RD.Title>
-            <RD.Close className="icon-btn" aria-label="Close">
+            <RD.Close className="icon-btn" aria-label={tt('Close')}>
               <Icon name="x" />
             </RD.Close>
           </div>

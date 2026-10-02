@@ -5,6 +5,7 @@
  */
 import { PROJECT_EXTENSION } from '../core/project/schema';
 import type { CompileRequest, CompileResult, ToolchainStatus } from '../core/toolchain/types';
+import { t } from '../i18n';
 
 export const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
@@ -23,7 +24,7 @@ export const toolchain = {
   },
 
   async install(onProgress: (line: string) => void): Promise<void> {
-    if (!isTauri) throw new Error('Toolchain installation is available in the desktop application.');
+    if (!isTauri) throw new Error(t('Toolchain installation is available in the desktop application.'));
     const { listen } = await import('@tauri-apps/api/event');
     const unlisten = await listen<string>('toolchain-progress', (e) => onProgress(e.payload));
     try {
@@ -52,14 +53,14 @@ function browserRecent(): Record<string, string> {
   }
 }
 
-const filters = [{ name: 'Virtual Lab Project', extensions: [PROJECT_EXTENSION] }];
+const filters = () => [{ name: t('Virtual Lab Project'), extensions: [PROJECT_EXTENSION] }];
 
 export const storage = {
   /** Shows an open dialog and returns { path, text }, or null if cancelled. */
   async openProject(): Promise<{ path: string; text: string } | null> {
     if (isTauri) {
       const { open } = await import('@tauri-apps/plugin-dialog');
-      const path = await open({ multiple: false, directory: false, filters });
+      const path = await open({ multiple: false, directory: false, filters: filters() });
       if (!path || Array.isArray(path)) return null;
       return { path, text: await invoke<string>('read_text_file', { path }) };
     }
@@ -82,7 +83,7 @@ export const storage = {
   async readProject(path: string): Promise<string> {
     if (isTauri) return invoke<string>('read_text_file', { path });
     const text = browserRecent()[path];
-    if (text === undefined) throw new Error(`${path} is not available any more`);
+    if (text === undefined) throw new Error(t('{path} is not available any more', { path }));
     return text;
   },
 
@@ -122,7 +123,7 @@ export const storage = {
       let target = path;
       if (!target) {
         const { save } = await import('@tauri-apps/plugin-dialog');
-        target = await save({ filters, defaultPath: `${suggestedName}.${PROJECT_EXTENSION}` });
+        target = await save({ filters: filters(), defaultPath: `${suggestedName}.${PROJECT_EXTENSION}` });
       }
       if (!target) return null;
       await invoke('write_text_file', { path: target, contents: text });

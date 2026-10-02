@@ -13,6 +13,7 @@
  * send model inputs.
  */
 import { memo, useEffect, useRef, useState, type ReactNode } from 'react';
+import { t, tr } from '../../i18n';
 import type { ComponentInstance, Point, PropValue } from '../../core/model/circuit';
 import type { ComponentDefinition, IndicatorDefinition, LocalDirection, LocalPoint, PropertyDefinition, SimControl } from '../../core/model/component';
 import { componentBounds, worldToLocal } from '../../core/circuit/geometry';
@@ -260,7 +261,7 @@ function Stick({ inst, def, c, toWorld }: { inst: ComponentInstance; def: Compon
     sendInput(inst.id, 'release', true);
   };
   return (
-    <Tip content="Drag to move the stick · click to press" side="top" direct>
+    <Tip content={t('Drag to move the stick · click to press')} side="top" direct>
       <div
         className="simctl-stick"
         style={{ left: c.center.x - c.radius, top: c.center.y - c.radius, width: c.radius * 2, height: c.radius * 2 }}
@@ -299,7 +300,7 @@ function Rotary({ inst, def, c, toWorld }: { inst: ComponentInstance; def: Compo
     return () => el.removeEventListener('wheel', onWheel);
   }, [inst.id, c.input]);
   return (
-    <Tip content="Drag around (or scroll) to turn · click to press" side="top" direct>
+    <Tip content={t('Drag around (or scroll) to turn · click to press')} side="top" direct>
       <div
         ref={ref}
         className="simctl-rotary"
@@ -437,16 +438,16 @@ function SliderChip({ inst, def, c }: { inst: ComponentInstance; def: ComponentD
   };
   const ref = useWheel((dir) => editProp(inst.id, c.prop, fromPos(Math.max(0, Math.min(1, toPos(value) + dir * 0.02))), 'coalesce'));
   return (
-    <Tip content={`${c.label ?? p?.label ?? c.prop} — drag or scroll`} side="top" direct>
+    <Tip content={t('{name} — drag or scroll', { name: tr(c.label ?? p?.label ?? c.prop) })} side="top" direct>
       <div ref={ref} className="simctl-chip slider" onPointerDown={stop} onDoubleClick={stop}>
         {c.icon && <Icon name={c.icon} />}
-        {c.label && <span className="lbl">{c.label}</span>}
+        {c.label && <span className="lbl">{tr(c.label)}</span>}
         <input
           type="range"
           min={0}
           max={1000}
           value={Math.round(toPos(value) * 1000)}
-          aria-label={c.label ?? p?.label ?? c.prop}
+          aria-label={tr(c.label ?? p?.label ?? c.prop)}
           onPointerDown={(e) => e.button === 0 && useProject.getState().begin()}
           onPointerUp={() => useProject.getState().end()}
           onChange={(e) => editProp(inst.id, c.prop, fromPos(Number(e.target.value) / 1000), useProject.getState().txBase ? 'gesture' : 'coalesce')}
@@ -466,11 +467,11 @@ function SelectChip({ inst, def, c }: { inst: ComponentInstance; def: ComponentD
   return (
     <div className="simctl-chip" onPointerDown={stop} onDoubleClick={stop}>
       {c.icon && <Icon name={c.icon} />}
-      {c.label && <span className="lbl">{c.label}</span>}
-      <select value={value} aria-label={c.label ?? p?.label} onChange={(e) => editProp(inst.id, c.prop, e.target.value, 'gesture')}>
+      {c.label && <span className="lbl">{tr(c.label)}</span>}
+      <select value={value} aria-label={tr(c.label ?? p?.label ?? c.prop)} onChange={(e) => editProp(inst.id, c.prop, e.target.value, 'gesture')}>
         {p?.options?.map((o) => (
           <option key={o.value} value={o.value}>
-            {o.label}
+            {tr(o.label)}
           </option>
         ))}
       </select>
@@ -492,7 +493,7 @@ function TiltChip({ inst, def, c }: { inst: ComponentInstance; def: ComponentDef
   };
   return (
     <div className="simctl-chip tilt" onPointerDown={stop} onDoubleClick={stop}>
-      <Tip content="Drag to tilt · double-click to level" side="top" direct>
+      <Tip content={t('Drag to tilt · double-click to level')} side="top" direct>
         <div
           ref={pad}
           className="pad"
@@ -519,7 +520,7 @@ function TiltChip({ inst, def, c }: { inst: ComponentInstance; def: ComponentDef
         </div>
       </Tip>
       <span className="val">
-        {c.label ?? 'Tilt'}
+        {c.label ? tr(c.label) : t('Tilt')}
         <br />
         pitch {pitch}°
         <br />
@@ -549,7 +550,7 @@ function ActionChip({ inst, c }: { inst: ComponentInstance; c: Extract<SimContro
       onDoubleClick={stop}
     >
       {c.icon && <Icon name={c.icon} />}
-      {c.label}
+      {c.label ? tr(c.label) : null}
     </button>
   );
 }
@@ -572,7 +573,7 @@ function Readouts({ inst, def, list }: { inst: ComponentInstance; def: Component
         } else text = String(v);
         return (
           <span key={i} className="simctl-chip readout">
-            {r.label && <span className="lbl">{r.label}</span>}
+            {r.label && <span className="lbl">{tr(r.label)}</span>}
             {text}
           </span>
         );

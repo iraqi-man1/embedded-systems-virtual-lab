@@ -1,6 +1,7 @@
 /** Editor/UI state: selection, viewport, tools, panels, preferences. */
 import { create } from 'zustand';
 import type { CircuitDocument, PinRef, Point } from '../core/model/circuit';
+import { detectLanguage, setLanguage, type Lang } from '../i18n';
 
 export type Tool = 'select' | 'probe-logic' | 'probe-scope' | 'probe-meter-red' | 'probe-meter-black';
 export type DockTab = 'serial' | 'plotter' | 'scope' | 'logic' | 'meter' | 'mcu' | 'problems' | 'output';
@@ -26,6 +27,8 @@ export interface RecentProject {
 const MAX_RECENT_PROJECTS = 10;
 
 interface Prefs {
+  /** Interface language (Arabic switches the layout to right-to-left). */
+  language: Lang;
   theme: Theme;
   favorites: string[];
   recent: string[];
@@ -63,9 +66,11 @@ interface Prefs {
 
 const PREFS_KEY = 'evlab.prefs.v1';
 
-function loadPrefs(): Prefs {
+/** Preferences of a fresh installation. Every key here is persisted. */
+export function defaultPrefs(): Prefs {
   const dark = typeof matchMedia !== 'undefined' && matchMedia('(prefers-color-scheme: dark)').matches;
-  const defaults: Prefs = {
+  return {
+    language: detectLanguage(),
     theme: dark ? 'dark' : 'light',
     favorites: ['evlab.arduino-uno', 'evlab.breadboard-half', 'evlab.resistor', 'evlab.led', 'evlab.pushbutton', 'evlab.potentiometer'],
     recent: [],
@@ -91,12 +96,21 @@ function loadPrefs(): Prefs {
     librarySimOnly: false,
     rightDragPan: true,
   };
+}
+
+const PREF_KEYS = Object.keys(defaultPrefs()) as (keyof Prefs)[];
+
+function loadPrefs(): Prefs {
+  const defaults = defaultPrefs();
+  let prefs = defaults;
   try {
     const raw = localStorage.getItem(PREFS_KEY);
-    return raw ? { ...defaults, ...JSON.parse(raw) } : defaults;
+    if (raw) prefs = { ...defaults, ...JSON.parse(raw) };
   } catch {
-    return defaults;
+    /* unreadable: defaults */
   }
+  setLanguage(prefs.language);
+  return prefs;
 }
 
 interface EditorState extends Prefs {
@@ -154,34 +168,10 @@ export const useEditor = create<EditorState>((set, get) => ({
 
   set: (partial) => set(partial),
   setPrefs(partial) {
+    if (partial.language && partial.language !== get().language) setLanguage(partial.language);
     set(partial);
     const s = get();
-    const prefs: Prefs = {
-      theme: s.theme,
-      favorites: s.favorites,
-      recent: s.recent,
-      recentProjects: s.recentProjects,
-      showGrid: s.showGrid,
-      snap: s.snap,
-      libraryWidth: s.libraryWidth,
-      inspectorHeight: s.inspectorHeight,
-      codeWidth: s.codeWidth,
-      dockHeight: s.dockHeight,
-      showLibrary: s.showLibrary,
-      showInspector: s.showInspector,
-      showCode: s.showCode,
-      showDock: s.showDock,
-      wireColor: s.wireColor,
-      sound: s.sound,
-      showLogicLevels: s.showLogicLevels,
-      showVoltages: s.showVoltages,
-      serialClearOnRun: s.serialClearOnRun,
-      serialTimestamps: s.serialTimestamps,
-      serialView: s.serialView,
-      libraryCollapsed: s.libraryCollapsed,
-      librarySimOnly: s.librarySimOnly,
-      rightDragPan: s.rightDragPan,
-    };
+    const prefs = Object.fromEntries(PREF_KEYS.map((k) => [k, s[k]])) as unknown as Prefs;
     try {
       localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
     } catch {

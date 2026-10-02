@@ -12,6 +12,7 @@ import { bytesToText } from '../core/instruments/decoders';
 import { countLines, stampLines } from '../core/instruments/serialLog';
 import { compileRequestFor, type CompileDiagnostic, type ToolchainStatus } from '../core/toolchain/types';
 import { lookup } from '../app/registry';
+import { t } from '../i18n';
 import { toolchain } from '../platform';
 import { captures } from './captures';
 import { getNetlist } from './derived';
@@ -88,7 +89,7 @@ function getWorker(): Worker {
   if (!worker) {
     worker = new Worker(new URL('../core/sim/worker.ts', import.meta.url), { type: 'module' });
     worker.onmessage = (e: MessageEvent<SimEvent>) => handleEvent(e.data);
-    worker.onerror = (e) => useEditor.getState().notify(`Simulation worker error: ${e.message}`, 'error');
+    worker.onerror = (e) => useEditor.getState().notify(t('Simulation worker error: {error}', { error: e.message }), 'error');
   }
   return worker;
 }
@@ -210,16 +211,16 @@ export async function compileFirmware(): Promise<boolean> {
   const editor = useEditor.getState();
   const board = findTargetBoard(project);
   if (!board) {
-    editor.notify('Add a programmable board (e.g. Arduino Uno) to compile firmware.', 'warning');
+    editor.notify(t('Add a programmable board (e.g. Arduino Uno) to compile firmware.'), 'warning');
     return false;
   }
   const def = lookup(board.type)!;
   if (def.simulation.support === 'visual-only' || !def.mcu) {
-    editor.notify(`${def.name} cannot be simulated yet (${def.simulation.notes ?? 'visual-only'}).`, 'warning');
+    editor.notify(t('{part} cannot be simulated yet ({reason}).', { part: def.name, reason: def.simulation.notes ?? t('visual-only') }), 'warning');
     return false;
   }
   const sim = useSim.getState();
-  useSim.setState({ compile: { ...sim.compile, status: 'compiling', log: `Compiling for ${def.name} (${def.mcu.toolchain.board})…\n` } });
+  useSim.setState({ compile: { ...sim.compile, status: 'compiling', log: `${t('Compiling for {board} ({target})…', { board: def.name, target: def.mcu.toolchain.board })}\n` } });
   try {
     const res = await toolchain.compile(compileRequestFor(def.mcu, project.firmware.files));
     const hex = res.success && res.hex ? { ...useSim.getState().compile.hex, [board.id]: res.hex } : useSim.getState().compile.hex;
@@ -241,19 +242,19 @@ export async function compileFirmware(): Promise<boolean> {
       reflash(board.id, board.label);
     } else if (res.success) {
       editor.notify(
-        `Compiled in ${(res.durationMs / 1000).toFixed(1)} s — flash ${res.flashBytes ?? '?'} B, RAM ${res.ramBytes ?? '?'} B`,
+        t('Compiled in {seconds} s — flash {flash} B, RAM {ram} B', { seconds: (res.durationMs / 1000).toFixed(1), flash: res.flashBytes ?? '?', ram: res.ramBytes ?? '?' }),
         'success',
       );
     } else {
       const n = res.diagnostics.filter((d) => d.severity === 'error').length;
-      editor.notify(`Compilation failed with ${n || 'unknown'} error${n === 1 ? '' : 's'}. See Problems.`, 'error');
+      editor.notify(n ? t('Compilation failed ({n} errors). See Problems.', { n }) : t('Compilation failed. See Problems.'), 'error');
       editor.set({ dockTab: 'problems', showDock: true });
     }
     return res.success;
   } catch (e) {
     const message = (e as Error).message ?? String(e);
     useSim.setState({ compile: { ...useSim.getState().compile, status: 'error', log: message, diagnostics: [] } });
-    editor.notify(`Toolchain error: ${message}`, 'error');
+    editor.notify(t('Toolchain error: {error}', { error: message }), 'error');
     const status = await refreshToolchain();
     if (!status?.installed) editor.set({ dialog: 'toolchain' });
     return false;
@@ -273,8 +274,8 @@ function serialNote(boardId: string, note: string) {
 /** Hot-swaps the firmware of a running simulation: the board restarts with the new build. */
 function reflash(boardId: string, label: string) {
   send({ type: 'update-circuit', setup: currentSetup(), restart: [boardId] });
-  serialNote(boardId, `firmware updated, ${label} restarted`);
-  useEditor.getState().notify(`New firmware flashed — ${label} restarted`, 'success');
+  serialNote(boardId, t('firmware updated, {board} restarted', { board: label }));
+  useEditor.getState().notify(t('New firmware flashed — {board} restarted', { board: label }), 'success');
 }
 
 export async function startSimulation() {
@@ -298,7 +299,7 @@ export async function startSimulation() {
     serialDecoder.clear();
     if (useEditor.getState().serialClearOnRun) useSim.setState({ serial: {}, serialStamps: {} });
     useSim.setState({ diagnostics: [], simTime: 0 });
-    for (const id of Object.keys(useSim.getState().serial)) serialNote(id, 'simulation started');
+    for (const id of Object.keys(useSim.getState().serial)) serialNote(id, t('simulation started'));
     send({ type: 'setup', setup: currentSetup(), settings: project.simulation });
     send({ type: 'start' });
   } finally {

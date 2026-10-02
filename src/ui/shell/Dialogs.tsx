@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { EXAMPLES, loadExample } from '../../examples';
+import { exampleSummary, exampleTitle, tr } from '../../i18n';
+import { rich, useT } from '../../i18n/react';
 import { isTauri, toolchain } from '../../platform';
 import { useEditor } from '../../state/editor';
 import { refreshToolchain, useSim } from '../../state/sim';
@@ -25,33 +27,34 @@ const EXAMPLE_TAGS = (() => {
 })();
 
 function ExamplesDialog() {
+  const t = useT();
   const [query, setQuery] = useState('');
   const [tag, setTag] = useState<string | null>(null);
   const q = query.trim().toLowerCase();
   const shown = EXAMPLES.filter(
-    (ex) => (!tag || ex.tags.includes(tag)) && (!q || [ex.title, ex.summary, ...ex.tags].some((t) => t.toLowerCase().includes(q))),
+    (ex) =>
+      (!tag || ex.tags.includes(tag)) &&
+      (!q || [ex.title, ex.summary, exampleTitle(ex), exampleSummary(ex), ...ex.tags, ...ex.tags.map((x) => tr(x))].some((s) => s.toLowerCase().includes(q))),
   );
   return (
-    <Modal title="Examples & Templates">
+    <Modal title={t('Examples & Templates')}>
       <p style={{ marginTop: 0, color: 'var(--text-2)' }}>
-        Each example opens a complete project — circuit and firmware. Press <kbd>F5</kbd> to compile and simulate.
+        {t('Each example opens a complete project — circuit and firmware.')} {rich(t('Press {key} to compile and simulate.'), { key: <kbd>F5</kbd> })}
       </p>
       <div className="examples-filter">
         <div className="search-box">
           <Icon name="search" />
-          <input autoFocus placeholder="Search examples (e.g. sensor, I2C, PWM)" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search examples" />
+          <input autoFocus placeholder={t('Search examples (e.g. sensor, I2C, PWM)')} value={query} onChange={(e) => setQuery(e.target.value)} aria-label={t('Search examples')} />
         </div>
-        <span className="count">
-          {shown.length} of {EXAMPLES.length}
-        </span>
+        <span className="count">{t('{n} of {total}', { n: shown.length, total: EXAMPLES.length })}</span>
       </div>
       <div className="chips examples-tags">
         <button className={`chip${tag === null ? ' active' : ''}`} aria-pressed={tag === null} onClick={() => setTag(null)}>
-          All
+          {t('All')}
         </button>
-        {EXAMPLE_TAGS.map((t) => (
-          <button key={t} className={`chip${tag === t ? ' active' : ''}`} aria-pressed={tag === t} onClick={() => setTag(tag === t ? null : t)}>
-            {t}
+        {EXAMPLE_TAGS.map((x) => (
+          <button key={x} className={`chip${tag === x ? ' active' : ''}`} aria-pressed={tag === x} onClick={() => setTag(tag === x ? null : x)}>
+            {tr(x)}
           </button>
         ))}
       </div>
@@ -65,24 +68,25 @@ function ExamplesDialog() {
             onClick={() => loadExample(ex.id)}
             onKeyDown={(e) => e.key === 'Enter' && loadExample(ex.id)}
           >
-            <h4>{ex.title}</h4>
-            <p>{ex.summary}</p>
+            <h4>{exampleTitle(ex)}</h4>
+            <p>{exampleSummary(ex)}</p>
             <div className="tags">
-              {ex.tags.map((t) => (
-                <span key={t} className={`chip${tag === t ? ' active' : ''}`}>
-                  {t}
+              {ex.tags.map((x) => (
+                <span key={x} className={`chip${tag === x ? ' active' : ''}`}>
+                  {tr(x)}
                 </span>
               ))}
             </div>
           </div>
         ))}
-        {!shown.length && <div className="empty-note">No example matches. Try another word or tag.</div>}
+        {!shown.length && <div className="empty-note">{t('No example matches. Try another word or tag.')}</div>}
       </div>
     </Modal>
   );
 }
 
 function ToolchainDialog() {
+  const t = useT();
   const status = useSim((s) => s.toolchain);
   const [log, setLog] = useState('');
   const [busy, setBusy] = useState(false);
@@ -95,7 +99,7 @@ function ToolchainDialog() {
     try {
       await toolchain.install((line) => setLog((l) => (l + line + '\n').slice(-40000)));
       await refreshToolchain();
-      useEditor.getState().notify('Firmware toolchain installed.', 'success');
+      useEditor.getState().notify(t('Firmware toolchain installed.'), 'success');
     } catch (e) {
       setLog((l) => l + `\nERROR: ${(e as Error).message ?? e}\n`);
     } finally {
@@ -104,95 +108,110 @@ function ToolchainDialog() {
   };
   return (
     <Modal
-      title="Firmware Toolchain"
+      title={t('Firmware Toolchain')}
       small
       footer={
         <>
           <button className="btn" onClick={() => void refreshToolchain()} disabled={busy}>
-            <Icon name="reset" /> Re-check
+            <Icon name="reset" /> {t('Re-check')}
           </button>
           {isTauri && (
             <button className="btn primary" onClick={install} disabled={busy}>
-              <Icon name="package" /> {status?.installed ? 'Reinstall / update' : 'Install toolchain'}
+              <Icon name="package" /> {status?.installed ? t('Reinstall / update') : t('Install toolchain')}
             </button>
           )}
         </>
       }
     >
       <p style={{ marginTop: 0 }}>
-        Firmware is compiled locally by <b>PlatformIO Core</b> (Apache-2.0) with the official AVR GCC toolchain and Arduino core. After a
-        one-time installation (internet required), compilation works fully offline.
+        {rich(
+          t(
+            'Firmware is compiled locally by {pio} (Apache-2.0) with the official AVR GCC toolchain and Arduino core. After a one-time installation (internet required), compilation works fully offline.',
+          ),
+          { pio: <b>PlatformIO Core</b> },
+        )}
       </p>
       <table className="kbd-table">
         <tbody>
           <tr>
-            <td>Status</td>
-            <td style={{ color: status?.installed ? 'var(--ok)' : 'var(--warn)' }}>{status ? (status.installed ? 'Installed' : 'Not installed') : 'Unknown'}</td>
+            <td>{t('Status')}</td>
+            <td style={{ color: status?.installed ? 'var(--ok)' : 'var(--warn)' }}>{status ? (status.installed ? t('Installed') : t('Not installed')) : t('Unknown')}</td>
           </tr>
           <tr>
             <td>PlatformIO</td>
             <td>{status?.pioVersion ?? '—'}</td>
           </tr>
           <tr>
-            <td>Platforms</td>
+            <td>{t('Platforms')}</td>
             <td>{status?.platforms.join(', ') || '—'}</td>
           </tr>
           <tr>
-            <td>Location</td>
-            <td style={{ fontFamily: 'var(--font-mono)', fontSize: 11, wordBreak: 'break-all' }}>{status?.root ?? '—'}</td>
+            <td>{t('Location')}</td>
+            <td className="ltr" style={{ fontFamily: 'var(--font-mono)', fontSize: 11, wordBreak: 'break-all' }}>
+              {status?.root ?? '—'}
+            </td>
           </tr>
         </tbody>
       </table>
-      {!isTauri && <p className="note" style={{ marginTop: 10 }}>Running in development (browser) mode: the dev server's local toolchain is used.</p>}
-      {isTauri && <p style={{ fontSize: 11.5, color: 'var(--text-3)' }}>Installation needs Python 3.9+ on the PATH. It creates a private environment; nothing is installed system-wide.</p>}
-      {(busy || log) && <div className="log-box">{log || 'Starting…'}</div>}
+      {!isTauri && (
+        <p className="note" style={{ marginTop: 10 }}>
+          {t("Running in development (browser) mode: the dev server's local toolchain is used.")}
+        </p>
+      )}
+      {isTauri && (
+        <p style={{ fontSize: 11.5, color: 'var(--text-3)' }}>
+          {t('Installation needs Python 3.9+ on the PATH. It creates a private environment; nothing is installed system-wide.')}
+        </p>
+      )}
+      {(busy || log) && <div className="log-box">{log || t('Starting…')}</div>}
     </Modal>
   );
 }
 
 function ShortcutsDialog() {
+  const t = useT();
   const rows: [string, string][] = [
-    ['Run / resume (compiles if needed)', 'F5'],
-    ['Pause', 'F6'],
-    ['Stop', 'Shift+F5'],
-    ['Reset board', 'Ctrl+F5'],
-    ['Step 1 ms / one instruction', 'F10 / F11'],
-    ['Compile (while running: flash the board)', 'Ctrl+B'],
-    ['Command palette', 'Ctrl+Shift+P'],
-    ['Add a part', 'Ctrl+K or double-click the canvas'],
-    ['Search the library', '/'],
-    ['New / Open / Save', 'Ctrl+N / Ctrl+O / Ctrl+S'],
-    ['Undo / Redo', 'Ctrl+Z / Ctrl+Y'],
-    ['Copy / Cut / Paste / Duplicate', 'Ctrl+C / X / V / D'],
-    ['Delete selection', 'Del'],
-    ['Rotate CW / CCW', 'R / Shift+R'],
-    ['Flip horizontally', 'H'],
-    ['Nudge (×5 with Shift)', 'Arrow keys'],
-    ['Zoom in / out / 100%', '+ / − / 0'],
-    ['Fit circuit to window / zoom to selection', 'F / Shift+F'],
-    ['Focus the canvas (hide panels)', 'Ctrl+`'],
-    ['Toggle grid', 'G'],
-    ['Show voltages on wires', 'V'],
-    ['Wire colour (selected / new wire)', '1–9, C cycles'],
-    ['Pan', 'Right-drag, middle-drag, or Space + drag'],
-    ['Zoom at cursor', 'Mouse wheel'],
-    ['Start a wire', 'Click a pin (or drag from it)'],
-    ['Add a bend while wiring', 'Click empty canvas'],
-    ['Cancel wire / probe / selection', 'Esc or right-click'],
-    ['Junction on a wire', 'Finish a wire on another wire'],
-    ['Add bend to a wire', 'Double-click or drag the selected wire'],
-    ['Multi-select', 'Shift+click or drag a box'],
-    ['Interact while simulating', 'Click buttons, drag/scroll knobs'],
-    ['Move a part while simulating', 'Alt + drag'],
+    [t('Run / resume (compiles if needed)'), 'F5'],
+    [t('Pause'), 'F6'],
+    [t('Stop'), 'Shift+F5'],
+    [t('Reset board'), 'Ctrl+F5'],
+    [t('Step 1 ms / one instruction'), 'F10 / F11'],
+    [t('Compile (while running: flash the board)'), 'Ctrl+B'],
+    [t('Command palette'), 'Ctrl+Shift+P'],
+    [t('Add a part'), t('Ctrl+K or double-click the canvas')],
+    [t('Search the library'), '/'],
+    [t('New / Open / Save'), 'Ctrl+N / Ctrl+O / Ctrl+S'],
+    [t('Undo / Redo'), 'Ctrl+Z / Ctrl+Y'],
+    [t('Copy / Cut / Paste / Duplicate'), 'Ctrl+C / X / V / D'],
+    [t('Delete selection'), 'Del'],
+    [t('Rotate CW / CCW'), 'R / Shift+R'],
+    [t('Flip horizontally'), 'H'],
+    [t('Nudge (×5 with Shift)'), t('Arrow keys')],
+    [t('Zoom in / out / 100%'), '+ / − / 0'],
+    [t('Fit circuit to window / zoom to selection'), 'F / Shift+F'],
+    [t('Focus the canvas (hide panels)'), 'Ctrl+`'],
+    [t('Toggle grid'), 'G'],
+    [t('Show voltages on wires'), 'V'],
+    [t('Wire colour (selected / new wire)'), t('1–9, C cycles')],
+    [t('Pan'), t('Right-drag, middle-drag, or Space + drag')],
+    [t('Zoom at cursor'), t('Mouse wheel')],
+    [t('Start a wire'), t('Click a pin (or drag from it)')],
+    [t('Add a bend while wiring'), t('Click empty canvas')],
+    [t('Cancel wire / probe / selection'), t('Esc or right-click')],
+    [t('Junction on a wire'), t('Finish a wire on another wire')],
+    [t('Add bend to a wire'), t('Double-click or drag the selected wire')],
+    [t('Multi-select'), t('Shift+click or drag a box')],
+    [t('Interact while simulating'), t('Click buttons, drag/scroll knobs')],
+    [t('Move a part while simulating'), t('Alt + drag')],
   ];
   return (
-    <Modal title="Keyboard & Mouse" small>
+    <Modal title={t('Keyboard & Mouse')} small>
       <table className="kbd-table">
         <tbody>
           {rows.map(([a, b]) => (
             <tr key={a}>
               <td>{a}</td>
-              <td style={{ textAlign: 'right' }}>
+              <td style={{ textAlign: 'end' }}>
                 <kbd>{b}</kbd>
               </td>
             </tr>
@@ -204,18 +223,31 @@ function ShortcutsDialog() {
 }
 
 function AboutDialog() {
+  const t = useT();
   const all = registry.all();
   return (
-    <Modal title="Embedded Systems Virtual Lab" small footer={<button className="btn" onClick={commands.shortcuts.run}>Shortcuts</button>}>
-      <p style={{ marginTop: 0 }}>Version {APP_VERSION} — an offline desktop laboratory for designing, programming and simulating embedded systems.</p>
+    <Modal
+      title={t('Embedded Systems Virtual Lab')}
+      small
+      footer={
+        <button className="btn" onClick={commands.shortcuts.run}>
+          {t('Shortcuts')}
+        </button>
+      }
+    >
+      <p style={{ marginTop: 0 }}>{t('Version {version} — an offline desktop laboratory for designing, programming and simulating embedded systems.', { version: APP_VERSION })}</p>
       <p>
-        Component library: {all.length} parts ({all.filter((d) => d.simulation.support === 'full').length} fully simulated,{' '}
-        {all.filter((d) => d.simulation.support === 'partial').length} partially, {all.filter((d) => d.simulation.support === 'visual-only').length}{' '}
-        visual-only).
+        {t('Component library: {n} parts ({full} fully simulated, {partial} partially, {visual} visual-only).', {
+          n: all.length,
+          full: all.filter((d) => d.simulation.support === 'full').length,
+          partial: all.filter((d) => d.simulation.support === 'partial').length,
+          visual: all.filter((d) => d.simulation.support === 'visual-only').length,
+        })}
       </p>
       <p style={{ fontSize: 12, color: 'var(--text-2)' }}>
-        Built on open-source technology: Tauri, React, avr8js and @wokwi/elements (Wokwi, MIT), Monaco Editor (MIT), PlatformIO Core (Apache-2.0),
-        AVR GCC (GPL with runtime exception, invoked as a separate program). See docs/01-technology-research.md for the full licence survey.
+        {t(
+          'Built on open-source technology: Tauri, React, avr8js and @wokwi/elements (Wokwi, MIT), Monaco Editor (MIT), PlatformIO Core (Apache-2.0), AVR GCC (GPL with runtime exception, invoked as a separate program). See docs/01-technology-research.md for the full licence survey.',
+        )}
       </p>
     </Modal>
   );

@@ -47,6 +47,7 @@ import {
   History,
   Info,
   Keyboard,
+  Languages,
   Lightbulb,
   Magnet,
   Maximize,
@@ -134,6 +135,7 @@ const ICONS: Record<string, LucideIcon> = {
   build: Hammer,
   info: Info,
   keyboard: Keyboard,
+  languages: Languages,
   bulb: Lightbulb,
   magnet: Magnet,
   fit: Maximize,
@@ -195,7 +197,11 @@ const ICONS: Record<string, LucideIcon> = {
   wind: Wind,
 };
 
+/** Icons that point along the reading direction: mirrored in right-to-left layouts. */
+const DIRECTIONAL = new Set(['chevron-right', 'chevrons-right']);
+
 export function Icon({ name, size, className, fill }: { name: string; size?: number; className?: string; fill?: string }) {
   const C = ICONS[name] ?? Box;
-  return <C size={size} className={className} strokeWidth={1.75} fill={fill ?? 'none'} />;
+  const cls = DIRECTIONAL.has(name) ? `${className ?? ''} dir-icon`.trim() : className;
+  return <C size={size} className={cls} strokeWidth={1.75} fill={fill ?? 'none'} />;
 }

@@ -1,4 +1,6 @@
 import { useRef, useState } from 'react';
+import { t as translate } from '../../i18n';
+import { useT } from '../../i18n/react';
 import { storage } from '../../platform';
 import { captures } from '../../state/captures';
 import { useEditor } from '../../state/editor';
@@ -13,6 +15,7 @@ import { removeChannel } from './probes';
 const ROW = 34;
 
 export function LogicAnalyzer() {
+  const t = useT();
   const channels = useProject((s) => s.project.instruments.logic);
   const simState = useSim((s) => s.state);
   const [timeDiv, setTimeDiv] = useState(1e-3);
@@ -120,8 +123,8 @@ export function LogicAnalyzer() {
     );
     void storage
       .exportText(vcd, 'capture.vcd', { name: 'Value Change Dump', extensions: ['vcd'] })
-      .then((path) => path && useEditor.getState().notify(`Saved ${path.split(/[\\/]/).pop()}`, 'success'))
-      .catch((e) => useEditor.getState().notify(`Could not save the capture: ${(e as Error).message ?? e}`, 'error'));
+      .then((path) => path && useEditor.getState().notify(translate('Saved {file}', { file: path.split(/[\\/]/).pop() ?? path }), 'success'))
+      .catch((e) => useEditor.getState().notify(translate('Could not save the capture: {error}', { error: String((e as Error).message ?? e) }), 'error'));
   };
 
   const timeAt = (clientX: number, el: HTMLElement) => {
@@ -134,18 +137,18 @@ export function LogicAnalyzer() {
   return (
     <div className="dock-body">
       <div className="inst-bar">
-        <Tip content="Then click pins on the canvas to add channels" direct>
+        <Tip content={t('Then click pins on the canvas to add channels')} direct>
           <button className="tb-btn" onClick={() => useEditor.getState().set({ tool: 'probe-logic' })}>
             <Icon name="probe" />
-            <span className="label">Add probe</span>
+            <span className="label">{t('Add probe')}</span>
           </button>
         </Tip>
         <label>
-          Time
+          {t('Time')}
           <select className="tb-select" value={timeDiv} onChange={(e) => setTimeDiv(Number(e.target.value))}>
-            {TIME_DIVS.map((t) => (
-              <option key={t} value={t}>
-                {formatTime(t)}/div
+            {TIME_DIVS.map((d) => (
+              <option key={d} value={d}>
+                {formatTime(d)}/div
               </option>
             ))}
           </select>
@@ -159,24 +162,25 @@ export function LogicAnalyzer() {
               setEnd(captures.simTime);
             }}
           />{' '}
-          Follow live
+          {t('Follow live')}
         </label>
-        <Tip content="Export a Value Change Dump (open with PulseView or GTKWave)">
+        <Tip content={t('Export a Value Change Dump (open with PulseView or GTKWave)')}>
           <button className="tb-btn" onClick={exportVcd} disabled={!channels.length}>
             <Icon name="save" />
-            <span className="label">Export VCD</span>
+            <span className="label">{t('Export VCD')}</span>
           </button>
         </Tip>
         <span className="grow" />
         <span style={{ color: 'var(--text-3)', fontSize: 11 }}>
-          {simState === 'stopped' ? 'Start the simulation to capture. ' : ''}Drag to pan · wheel to zoom when not following
+          {simState === 'stopped' ? `${t('Start the simulation to capture.')} ` : ''}
+          {t('Drag to pan · wheel to zoom when not following')}
         </span>
       </div>
       <div className="row-fill">
         <div className="chan-list">
           {channels.length === 0 && (
             <div style={{ padding: 10, color: 'var(--text-3)', lineHeight: 1.5 }}>
-              No channels. Click <b>Add probe</b> and then pins on the canvas (up to 8).
+              {t('No channels. Click Add probe and then pins on the canvas (up to 8).')}
             </div>
           )}
           {channels.map((c) => (
@@ -189,18 +193,18 @@ export function LogicAnalyzer() {
                 className="tb-select"
                 style={{ width: 62, height: 22, fontSize: 10.5 }}
                 value={decoders[c.id] ?? 0}
-                aria-label="Protocol decoder"
+                aria-label={t('Protocol decoder')}
                 onChange={(e) => setDecoders({ ...decoders, [c.id]: Number(e.target.value) })}
               >
-                <option value={0}>raw</option>
+                <option value={0}>{t('raw')}</option>
                 {[9600, 19200, 38400, 57600, 115200].map((b) => (
                   <option key={b} value={b}>
                     UART {b}
                   </option>
                 ))}
               </select>
-              <Tip content="Remove channel" direct>
-                <button className="icon-btn" aria-label="Remove channel" onClick={() => removeChannel('logic', c.id)}>
+              <Tip content={t('Remove channel')} direct>
+                <button className="icon-btn" aria-label={t('Remove channel')} onClick={() => removeChannel('logic', c.id)}>
                   <Icon name="x" size={12} />
                 </button>
               </Tip>

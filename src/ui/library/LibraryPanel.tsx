@@ -1,12 +1,14 @@
 import { createElement, memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { ComponentDefinition } from '../../core/model/component';
 import { registry } from '../../app/registry';
+import { tr, type MessageKey } from '../../i18n';
+import { useT } from '../../i18n/react';
 import { useEditor } from '../../state/editor';
 import { addComponentAtCenter } from '../workspace/actions';
 import { Icon } from '../common/Icon';
 import { Tip } from '../common/Tooltip';
 
-const SUPPORT_LABEL = { full: 'Simulated', partial: 'Partial', 'visual-only': 'Visual only' } as const;
+const SUPPORT_LABEL: Record<ComponentDefinition['simulation']['support'], MessageKey> = { full: 'Simulated', partial: 'Partial', 'visual-only': 'Visual only' };
 
 /** Transparent drag image (the canvas shows its own preview). */
 const EMPTY_DRAG_IMAGE = (() => {
@@ -66,6 +68,7 @@ interface ItemProps {
 }
 
 const Item = memo(function Item({ def, fav, active }: ItemProps) {
+  const t = useT();
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (active) ref.current?.scrollIntoView({ block: 'nearest' });
@@ -88,10 +91,10 @@ const Item = memo(function Item({ def, fav, active }: ItemProps) {
       >
         <Thumb def={def} />
         <span className="name">{def.name}</span>
-        <span className={`dot ${def.simulation.support}`} aria-label={SUPPORT_LABEL[def.simulation.support]} />
+        <span className={`dot ${def.simulation.support}`} aria-label={t(SUPPORT_LABEL[def.simulation.support])} />
         <button
           className={`icon-btn star${fav ? ' on' : ''}`}
-          aria-label={fav ? 'Remove from favourites' : 'Add to favourites'}
+          aria-label={fav ? t('Remove from favourites') : t('Add to favourites')}
           onClick={(e) => {
             e.stopPropagation();
             useEditor.getState().toggleFavorite(def.type);
@@ -105,6 +108,7 @@ const Item = memo(function Item({ def, fav, active }: ItemProps) {
 });
 
 export function LibraryPanel() {
+  const t = useT();
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   // Category collapse and the simulated-only filter persist between sessions.
@@ -135,19 +139,17 @@ export function LibraryPanel() {
   return (
     <div className="panel" style={{ height: '100%' }}>
       <div className="panel-header">
-        <span className="title">Components</span>
-        <Tip content={`${simulated} of ${total} parts have simulation models`} direct>
-          <span style={{ color: 'var(--text-3)', fontSize: 11 }}>
-            {total} parts · {simulated} simulated
-          </span>
+        <span className="title">{t('Components')}</span>
+        <Tip content={t('{n} of {total} parts have simulation models', { n: simulated, total })} direct>
+          <span style={{ color: 'var(--text-3)', fontSize: 11 }}>{t('{total} parts · {n} simulated', { total, n: simulated })}</span>
         </Tip>
       </div>
       <div className="lib-search">
         <div className="search-box">
           <Icon name="search" />
           <input
-            placeholder="Search parts (e.g. led, sensor, i2c)…  /"
-            aria-label="Search parts"
+            placeholder={t('Search parts (e.g. led, sensor, i2c)…  /')}
+            aria-label={t('Search parts')}
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -169,20 +171,20 @@ export function LibraryPanel() {
             }}
           />
           {query && (
-            <button className="icon-btn" aria-label="Clear search" onClick={() => setQuery('')}>
+            <button className="icon-btn" aria-label={t('Clear search')} onClick={() => setQuery('')}>
               <Icon name="x" />
             </button>
           )}
         </div>
         <div className="chips">
-          <Tip content="Hide visual-only parts" direct>
+          <Tip content={t('Hide visual-only parts')} direct>
             <button className={`chip${simOnly ? ' active' : ''}`} aria-pressed={simOnly} onClick={() => setSimOnly(!simOnly)}>
-              Simulated only
+              {t('Simulated only')}
             </button>
           </Tip>
           {/* Legend for the dots on each part (text, not a control). */}
-          <span className="lib-legend" aria-label="Simulation support legend">
-            <span className="dot full" /> full <span className="dot partial" /> partial <span className="dot visual-only" /> visual
+          <span className="lib-legend" aria-label={t('Simulation support legend')}>
+            <span className="dot full" /> {t('full')} <span className="dot partial" /> {t('partial')} <span className="dot visual-only" /> {t('visual')}
           </span>
         </div>
       </div>
@@ -190,20 +192,20 @@ export function LibraryPanel() {
         {query ? (
           <>
             <div className="lib-section">
-              Results <span className="count">{results.length}</span>
+              {t('Results')} <span className="count">{results.length}</span>
             </div>
             {results.map((d, i) => (
               <Item key={d.type} def={d} fav={favSet.has(d.type)} active={i === active} />
             ))}
-            {results.length > 0 && <div className="lib-sub">↑/↓ to choose · Enter adds to the canvas</div>}
-            {!results.length && <div className="lib-sub">No parts match “{query}”.</div>}
+            {results.length > 0 && <div className="lib-sub">{t('↑/↓ to choose · Enter adds to the canvas')}</div>}
+            {!results.length && <div className="lib-sub">{t('No parts match “{query}”.', { query })}</div>}
           </>
         ) : (
           <>
             {favorites.length > 0 && (
               <>
                 <div className="lib-section" onClick={() => toggle('__fav')}>
-                  <Icon name={collapsed.has('__fav') ? 'chevron-right' : 'chevron-down'} /> Favourites <span className="count">{favorites.length}</span>
+                  <Icon name={collapsed.has('__fav') ? 'chevron-right' : 'chevron-down'} className="chev" /> {t('Favourites')} <span className="count">{favorites.length}</span>
                 </div>
                 {!collapsed.has('__fav') &&
                   favorites
@@ -215,7 +217,7 @@ export function LibraryPanel() {
             {recent.length > 0 && (
               <>
                 <div className="lib-section" onClick={() => toggle('__recent')}>
-                  <Icon name={collapsed.has('__recent') ? 'chevron-right' : 'chevron-down'} /> Recently used
+                  <Icon name={collapsed.has('__recent') ? 'chevron-right' : 'chevron-down'} className="chev" /> {t('Recently used')}
                 </div>
                 {!collapsed.has('__recent') &&
                   recent
@@ -230,7 +232,7 @@ export function LibraryPanel() {
               return (
                 <div key={cat.name}>
                   <div className="lib-section" onClick={() => toggle(cat.name)}>
-                    <Icon name={open ? 'chevron-down' : 'chevron-right'} /> {cat.name} <span className="count">{cat.count}</span>
+                    <Icon name={open ? 'chevron-down' : 'chevron-right'} className="chev" /> {tr(cat.name)} <span className="count">{cat.count}</span>
                   </div>
                   {open &&
                     [...cat.subcategories.entries()].map(([sub, defs]) => {
@@ -238,7 +240,7 @@ export function LibraryPanel() {
                       if (!shown.length) return null;
                       return (
                         <div key={sub}>
-                          {cat.subcategories.size > 1 && <div className="lib-sub">{sub}</div>}
+                          {cat.subcategories.size > 1 && <div className="lib-sub">{tr(sub)}</div>}
                           {shown.map((d) => (
                             <Item key={d.type} def={d} fav={favSet.has(d.type)} />
                           ))}
@@ -256,21 +258,22 @@ export function LibraryPanel() {
 }
 
 function InfoCard({ def }: { def: ComponentDefinition }) {
+  const t = useT();
   const pins = def.pins.filter((p) => p.kind !== 'socket');
   return (
     <div className="lib-tooltip">
       <h4>{def.name}</h4>
-      <span className={`badge ${def.simulation.support}`}>{SUPPORT_LABEL[def.simulation.support]}</span>
+      <span className={`badge ${def.simulation.support}`}>{t(SUPPORT_LABEL[def.simulation.support])}</span>
       <p>{def.docs.summary}</p>
       {def.simulation.notes && <p style={{ fontSize: 11 }}>{def.simulation.notes}</p>}
       {pins.length > 0 && (
         <div className="pins">
-          Pins: {pins.slice(0, 40).map((p) => p.label ?? p.id).join(', ')}
+          {t('Pins:')} {pins.slice(0, 40).map((p) => p.label ?? p.id).join(', ')}
           {pins.length > 40 ? ` … (+${pins.length - 40})` : ''}
         </div>
       )}
-      {def.pins.some((p) => p.kind === 'socket') && <div className="pins">{def.pins.length} holes</div>}
-      <div className="hint">Drag onto the canvas or double-click to add</div>
+      {def.pins.some((p) => p.kind === 'socket') && <div className="pins">{t('{n} holes', { n: def.pins.length })}</div>}
+      <div className="hint">{t('Drag onto the canvas or double-click to add')}</div>
     </div>
   );
 }

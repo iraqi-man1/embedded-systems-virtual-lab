@@ -8,6 +8,7 @@ import { GRID } from '../../core/model/component';
 import { componentBounds, snapComponentPosition } from '../../core/circuit/geometry';
 import { carriedComponents } from '../../core/circuit/netlist';
 import { lookup, registry } from '../../app/registry';
+import { t } from '../../i18n';
 import { getNetlist } from '../../state/derived';
 import { useEditor } from '../../state/editor';
 import { createInstance, nextLabel, useProject } from '../../state/project';
@@ -267,7 +268,7 @@ export function netWireIds(wireId: string): string[] {
 export function setNetWireColor(wireId: string, color: string) {
   const ids = netWireIds(wireId);
   setWireColor(ids, color);
-  if (ids.length > 1) ed().notify(`Recoloured ${ids.length} wires on this net.`, 'info');
+  if (ids.length > 1) ed().notify(t('Recoloured {n} wires on this net.', { n: ids.length }), 'info');
 }
 
 /**
@@ -311,7 +312,7 @@ export function autoRouteWires(ids: string[]) {
       if (r) w.points = r;
     }
   });
-  if (routes.size < ids.length) ed().notify('Some wires could not be routed around parts automatically.', 'warning');
+  if (routes.size < ids.length) ed().notify(t('Some wires could not be routed around parts automatically.'), 'warning');
 }
 
 export function bringToFront(id: string, front = true) {

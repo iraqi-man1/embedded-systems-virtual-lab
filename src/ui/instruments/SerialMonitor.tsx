@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { HEX_LIMIT, hexDump, withTimestamps } from '../../core/instruments/serialLog';
+import { t } from '../../i18n';
+import { useT } from '../../i18n/react';
 import { storage } from '../../platform';
 import { useEditor } from '../../state/editor';
 import { useProject } from '../../state/project';
@@ -10,14 +12,15 @@ import { Tip } from '../common/Tooltip';
 const ENDINGS = { none: '', nl: '\n', cr: '\r', both: '\r\n' } as const;
 async function saveLog(text: string, label: string) {
   try {
-    const path = await storage.exportText(text, `serial-${label}.txt`, { name: 'Text', extensions: ['txt', 'log'] });
-    if (path) useEditor.getState().notify(`Saved ${path.split(/[\\/]/).pop()}`, 'success');
+    const path = await storage.exportText(text, `serial-${label}.txt`, { name: t('Text'), extensions: ['txt', 'log'] });
+    if (path) useEditor.getState().notify(t('Saved {file}', { file: path.split(/[\\/]/).pop() ?? path }), 'success');
   } catch (e) {
-    useEditor.getState().notify(`Could not save the log: ${(e as Error).message ?? e}`, 'error');
+    useEditor.getState().notify(t('Could not save the log: {error}', { error: String((e as Error).message ?? e) }), 'error');
   }
 }
 
 export function SerialMonitor() {
+  useT();
   const project = useProject((s) => s.project);
   const board = findTargetBoard(project);
   const text = useSim((s) => (board ? (s.serial[board.id] ?? '') : ''));
@@ -54,53 +57,58 @@ export function SerialMonitor() {
     <div className="dock-body">
       <div className="inst-bar">
         <span style={{ color: 'var(--text-2)' }}>
-          {board ? `${board.label} · USART0` : 'No board'}
-          {baud && text ? ` · ${Math.round(baud)} baud` : ''}
+          {board ? `${board.label} · USART0` : t('No board')}
+          {baud && text ? ` · ${t('{baud} baud', { baud: Math.round(baud) })}` : ''}
         </span>
         <span className="grow" />
-        <Tip content="Prefix lines with the simulation time">
+        <Tip content={t('Prefix lines with the simulation time')}>
           <button className={`tb-btn${timestamps ? ' active' : ''}`} aria-pressed={timestamps} disabled={view === 'hex'} onClick={() => useEditor.getState().setPrefs({ serialTimestamps: !timestamps })}>
             <Icon name="clock" />
-            <span className="label">Time</span>
+            <span className="label">{t('Time')}</span>
           </button>
         </Tip>
-        <Tip content={view === 'hex' ? 'Show as text' : `Show bytes in hex (last ${HEX_LIMIT / 1024} KB)`}>
+        <Tip content={view === 'hex' ? t('Show as text') : t('Show bytes in hex (last {kb} KB)', { kb: HEX_LIMIT / 1024 })}>
           <button className={`tb-btn${view === 'hex' ? ' active' : ''}`} aria-pressed={view === 'hex'} onClick={() => useEditor.getState().setPrefs({ serialView: view === 'hex' ? 'text' : 'hex' })}>
             <span className="label mono">0x</span>
           </button>
         </Tip>
-        <Tip content="Clear the output each time the simulation starts" direct>
+        <Tip content={t('Clear the output each time the simulation starts')} direct>
           <label>
-            <input type="checkbox" checked={clearOnRun} onChange={(e) => useEditor.getState().setPrefs({ serialClearOnRun: e.target.checked })} /> Clear on run
+            <input type="checkbox" checked={clearOnRun} onChange={(e) => useEditor.getState().setPrefs({ serialClearOnRun: e.target.checked })} /> {t('Clear on run')}
           </label>
         </Tip>
         <label>
-          <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} /> Autoscroll
+          <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} /> {t('Autoscroll')}
         </label>
-        <Tip content="Clear output">
-          <button className="tb-btn" onClick={clearSerial} aria-label="Clear output">
+        <Tip content={t('Clear output')}>
+          <button className="tb-btn" onClick={clearSerial} aria-label={t('Clear output')}>
             <Icon name="eraser" />
-            <span className="label">Clear</span>
+            <span className="label">{t('Clear')}</span>
           </button>
         </Tip>
-        <Tip content="Copy all">
-          <button className="tb-btn" onClick={() => navigator.clipboard?.writeText(shown)} aria-label="Copy all" disabled={!text}>
+        <Tip content={t('Copy all')}>
+          <button className="tb-btn" onClick={() => navigator.clipboard?.writeText(shown)} aria-label={t('Copy all')} disabled={!text}>
             <Icon name="copy" />
           </button>
         </Tip>
-        <Tip content="Save the log to a text file">
-          <button className="tb-btn" aria-label="Save log" disabled={!text} onClick={() => void saveLog(shown, board?.label ?? 'serial')}>
+        <Tip content={t('Save the log to a text file')}>
+          <button className="tb-btn" aria-label={t('Save log')} disabled={!text} onClick={() => void saveLog(shown, board?.label ?? 'serial')}>
             <Icon name="save" />
           </button>
         </Tip>
       </div>
       <pre ref={out} className="serial-out">
-        {shown || <span style={{ color: 'var(--text-3)' }}>{running ? 'Waiting for serial output…' : 'Serial output appears here when the simulation runs. Use Serial.begin() in your sketch.'}</span>}
+        {shown || (
+          <span className="placeholder" style={{ color: 'var(--text-3)' }}>
+            {running ? t('Waiting for serial output…') : t('Serial output appears here when the simulation runs. Use Serial.begin() in your sketch.')}
+          </span>
+        )}
       </pre>
       <div className="serial-in">
         <input
           className="input"
-          placeholder={running ? 'Type a message and press Enter to send to the board' : 'Start the simulation to send data'}
+          placeholder={running ? t('Type a message and press Enter to send to the board') : t('Start the simulation to send data')}
+          dir="auto"
           disabled={!running}
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -120,14 +128,14 @@ export function SerialMonitor() {
             }
           }}
         />
-        <select className="tb-select" value={ending} onChange={(e) => setEnding(e.target.value as keyof typeof ENDINGS)} aria-label="Line ending">
-          <option value="none">No line ending</option>
-          <option value="nl">Newline</option>
-          <option value="cr">Carriage return</option>
-          <option value="both">Both NL & CR</option>
+        <select className="tb-select" value={ending} onChange={(e) => setEnding(e.target.value as keyof typeof ENDINGS)} aria-label={t('Line ending')}>
+          <option value="none">{t('No line ending')}</option>
+          <option value="nl">{t('Newline')}</option>
+          <option value="cr">{t('Carriage return')}</option>
+          <option value="both">{t('Both NL & CR')}</option>
         </select>
         <button className="btn primary" onClick={send} disabled={!running}>
-          <Icon name="send" /> Send
+          <Icon name="send" /> {t('Send')}
         </button>
       </div>
     </div>

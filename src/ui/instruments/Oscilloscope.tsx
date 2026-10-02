@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useT } from '../../i18n/react';
 import { captures } from '../../state/captures';
 import { useEditor } from '../../state/editor';
 import { useProject } from '../../state/project';
@@ -69,6 +70,7 @@ function measure(id: string, t0: number, t1: number): Measure | null {
 }
 
 export function Oscilloscope() {
+  const t = useT();
   const channels = useProject((s) => s.project.instruments.scope);
   const simState = useSim((s) => s.state);
   const [timeDiv, setTimeDiv] = useState(1e-3);
@@ -200,24 +202,24 @@ export function Oscilloscope() {
   return (
     <div className="dock-body">
       <div className="inst-bar">
-        <Tip content="Then click a pin on the canvas to attach a channel" direct>
+        <Tip content={t('Then click a pin on the canvas to attach a channel')} direct>
           <button className="tb-btn" onClick={() => useEditor.getState().set({ tool: 'probe-scope' })}>
             <Icon name="probe" />
-            <span className="label">Add probe</span>
+            <span className="label">{t('Add probe')}</span>
           </button>
         </Tip>
         <label>
-          Time
+          {t('Time')}
           <select className="tb-select" value={timeDiv} onChange={(e) => setTimeDiv(Number(e.target.value))}>
-            {TIME_DIVS.map((t) => (
-              <option key={t} value={t}>
-                {formatTime(t)}/div
+            {TIME_DIVS.map((d) => (
+              <option key={d} value={d}>
+                {formatTime(d)}/div
               </option>
             ))}
           </select>
         </label>
         <label>
-          Trigger
+          {t('Trigger')}
           <select className="tb-select" value={trigSrc} onChange={(e) => setTrigSrc(Number(e.target.value))}>
             {channels.map((c, i) => (
               <option key={c.id} value={i}>
@@ -226,23 +228,23 @@ export function Oscilloscope() {
             ))}
           </select>
           <select className="tb-select" value={trigEdge} onChange={(e) => setTrigEdge(e.target.value as 'rising' | 'falling')}>
-            <option value="rising">↑ rising</option>
-            <option value="falling">↓ falling</option>
+            <option value="rising">↑ {t('rising')}</option>
+            <option value="falling">↓ {t('falling')}</option>
           </select>
           <input className="input" style={{ width: 56 }} type="number" step={0.1} value={trigLevel} onChange={(e) => setTrigLevel(Number(e.target.value))} /> V
         </label>
         <button className={`tb-btn${running ? '' : ' active'}`} onClick={() => setRunning(!running)}>
           <Icon name={running ? 'pause' : 'play'} />
-          <span className="label">{running ? 'Stop' : 'Run'}</span>
+          <span className="label">{running ? t('Stop') : t('Run')}</span>
         </button>
         <span className="grow" />
-        {simState === 'stopped' && <span style={{ color: 'var(--text-3)' }}>Start the simulation to capture.</span>}
+        {simState === 'stopped' && <span style={{ color: 'var(--text-3)' }}>{t('Start the simulation to capture.')}</span>}
       </div>
       <div className="row-fill">
         <div className="chan-list">
           {channels.length === 0 && (
             <div style={{ padding: 10, color: 'var(--text-3)', lineHeight: 1.5 }}>
-              No channels. Click <b>Add probe</b>, then click a pin or breadboard hole.
+              {t('No channels. Click Add probe, then click a pin or breadboard hole.')}
             </div>
           )}
           {channels.map((c, i) => {
@@ -256,8 +258,8 @@ export function Oscilloscope() {
                       CH{i + 1} {c.label}
                     </span>
                   </Tip>
-                  <Tip content="Remove channel" direct>
-                    <button className="icon-btn" aria-label="Remove channel" onClick={() => removeChannel('scope', c.id)}>
+                  <Tip content={t('Remove channel')} direct>
+                    <button className="icon-btn" aria-label={t('Remove channel')} onClick={() => removeChannel('scope', c.id)}>
                       <Icon name="x" size={12} />
                     </button>
                   </Tip>
@@ -270,14 +272,14 @@ export function Oscilloscope() {
                   ))}
                 </select>
                 {m && (
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--text-2)', lineHeight: 1.45 }}>
-                    max {formatEngineering(m.vmax, 'V')} · min {formatEngineering(m.vmin, 'V')}
+                  <div className="ltr" style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--text-2)', lineHeight: 1.45 }}>
+                    {t('max')} {formatEngineering(m.vmax, 'V')} · {t('min')} {formatEngineering(m.vmin, 'V')}
                     <br />
-                    avg {formatEngineering(m.vavg, 'V')}
+                    {t('avg')} {formatEngineering(m.vavg, 'V')}
                     {m.freq !== null && (
                       <>
                         <br />
-                        f {formatEngineering(m.freq, 'Hz')} · duty {((m.duty ?? 0) * 100).toFixed(1)}%
+                        f {formatEngineering(m.freq, 'Hz')} · {t('duty')} {((m.duty ?? 0) * 100).toFixed(1)}%
                       </>
                     )}
                   </div>

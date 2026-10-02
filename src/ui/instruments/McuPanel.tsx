@@ -5,13 +5,15 @@
 import { useMemo, useRef, useState } from 'react';
 import { lookup } from '../../app/registry';
 import type { McuStatus } from '../../core/sim/types';
+import type { MessageKey } from '../../i18n';
+import { useT } from '../../i18n/react';
 import { useNetlist } from '../../state/derived';
 import { useProject } from '../../state/project';
 import { findTargetBoard, useSim } from '../../state/sim';
 import { Tip } from '../common/Tooltip';
 
 const SREG_FLAGS = ['I', 'T', 'H', 'S', 'V', 'N', 'Z', 'C'];
-const SREG_NAMES: Record<string, string> = {
+const SREG_NAMES: Record<string, MessageKey> = {
   I: 'Global interrupt enable',
   T: 'Bit copy storage',
   H: 'Half carry',
@@ -31,7 +33,7 @@ function Bar({ label, used, total, extra }: { label: string; used: number | null
     <div className="mcu-mem">
       <div className="mcu-mem-head">
         <span>{label}</span>
-        <span className="mono">
+        <span className="mono ltr">
           {used == null ? '—' : `${used.toLocaleString('en-US')} / ${total.toLocaleString('en-US')} B (${pct.toFixed(1)} %)`}
           {extra ? ` · ${extra}` : ''}
         </span>
@@ -63,6 +65,7 @@ function Registers({ r }: { r: number[] }) {
 }
 
 export function McuPanel() {
+  const t = useT();
   const project = useProject((s) => s.project);
   const mcus = useSim((s) => s.mcus);
   const voltages = useSim((s) => s.voltages);
@@ -89,7 +92,7 @@ export function McuPanel() {
     });
   }, [board, def, status, netlist]);
 
-  if (!board || !mcu) return <div className="dock-body empty-note">Add a programmable board (e.g. Arduino Uno) to inspect its microcontroller.</div>;
+  if (!board || !mcu) return <div className="dock-body empty-note">{t('Add a programmable board (e.g. Arduino Uno) to inspect its microcontroller.')}</div>;
 
   const dbg = status?.debug;
   const built = compile.hex[board.id] ? compile : null;
@@ -99,7 +102,7 @@ export function McuPanel() {
     <div className="dock-body mcu-panel">
       <div className="inst-bar">
         {mcus.length > 1 ? (
-          <select className="tb-select" value={status?.componentId} onChange={(e) => setChosen(e.target.value)} aria-label="Board">
+          <select className="tb-select" value={status?.componentId} onChange={(e) => setChosen(e.target.value)} aria-label={t('Board')}>
             {mcus.map((m) => {
               const c = project.circuit.components.find((x) => x.id === m.componentId);
               return (
@@ -114,21 +117,21 @@ export function McuPanel() {
             {board.label} · {def.name}
           </span>
         )}
-        <span className="mono" style={{ color: 'var(--text-3)' }}>
+        <span className="mono ltr" style={{ color: 'var(--text-3)' }}>
           {mcu.chip.toUpperCase()} · {(mcu.clockHz / 1e6).toLocaleString('en-US')} MHz · {mcu.vcc} V
         </span>
         <span className="grow" />
         <label>
-          <input type="checkbox" checked={wiredOnly} onChange={(e) => setWiredOnly(e.target.checked)} /> Wired pins only
+          <input type="checkbox" checked={wiredOnly} onChange={(e) => setWiredOnly(e.target.checked)} /> {t('Wired pins only')}
         </label>
       </div>
       {!status ? (
         <div className="empty-note">
-          {simState === 'stopped' ? 'Run the simulation to see pin states and registers.' : `${board.label} is not running firmware.`}
+          {simState === 'stopped' ? t('Run the simulation to see pin states and registers.') : t('{board} is not running firmware.', { board: board.label })}
           {built && (
             <div className="mcu-side" style={{ maxWidth: 420, margin: '12px auto 0' }}>
-              <Bar label="Flash" used={built.flashBytes} total={mcu.flashBytes} />
-              <Bar label="RAM (globals)" used={built.ramBytes} total={mcu.sramBytes} />
+              <Bar label={t('Flash')} used={built.flashBytes} total={mcu.flashBytes} />
+              <Bar label={t('RAM (globals)')} used={built.ramBytes} total={mcu.sramBytes} />
             </div>
           )}
         </div>
@@ -143,31 +146,36 @@ export function McuPanel() {
                 <span className="k">SP</span> {dbg ? hex(dbg.sp, 4) : '—'}
               </div>
               <div>
-                <span className="k">Cycles</span> {status.cycles.toLocaleString('en-US')}
+                <span className="k">{t('Cycles')}</span> {status.cycles.toLocaleString('en-US')}
               </div>
             </div>
             {dbg && (
               <div className="mcu-sreg" aria-label={`SREG ${hex(dbg.sreg, 2)}`}>
                 <span className="k mono">SREG</span>
                 {SREG_FLAGS.map((f, i) => (
-                  <Tip key={f} content={`${f}: ${SREG_NAMES[f]}`} direct>
+                  <Tip key={f} content={`${f}: ${t(SREG_NAMES[f])}`} direct>
                     <span className={`flag${dbg.sreg & (0x80 >> i) ? ' on' : ''}`}>{f}</span>
                   </Tip>
                 ))}
               </div>
             )}
-            <Bar label="Flash" used={built?.flashBytes ?? null} total={mcu.flashBytes} />
-            <Bar label="RAM" used={built?.ramBytes != null && stack != null ? built.ramBytes + stack : null} total={mcu.sramBytes} extra={stack != null ? `stack ${stack} B` : undefined} />
+            <Bar label={t('Flash')} used={built?.flashBytes ?? null} total={mcu.flashBytes} />
+            <Bar
+              label="RAM"
+              used={built?.ramBytes != null && stack != null ? built.ramBytes + stack : null}
+              total={mcu.sramBytes}
+              extra={stack != null ? t('stack {n} B', { n: stack }) : undefined}
+            />
             {dbg && <Registers r={dbg.r} />}
           </div>
           <div className="mcu-pins">
             <table>
               <thead>
                 <tr>
-                  <th>Pin</th>
-                  <th>Mode</th>
-                  <th>Level</th>
-                  <th className="num">Voltage</th>
+                  <th>{t('Pin')}</th>
+                  <th>{t('Mode')}</th>
+                  <th>{t('Level')}</th>
+                  <th className="num">{t('Voltage')}</th>
                   <th className="num">PWM</th>
                 </tr>
               </thead>
@@ -189,7 +197,7 @@ export function McuPanel() {
                         <td className="mono">{MODE[drive] ?? drive}</td>
                         <td>
                           {floating ? (
-                            <span className="pin-lvl float">floating</span>
+                            <span className="pin-lvl float">{t('floating')}</span>
                           ) : level === undefined ? (
                             '—'
                           ) : (
@@ -203,7 +211,7 @@ export function McuPanel() {
                   })}
               </tbody>
             </table>
-            {wiredOnly && !rows.some((r) => r.wired) && <div className="empty-note">No pins of {board.label} are wired yet.</div>}
+            {wiredOnly && !rows.some((r) => r.wired) && <div className="empty-note">{t('No pins of {board} are wired yet.', { board: board.label })}</div>}
           </div>
         </div>
       )}

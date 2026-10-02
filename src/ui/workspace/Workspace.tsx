@@ -14,6 +14,8 @@ import { coalescedEdit, createInstance, createWire, useProject } from '../../sta
 import { sendInput, useSim } from '../../state/sim';
 import { useErc, useNetlist } from '../../state/derived';
 import { formatEngineering } from '../../core/model/units';
+import { formatShortDate } from '../../i18n';
+import { useT } from '../../i18n/react';
 import { ComponentView } from './ComponentView';
 import { WireLayer, type Overlay } from './WireLayer';
 import { hitPin, insertionPreview, marqueeSelection, nearestSegment, pinIndex, pinPosition, pointAlong, polylineLength, wirePolyline, type IndexedPin } from './geometry';
@@ -52,17 +54,18 @@ function wireColorFor(a: IndexedPin | undefined, b: IndexedPin | undefined, fall
 
 /** Recently opened projects on the empty canvas. */
 function RecentProjects() {
+  const t = useT();
   const recent = useEditor((s) => s.recentProjects);
   if (!recent.length) return null;
   return (
     <div className="recent-projects">
-      <h4>Recent projects</h4>
+      <h4>{t('Recent projects')}</h4>
       {recent.slice(0, 5).map((r) => (
         <Tip key={r.path} content={r.path} side="right" direct>
           <button className="recent-item" onClick={() => void openRecent(r.path)}>
             <Icon name="history" />
             <span className="name">{fileTitle(r.path)}</span>
-            <span className="when">{new Date(r.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+            <span className="when">{formatShortDate(r.at)}</span>
           </button>
         </Tip>
       ))}
@@ -71,6 +74,7 @@ function RecentProjects() {
 }
 
 export function Workspace() {
+  const t = useT();
   const circuit = useProject((s) => s.project.circuit);
   const instruments = useProject((s) => s.project.instruments);
   const viewport = useEditor((s) => s.viewport);
@@ -768,11 +772,11 @@ export function Workspace() {
           {hover.inst.label}.{hover.pin.label ?? hover.pin.id}
         </b>
         {hover.pin.description ? ` — ${hover.pin.description}` : ''}
-        {net && <span style={{ color: 'var(--text-3)' }}> · net {net.name}</span>}
+        {net && <span style={{ color: 'var(--text-3)' }}> · {t('net {name}', { name: net.name })}</span>}
         {simulating && (
           <span className="v">
             {' '}
-            · {v !== undefined ? formatEngineering(v, 'V') : 'floating'}
+            · {v !== undefined ? formatEngineering(v, 'V') : t('floating')}
             {drive ? ` (${drive})` : ''}
           </span>
         )}
@@ -838,7 +842,7 @@ export function Workspace() {
         )}
         {c.label}
         {def.simulation.support === 'visual-only' &&
-          (simulating ? <span className="vo-tag">not simulated</span> : <span className="vo"> (visual)</span>)}
+          (simulating ? <span className="vo-tag">{t('not simulated')}</span> : <span className="vo"> ({t('visual')})</span>)}
       </div>
     );
   });
@@ -896,15 +900,14 @@ export function Workspace() {
       </div>
       {!circuit.components.length && (
         <div className="canvas-hint">
-          <h3>Start building your circuit</h3>
-          Drag parts from the library on the left onto this canvas. Click a pin to start a wire, click another pin to finish it.
-          Legs dropped onto breadboard holes connect automatically.
+          <h3>{t('Start building your circuit')}</h3>
+          {t('Drag parts from the library onto this canvas. Click a pin to start a wire, click another pin to finish it. Legs dropped onto breadboard holes connect automatically.')}
           <div className="btns">
             <button className="btn primary" onClick={() => loadExample('blink')}>
-              <Icon name="sparkles" /> Load the Blink example
+              <Icon name="sparkles" /> {t('Load the Blink example')}
             </button>
             <button className="btn" onClick={() => useEditor.getState().set({ dialog: 'examples' })}>
-              <Icon name="book" /> Browse examples
+              <Icon name="book" /> {t('Browse examples')}
             </button>
           </div>
           <RecentProjects />
@@ -914,12 +917,12 @@ export function Workspace() {
       {simulating && <div className={`sim-frame ${simState}`} />}
       {wiring && (
         <div className="sim-banner">
-          Drawing wire — click a pin to finish, click the canvas to add a bend, Esc or right-click to cancel
+          {t('Drawing wire — click a pin to finish, click the canvas to add a bend, Esc or right-click to cancel')}
         </div>
       )}
       <div className="zoom-ctl" onPointerDown={(e) => e.stopPropagation()}>
-        <Tip content="Zoom out" shortcut="−" side="top">
-          <button className="icon-btn" aria-label="Zoom out" onClick={() => zoomBy(1 / 1.2)}>
+        <Tip content={t('Zoom out')} shortcut="−" side="top">
+          <button className="icon-btn" aria-label={t('Zoom out')} onClick={() => zoomBy(1 / 1.2)}>
             <Icon name="zoom-out" />
           </button>
         </Tip>
@@ -927,23 +930,23 @@ export function Workspace() {
           side="top"
           align="center"
           trigger={
-            <button className="zoom-level" aria-label="Zoom presets">
+            <button className="zoom-level" aria-label={t('Zoom presets')}>
               {Math.round(viewport.zoom * 100)}%
             </button>
           }
         >
           <ZoomItems />
           <MenuSeparator />
-          <MenuItem label="Fit to window" icon="fit" shortcut="F" onSelect={fitView} />
-          <MenuItem label="Zoom to selection" icon="zoom-in" shortcut="Shift+F" onSelect={zoomToSelection} disabled={!selectedComponents.length} />
+          <MenuItem label={t('Fit to window')} icon="fit" shortcut="F" onSelect={fitView} />
+          <MenuItem label={t('Zoom to selection')} icon="zoom-in" shortcut="Shift+F" onSelect={zoomToSelection} disabled={!selectedComponents.length} />
         </DropdownMenu>
-        <Tip content="Zoom in" shortcut="+" side="top">
-          <button className="icon-btn" aria-label="Zoom in" onClick={() => zoomBy(1.2)}>
+        <Tip content={t('Zoom in')} shortcut="+" side="top">
+          <button className="icon-btn" aria-label={t('Zoom in')} onClick={() => zoomBy(1.2)}>
             <Icon name="zoom-in" />
           </button>
         </Tip>
-        <Tip content="Fit to view" shortcut="F" side="top">
-          <button className="icon-btn" aria-label="Fit to view" onClick={fitView}>
+        <Tip content={t('Fit to view')} shortcut="F" side="top">
+          <button className="icon-btn" aria-label={t('Fit to view')} onClick={fitView}>
             <Icon name="fit" />
           </button>
         </Tip>

@@ -4,6 +4,8 @@ import { WIRE_COLORS } from '../../core/model/circuit';
 import type { ComponentDefinition, PropertyDefinition } from '../../core/model/component';
 import { formatEngineering, parseEngineering } from '../../core/model/units';
 import { lookup, registry } from '../../app/registry';
+import { tr, type MessageKey } from '../../i18n';
+import { rich, useT } from '../../i18n/react';
 import { useNetlist, useErc } from '../../state/derived';
 import { useEditor } from '../../state/editor';
 import { coalescedEdit, useProject } from '../../state/project';
@@ -13,9 +15,10 @@ import { Tip } from '../common/Tooltip';
 import { clearWirePoints, deleteSelection, flipSelection, rotateSelection, setNetWireColor, setWireColor, autoRouteWires } from '../workspace/actions';
 import { pinLabel } from '../instruments/probes';
 
-const SUPPORT_LABEL = { full: 'Simulated', partial: 'Partially simulated', 'visual-only': 'Visual only' } as const;
+const SUPPORT_LABEL: Record<ComponentDefinition['simulation']['support'], MessageKey> = { full: 'Simulated', partial: 'Partially simulated', 'visual-only': 'Visual only' };
 
 function PropertyField({ inst, def, p }: { inst: ComponentInstance; def: ComponentDefinition; p: PropertyDefinition }) {
+  useT();
   const value = inst.props[p.key] ?? p.default;
   const simulating = useSim((s) => s.state !== 'stopped');
   const [text, setText] = useState(String(value));
@@ -37,7 +40,7 @@ function PropertyField({ inst, def, p }: { inst: ComponentInstance; def: Compone
       <select className="input" value={String(value)} onChange={(e) => commit(e.target.value)}>
         {p.options?.map((o) => (
           <option key={o.value} value={o.value}>
-            {o.label}
+            {tr(o.label)}
           </option>
         ))}
       </select>
@@ -57,7 +60,7 @@ function PropertyField({ inst, def, p }: { inst: ComponentInstance; def: Compone
           onPointerUp={() => useProject.getState().end()}
           onChange={(e) => commit(Number(e.target.value), true)}
         />
-        <span style={{ fontFamily: 'var(--font-mono)', minWidth: 44, textAlign: 'right' }}>
+        <span className="ltr" style={{ fontFamily: 'var(--font-mono)', minWidth: 44, textAlign: 'end' }}>
           {Number(value).toFixed(p.step && p.step < 0.1 ? 2 : 1)}
           {p.unit ? ` ${p.unit}` : ''}
         </span>
@@ -100,10 +103,10 @@ function PropertyField({ inst, def, p }: { inst: ComponentInstance; def: Compone
     <div className="field">
       {p.description ? (
         <Tip content={p.description} side="left" direct>
-          <label className="has-tip">{p.label}</label>
+          <label className="has-tip">{tr(p.label)}</label>
         </Tip>
       ) : (
-        <label>{p.label}</label>
+        <label>{tr(p.label)}</label>
       )}
       {control}
     </div>
@@ -111,6 +114,7 @@ function PropertyField({ inst, def, p }: { inst: ComponentInstance; def: Compone
 }
 
 function ComponentInspector({ inst, def }: { inst: ComponentInstance; def: ComponentDefinition }) {
+  const t = useT();
   const netlist = useNetlist();
   const voltages = useSim((s) => s.voltages);
   const driven = useSim((s) => s.driven);
@@ -129,13 +133,16 @@ function ComponentInspector({ inst, def }: { inst: ComponentInstance; def: Compo
       <div className="insp-head">
         <h3>{def.name}</h3>
         <div className="sub">
-          <span className={`badge ${def.simulation.support}`}>{SUPPORT_LABEL[def.simulation.support]}</span>
-          <span>{def.category}{def.subcategory ? ` › ${def.subcategory}` : ''}</span>
+          <span className={`badge ${def.simulation.support}`}>{t(SUPPORT_LABEL[def.simulation.support])}</span>
+          <span>
+            {tr(def.category)}
+            {def.subcategory ? ` › ${tr(def.subcategory)}` : ''}
+          </span>
         </div>
       </div>
       <div className="insp-sec">
         <div className="field">
-          <label>Reference</label>
+          <label>{t('Reference')}</label>
           <input
             className="input"
             value={label}
@@ -148,18 +155,18 @@ function ComponentInspector({ inst, def }: { inst: ComponentInstance; def: Compo
           <PropertyField key={p.key} inst={inst} def={def} p={p} />
         ))}
         <div className="btn-row" style={{ marginTop: 8 }}>
-          <Tip content="Rotate 90° clockwise" shortcut="R" direct>
+          <Tip content={t('Rotate 90° clockwise')} shortcut="R" direct>
             <button className="btn" onClick={() => rotateSelection(90)}>
-              <Icon name="rotate" /> Rotate
+              <Icon name="rotate" /> {t('Rotate')}
             </button>
           </Tip>
-          <Tip content="Flip horizontally" shortcut="H" direct>
+          <Tip content={t('Flip horizontally')} shortcut="H" direct>
             <button className="btn" onClick={flipSelection}>
-              <Icon name="flip" /> Flip
+              <Icon name="flip" /> {t('Flip')}
             </button>
           </Tip>
-          <Tip content="Delete" shortcut="Del" direct>
-            <button className="btn danger" onClick={deleteSelection} aria-label="Delete">
+          <Tip content={t('Delete')} shortcut="Del" direct>
+            <button className="btn danger" onClick={deleteSelection} aria-label={t('Delete')}>
               <Icon name="trash" />
             </button>
           </Tip>
@@ -167,7 +174,7 @@ function ComponentInspector({ inst, def }: { inst: ComponentInstance; def: Compo
       </div>
       {(erc.length > 0 || simDiags.length > 0) && (
         <div className="insp-sec">
-          <div className="h">Problems</div>
+          <div className="h">{t('Problems')}</div>
           {[...erc, ...simDiags].map((d, i) => (
             <div key={i} className={`note${d.severity !== 'info' ? ' warn' : ''}`} style={{ marginBottom: 4 }}>
               <span className={`sev-${d.severity}`}>●</span> {d.message}
@@ -177,14 +184,14 @@ function ComponentInspector({ inst, def }: { inst: ComponentInstance; def: Compo
       )}
       {def.simulation.support !== 'full' && (
         <div className="insp-sec">
-          <div className="h">Simulation</div>
-          <div className={`note${def.simulation.support === 'visual-only' ? ' warn' : ''}`}>{def.simulation.notes ?? 'Partial model.'}</div>
+          <div className="h">{t('Simulation')}</div>
+          <div className={`note${def.simulation.support === 'visual-only' ? ' warn' : ''}`}>{def.simulation.notes ?? t('Partial model.')}</div>
         </div>
       )}
       {pins.length > 0 && (
         <div className="insp-sec">
           <div className="h">
-            Pins <span className="r">{simulating ? 'live' : `${pins.length}`}</span>
+            {t('Pins')} <span className="r">{simulating ? t('live') : `${pins.length}`}</span>
           </div>
           <table className="pin-table">
             <tbody>
@@ -204,7 +211,7 @@ function ComponentInspector({ inst, def }: { inst: ComponentInstance; def: Compo
                     )}
                     <td style={{ color: connected ? 'var(--text-2)' : 'var(--text-3)' }}>{connected ? n!.name : '—'}</td>
                     <td className="mono" style={{ color: 'var(--text-3)' }}>{mcu?.pins[p.id] ?? ''}</td>
-                    <td className="v">{simulating ? (v !== undefined ? formatEngineering(v, 'V', 3) : connected ? 'float' : '') : ''}</td>
+                    <td className="v">{simulating ? (v !== undefined ? formatEngineering(v, 'V', 3) : connected ? t('float') : '') : ''}</td>
                   </tr>
                 );
               })}
@@ -213,13 +220,20 @@ function ComponentInspector({ inst, def }: { inst: ComponentInstance; def: Compo
         </div>
       )}
       <div className="insp-sec">
-        <div className="h">Documentation</div>
+        <div className="h">{t('Documentation')}</div>
         <p className="doc-text">{def.docs.summary}</p>
         {def.docs.notes && <p className="doc-text">{def.docs.notes}</p>}
-        {def.simulation.support === 'full' && def.simulation.notes && <p className="doc-text" style={{ fontSize: 11 }}>Model: {def.simulation.notes}</p>}
+        {def.simulation.support === 'full' && def.simulation.notes && (
+          <p className="doc-text" style={{ fontSize: 11 }}>
+            {t('Model:')} {def.simulation.notes}
+          </p>
+        )}
         {def.docs.datasheetUrl && (
           <p className="doc-text" style={{ fontSize: 11 }}>
-            Datasheet: <span style={{ fontFamily: 'var(--font-mono)', userSelect: 'text' }}>{def.docs.datasheetUrl}</span>
+            {t('Datasheet:')}{' '}
+            <span className="ltr" style={{ fontFamily: 'var(--font-mono)', userSelect: 'text' }}>
+              {def.docs.datasheetUrl}
+            </span>
           </p>
         )}
         <p className="doc-text" style={{ fontSize: 10.5, color: 'var(--text-3)' }}>
@@ -232,50 +246,53 @@ function ComponentInspector({ inst, def }: { inst: ComponentInstance; def: Compo
 }
 
 function WireInspector({ wire }: { wire: Wire }) {
+  const t = useT();
   const circuit = useProject((s) => s.project.circuit);
   const [label, setLabel] = useState(wire.label ?? '');
   useEffect(() => setLabel(wire.label ?? ''), [wire.label]);
   return (
     <>
       <div className="insp-head">
-        <h3>Wire</h3>
-        <div className="sub">
+        <h3>{t('Wire')}</h3>
+        <div className="sub ltr">
           {pinLabel(circuit, wire.from)} → {pinLabel(circuit, wire.to)}
         </div>
       </div>
       <div className="insp-sec">
-        <div className="h">Colour</div>
+        <div className="h">{t('Colour')}</div>
         <WireSwatches active={wire.color} onPick={(c) => setWireColor([wire.id], c)} />
         <button className="btn" style={{ marginTop: 8 }} onClick={() => setNetWireColor(wire.id, wire.color)}>
-          <Icon name="palette" /> Apply to whole net
+          <Icon name="palette" /> {t('Apply to whole net')}
         </button>
         <div className="field" style={{ marginTop: 10 }}>
-          <label>Label</label>
+          <label>{t('Label')}</label>
           <input
             className="input"
             value={label}
-            placeholder="e.g. SDA"
+            placeholder={t('e.g. SDA')}
             onChange={(e) => setLabel(e.target.value)}
             onBlur={() => useProject.getState().edit((c) => void (c.wires.find((w) => w.id === wire.id)!.label = label || undefined))}
             onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
           />
         </div>
         <div className="btn-row" style={{ marginTop: 8 }}>
-          <Tip content="Route the wire around parts" direct>
+          <Tip content={t('Route the wire around parts')} direct>
             <button className="btn" onClick={() => autoRouteWires([wire.id])}>
-              <Icon name="route" /> Auto-route
+              <Icon name="route" /> {t('Auto-route')}
             </button>
           </Tip>
           <button className="btn" onClick={() => clearWirePoints([wire.id])} disabled={!wire.points.length}>
-            Straighten
+            {t('Straighten')}
           </button>
-          <button className="btn danger" onClick={deleteSelection}>
+          <button className="btn danger" onClick={deleteSelection} aria-label={t('Delete')}>
             <Icon name="trash" />
           </button>
         </div>
         <p className="doc-text" style={{ fontSize: 11, marginTop: 8 }}>
-          Drag the wire to add a bend; drag the square handles to move bends. Double-click adds a bend. Keys <kbd>1</kbd>–<kbd>9</kbd>{' '}
-          pick a colour, <kbd>C</kbd> cycles.
+          {rich(t('Drag the wire to add a bend; drag the square handles to move bends. Double-click adds a bend. Keys {keys} pick a colour, {c} cycles.'), {
+            keys: <kbd>1–9</kbd>,
+            c: <kbd>C</kbd>,
+          })}
         </p>
       </div>
     </>
@@ -284,21 +301,22 @@ function WireInspector({ wire }: { wire: Wire }) {
 
 /** Bulk wire editing for multi-selections. */
 function MultiWireSection({ ids }: { ids: string[] }) {
+  const t = useT();
   const wires = useProject((s) => s.project.circuit.wires);
   const colors = new Set(wires.filter((w) => ids.includes(w.id)).map((w) => w.color));
   const current = colors.size === 1 ? [...colors][0] : undefined;
   return (
     <div className="insp-sec">
       <div className="h">
-        Wire colour <span className="r">{ids.length} wires</span>
+        {t('Wire colour')} <span className="r">{t('Wires: {n}', { n: ids.length })}</span>
       </div>
       <WireSwatches active={current} onPick={(c) => setWireColor(ids, c)} />
       <div className="btn-row" style={{ marginTop: 8 }}>
         <button className="btn" onClick={() => autoRouteWires(ids)}>
-          <Icon name="route" /> Auto-route
+          <Icon name="route" /> {t('Auto-route')}
         </button>
         <button className="btn" onClick={() => clearWirePoints(ids)}>
-          Straighten
+          {t('Straighten')}
         </button>
       </div>
     </div>
@@ -309,8 +327,8 @@ function WireSwatches({ active, onPick }: { active?: string; onPick: (c: string)
   return (
     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
       {WIRE_COLORS.map((c, i) => (
-        <Tip key={c.value} content={c.label} shortcut={i < 9 ? String(i + 1) : undefined} direct>
-          <button className={`swatch${active === c.value ? ' active' : ''}`} style={{ background: c.value }} aria-label={c.label} onClick={() => onPick(c.value)} />
+        <Tip key={c.value} content={tr(c.label)} shortcut={i < 9 ? String(i + 1) : undefined} direct>
+          <button className={`swatch${active === c.value ? ' active' : ''}`} style={{ background: c.value }} aria-label={tr(c.label)} onClick={() => onPick(c.value)} />
         </Tip>
       ))}
     </div>
@@ -318,6 +336,7 @@ function WireSwatches({ active, onPick }: { active?: string; onPick: (c: string)
 }
 
 function ProjectInspector() {
+  const t = useT();
   const project = useProject((s) => s.project);
   const netlist = useNetlist();
   const [name, setName] = useState(project.meta.name);
@@ -329,31 +348,33 @@ function ProjectInspector() {
   const comps = project.circuit.components;
   const simulated = comps.filter((c) => (lookup(c.type)?.simulation.support ?? 'visual-only') !== 'visual-only').length;
   const stats: [string, number][] = [
-    ['parts', comps.length],
-    ['simulated', simulated],
-    ['wires', project.circuit.wires.length],
-    ['nets', netlist.nets.filter((n) => n.activePinCount > 1).length],
-    ['on breadboards', netlist.insertions.length],
+    [t('Parts'), comps.length],
+    [t('Simulated'), simulated],
+    [t('Wires'), project.circuit.wires.length],
+    [t('Nets'), netlist.nets.filter((n) => n.activePinCount > 1).length],
+    [t('On breadboards'), netlist.insertions.length],
   ];
   return (
     <div className="insp-empty">
       <div className="insp-sec">
-        <div className="sub">Nothing selected — select a part or wire to edit it.</div>
+        <div className="sub">{t('Nothing selected — select a part or wire to edit it.')}</div>
         <div className="field">
-          <label>Project</label>
+          <label>{t('Project')}</label>
           <input
             className="input"
             value={name}
-            aria-label="Project name"
+            dir="auto"
+            aria-label={t('Project name')}
             onChange={(e) => setName(e.target.value)}
-            onBlur={() => useProject.getState().updateProject((p) => void (p.meta.name = name || 'Untitled'))}
+            onBlur={() => useProject.getState().updateProject((p) => void (p.meta.name = name || t('Untitled')))}
           />
         </div>
         <textarea
           className="input insp-desc"
           rows={2}
-          placeholder="Description"
-          aria-label="Project description"
+          dir="auto"
+          placeholder={t('Description')}
+          aria-label={t('Project description')}
           value={desc}
           onChange={(e) => setDesc(e.target.value)}
           onBlur={() => useProject.getState().updateProject((p) => void (p.meta.description = desc))}
@@ -361,19 +382,25 @@ function ProjectInspector() {
         <div className="insp-stats">
           {stats.map(([k, v]) => (
             <span key={k}>
-              <b>{v.toLocaleString('en-US')}</b> {k}
+              {k}: <b>{v.toLocaleString('en-US')}</b>
             </span>
           ))}
         </div>
       </div>
       <div className="insp-sec insp-tips">
-        <kbd>Ctrl+K</kbd> add a part · <kbd>F5</kbd> run · <kbd>Ctrl+Shift+P</kbd> commands · <kbd>?</kbd> shortcuts
+        {rich(t('{add} add a part · {run} run · {palette} commands · {help} shortcuts'), {
+          add: <kbd>Ctrl+K</kbd>,
+          run: <kbd>F5</kbd>,
+          palette: <kbd>Ctrl+Shift+P</kbd>,
+          help: <kbd>?</kbd>,
+        })}
       </div>
     </div>
   );
 }
 
 export function Inspector() {
+  const t = useT();
   const selectedComponents = useEditor((s) => s.selectedComponents);
   const selectedWires = useEditor((s) => s.selectedWires);
   const circuit = useProject((s) => s.project.circuit);
@@ -386,10 +413,10 @@ export function Inspector() {
     content = (
       <>
         <div className="insp-head">
-          <h3>{selectedComponents.length + selectedWires.length} items selected</h3>
+          <h3>{t('{n} items selected', { n: selectedComponents.length + selectedWires.length })}</h3>
           <div className="sub">
-            {selectedComponents.length} part{selectedComponents.length === 1 ? '' : 's'} · {selectedWires.length} wire{selectedWires.length === 1 ? '' : 's'} — use the
-            toolbar to align, rotate or delete. Ctrl+D duplicates.
+            {t('{parts} parts · {wires} wires', { parts: selectedComponents.length, wires: selectedWires.length })} —{' '}
+            {t('use the toolbar to align, rotate or delete. Ctrl+D duplicates.')}
           </div>
         </div>
         {selectedWires.length > 0 && <MultiWireSection ids={selectedWires} />}
@@ -402,10 +429,10 @@ export function Inspector() {
   return (
     <div className="panel" style={{ height: '100%' }}>
       <div className="panel-header">
-        <span className="title">Properties</span>
+        <span className="title">{t('Properties')}</span>
         <div className="actions">
-          <Tip content="Hide the Properties panel" direct>
-            <button className="icon-btn" aria-label="Hide properties" onClick={() => useEditor.getState().setPrefs({ showInspector: false })}>
+          <Tip content={t('Hide the Properties panel')} direct>
+            <button className="icon-btn" aria-label={t('Hide properties')} onClick={() => useEditor.getState().setPrefs({ showInspector: false })}>
               <Icon name="x" />
             </button>
           </Tip>

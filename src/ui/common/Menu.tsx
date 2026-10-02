@@ -9,6 +9,8 @@ import { createContext, useContext, type ReactNode } from 'react';
 import * as CM from '@radix-ui/react-context-menu';
 import * as DM from '@radix-ui/react-dropdown-menu';
 import * as MB from '@radix-ui/react-menubar';
+import { t, tr } from '../../i18n';
+import { useRtl } from '../../i18n/react';
 import { Icon } from './Icon';
 
 type Kind = 'dropdown' | 'context' | 'menubar';
@@ -72,8 +74,8 @@ export function MenuSwatches({ colors, active, onPick }: { colors: { value: stri
           key={c.value}
           className={`swatch${active === c.value ? ' active' : ''}`}
           style={{ background: c.value }}
-          aria-label={`${c.label}${i < 9 ? ` (${i + 1})` : ''}`}
-          title={`${c.label}${i < 9 ? ` — key ${i + 1}` : ''}`}
+          aria-label={`${tr(c.label)}${i < 9 ? ` (${i + 1})` : ''}`}
+          title={i < 9 ? t('{color} — key {n}', { color: tr(c.label), n: i + 1 }) : tr(c.label)}
           onSelect={() => onPick(c.value)}
         />
       ))}
@@ -115,9 +117,10 @@ export function DropdownMenu({
   className?: string;
   onOpenChange?: (open: boolean) => void;
 }) {
+  const dir = useRtl() ? 'rtl' : 'ltr';
   return (
     <KindContext.Provider value="dropdown">
-      <DM.Root modal={false} onOpenChange={onOpenChange}>
+      <DM.Root modal={false} onOpenChange={onOpenChange} dir={dir}>
         <DM.Trigger asChild>{trigger}</DM.Trigger>
         <DM.Portal>
           <DM.Content className={`dropdown ${className}`} align={align} side={side} sideOffset={4} collisionPadding={COLLISION_PADDING} loop>
@@ -131,9 +134,10 @@ export function DropdownMenu({
 
 /** Context menu: `trigger` receives the right-click; `content` renders when open. */
 export function ContextMenu({ trigger, children, onOpenChange }: { trigger: ReactNode; children: ReactNode; onOpenChange?: (open: boolean) => void }) {
+  const dir = useRtl() ? 'rtl' : 'ltr';
   return (
     <KindContext.Provider value="context">
-      <CM.Root onOpenChange={onOpenChange}>
+      <CM.Root onOpenChange={onOpenChange} dir={dir}>
         <CM.Trigger asChild>{trigger}</CM.Trigger>
         <CM.Portal>
           <CM.Content className="ctxmenu" collisionPadding={COLLISION_PADDING} loop onContextMenu={(e) => e.preventDefault()}>
@@ -147,9 +151,10 @@ export function ContextMenu({ trigger, children, onOpenChange }: { trigger: Reac
 
 /** Application menu bar: hovering switches between open menus, arrows move between them. */
 export function MenuBarRoot({ children }: { children: ReactNode }) {
+  const dir = useRtl() ? 'rtl' : 'ltr';
   return (
     <KindContext.Provider value="menubar">
-      <MB.Root className="menubar-menus" loop>
+      <MB.Root className="menubar-menus" loop dir={dir}>
         {children}
       </MB.Root>
     </KindContext.Provider>
