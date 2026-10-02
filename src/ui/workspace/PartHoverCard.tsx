@@ -11,7 +11,11 @@ import { formatEngineering, parseEngineering } from '../../core/model/units';
 import { guideEntry } from '../../components/builtin/guide';
 import { tr } from '../../i18n';
 import { rich, useT } from '../../i18n/react';
+import { partReadings } from '../../core/sim/readings';
+import { useNetlist } from '../../state/derived';
 import { useEditor } from '../../state/editor';
+import { useSim } from '../../state/sim';
+import { visualBus } from '../../state/visualBus';
 import { AnchoredPopover } from '../common/Popover';
 import { partName, partWhat, pick } from '../guide/guideModel';
 import { setHoveredPart } from '../guide/open';
@@ -104,6 +108,34 @@ function propText(p: PropertyDefinition, v: unknown): string | null {
   return String(v) || null;
 }
 
+/** While simulating: voltage, current, power and how much of the part's rating that is (updated every frame). */
+function LiveReadings({ inst, def }: { inst: ComponentInstance; def: ComponentDefinition }) {
+  const t = useT();
+  const netlist = useNetlist();
+  const voltages = useSim((s) => s.voltages);
+  const driven = useSim((s) => s.driven);
+  const r = partReadings(def, inst, (pin) => netlist.netOf(pin), voltages, driven, visualBus.get(inst.id));
+  if (!r || r.volts === null) return null;
+  const pct = r.load ? Math.round(r.load.ratio * 100) : null;
+  const level = !r.load ? '' : r.load.ratio >= 1 ? ' over' : r.load.ratio >= 0.8 ? ' high' : '';
+  return (
+    <div className="part-card-live">
+      <span className="k">{t('Now')}</span>
+      <b className="ltr">{formatEngineering(r.volts, 'V')}</b>
+      {r.amps !== null && <b className="ltr">{formatEngineering(r.amps, 'A')}</b>}
+      {r.watts !== null && <b className="ltr">{formatEngineering(r.watts, 'W')}</b>}
+      {r.load && pct !== null && (
+        <span className={`live-load${level}`}>
+          <span className="bar" aria-hidden>
+            <span style={{ width: `${Math.min(100, pct)}%` }} />
+          </span>
+          {t('{pct}% of {limit}', { pct, limit: formatEngineering(r.load.limit, r.load.unit) })}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export function PartHoverCard({ card, inst, def, simulating }: { card: Card; inst: ComponentInstance; def: ComponentDefinition; simulating: boolean }) {
   const t = useT();
   const g = guideEntry(def.type);
@@ -118,6 +150,7 @@ export function PartHoverCard({ card, inst, def, simulating }: { card: Card; ins
         <span className="name">{partName(def)}</span>
         {def.simulation.support !== 'full' && <span className={`badge ${def.simulation.support}`}>{t(def.simulation.support === 'partial' ? 'Partial' : simulating ? 'not simulated' : 'Visual only')}</span>}
       </div>
+      {simulating && <LiveReadings inst={inst} def={def} />}
       {values.length > 0 && (
         <div className="part-card-values">
           {values.map(({ p, text }) => (

@@ -161,8 +161,10 @@ class LedModel implements SimModel {
     this.ctx.solveNow([this.ctx.net('A'), this.ctx.net('C')]);
   }
   visualState() {
-    const b = brightnessOf(this.j.sample());
-    return { value: b > 0.005, brightness: Math.max(b, b > 0.005 ? 0.08 : 0) };
+    const amps = this.j.sample();
+    const b = brightnessOf(amps);
+    // `_amps`: average current over the frame (the part's hover card shows it).
+    return { value: b > 0.005, brightness: Math.max(b, b > 0.005 ? 0.08 : 0), _amps: amps };
   }
   diagnostics() {
     return ledDiagnostics(this.ctx, [this.j]);

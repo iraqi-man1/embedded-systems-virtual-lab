@@ -34,7 +34,7 @@ class DiodeModel implements SimModel {
   visualState() {
     if (this.window > 0) this.avgI = this.charge / this.window;
     this.charge = this.window = 0;
-    return { _conducting: this.avgI > 1e-4 };
+    return { _conducting: this.avgI > 1e-4, _amps: this.avgI };
   }
   diagnostics(): Diagnostic[] {
     const max = numProp(this.ctx, 'maxCurrent', 1);

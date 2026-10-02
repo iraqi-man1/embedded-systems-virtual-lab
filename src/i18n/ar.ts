@@ -911,6 +911,8 @@ export const AR = {
   'Loading…': 'جارٍ التحميل…',
   'No earlier versions yet: run or save the project to keep one.': 'لا توجد نسخ سابقة بعد: شغّل المشروع أو احفظه لتُحفظ نسخة.',
   'Before restoring': 'قبل الاستعادة',
+  'Now': 'الآن',
+  '{pct}% of {limit}': '{pct}% من {limit}',
   // ---------------------------------------------------- command descriptions
   'Earlier versions of the project, kept each time it was run or saved; bring one back.': 'نسخ سابقة من المشروع تُحفظ في كل تشغيل أو حفظ؛ استعد أيّاً منها.',
   'Make menus, panels, text and the code editor larger (for a projector or a large screen).': 'كبّر القوائم واللوحات والنصوص ومحرر الشيفرة (لجهاز العرض أو الشاشة الكبيرة).',
