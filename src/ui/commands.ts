@@ -35,6 +35,7 @@ import {
   zoomBy,
 } from './workspace/actions';
 import { closeGuide, openGuideForContext } from './guide/open';
+import { toggleCodeFloat } from './editor/codeDock';
 import { copyCircuitImage } from './export/copy';
 
 export interface Command {
@@ -185,6 +186,7 @@ export const commands: Record<string, Command> = {
   toggleInspector: cmd('toggleInspector', 'Properties Panel', 'Show or hide the properties of the selected part or wire.', { icon: 'settings', run: () => ed().setPrefs({ showInspector: !ed().showInspector }) }),
   focusCanvas: cmd('focusCanvas', 'Focus Canvas (hide/restore panels)', 'Hide every panel around the canvas; run again to bring them back.', { icon: 'fit', shortcut: 'Ctrl+`', run: toggleFocusCanvas }),
   toggleCode: cmd('toggleCode', 'Code Editor', 'Show or hide the firmware code editor.', { icon: 'code', run: () => ed().setPrefs({ showCode: !ed().showCode }) }),
+  floatCode: cmd('floatCode', 'Floating Code Editor', 'Take the code editor out into a window you can move anywhere; run again to put it back beside the canvas.', { icon: 'float', run: toggleCodeFloat }),
   toggleDock: cmd('toggleDock', 'Instruments Panel', 'Show or hide the serial monitor, oscilloscope, logic analyzer and other instruments.', { icon: 'panel-bottom', run: () => ed().setPrefs({ showDock: !ed().showDock }) }),
   compile: byLanguage(
     cmd('compile', 'Compile Firmware', 'Build the code for the board with the real compiler and show any errors. While running, flashes the new build.', {

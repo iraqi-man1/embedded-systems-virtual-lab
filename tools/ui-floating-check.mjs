@@ -1,7 +1,8 @@
 // DEVELOPMENT ONLY. Floating-UI regression check: opens every menu, submenu,
 // popover, context menu and dialog (incl. near each window edge, a light and a
-// dark theme, Arabic right-to-left, narrow window) against the running dev
-// server and asserts that each one is fully inside the window and on top.
+// dark theme, Arabic right-to-left, narrow window, over the floating code
+// editor) against the running dev server and asserts that each one is fully
+// inside the window and on top.
 // Screenshots go to .toolchain/ui-check/.
 //
 //   npm run dev                      # in another terminal
@@ -208,6 +209,30 @@ for (const pass of passes) {
   await page.waitForTimeout(800);
   await visible('.lib-tooltip', `[${p}] library info card near the bottom`);
   await page.mouse.move(800, 400);
+
+  // Floating code editor: above the canvas, below menus, dialogs and pages.
+  await page.click('.code-bar-btn');
+  await page.waitForTimeout(250);
+  const bar = await page.locator('.code-tabs-fill').boundingBox();
+  await page.mouse.move(bar.x + 8, bar.y + 8);
+  await page.mouse.down();
+  await page.mouse.move(380, 90, { steps: 5 });
+  await page.mouse.up();
+  await page.waitForTimeout(200);
+  await visible('.code-slot.floating', `[${p}] floating code editor`);
+  await shot(`${p}-floating-editor`);
+  const menus2 = await page.locator('.menu-trigger').allTextContents();
+  await page.click(`.menu-trigger:has-text("${menus2[0]}")`);
+  await page.waitForTimeout(150);
+  await visible('.dropdown', `[${p}] menu over the floating code editor`);
+  await closeAll();
+  await page.keyboard.press('Control+Shift+P');
+  await page.waitForTimeout(200);
+  await visible('.cmdk-dialog', `[${p}] command palette over the floating code editor`);
+  await closeAll();
+  await page.click('.code-bar-btn');
+  await page.waitForTimeout(250);
+  check(`[${p}] code editor docked again`, (await page.locator('.code-slot.floating').count()) === 0);
 
   // Narrow window: overflow menu.
   await page.setViewportSize({ width: 760, height: 640 });

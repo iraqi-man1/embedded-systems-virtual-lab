@@ -55,6 +55,10 @@ interface Prefs {
   showInspector: boolean;
   showCode: boolean;
   showDock: boolean;
+  /** The code editor floats over the window (dragged out of its place) instead of sitting beside the canvas. */
+  codeFloating: boolean;
+  /** Where the floating code editor was left, in window pixels (null: next to its place). */
+  codeFloatRect: { x: number; y: number; w: number; h: number } | null;
   wireColor: string;
   sound: boolean;
   /** Coloured dots on IC/MCU pins while simulating (high/low/floating). */
@@ -109,6 +113,8 @@ export function defaultPrefs(): Prefs {
     showInspector: true,
     showCode: true,
     showDock: true,
+    codeFloating: false,
+    codeFloatRect: null,
     wireColor: '#2ecc71',
     sound: true,
     showLogicLevels: false,
@@ -174,6 +180,8 @@ interface EditorState extends Prefs {
   palette: null | { mode: 'commands' | 'add' | 'find'; at?: { x: number; y: number } };
   /** Component type being dragged from the library (drop preview). */
   dragType: string | null;
+  /** The floating code editor is being dragged over its place: letting go docks it. */
+  codeDocking: boolean;
   /** Line to reveal in the code editor (set by the Problems panel). */
   revealLine: { file: string; line: number; nonce: number } | null;
 
@@ -217,6 +225,7 @@ export const useEditor = create<EditorState>((set, get) => ({
   dialog: null,
   toasts: [],
   dragType: null,
+  codeDocking: false,
   palette: null,
   revealLine: null,
 
