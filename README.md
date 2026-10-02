@@ -55,7 +55,7 @@ Built with Tauri 2, React, TypeScript, avr8js, Wokwi Elements, Monaco Editor and
 
 ## Getting started (users)
 
-1. Download `EmbeddedSystemsVirtualLab_0.1.0_x64-setup.exe` (or the `.msi`) from the
+1. Download `EmbeddedSystemsVirtualLab_0.2.0_x64-setup.exe` (or the `.msi`) from the
    [Releases page](../../releases/latest) and run it. Windows 10/11 x64; the installer is not
    code-signed yet, so SmartScreen may ask you to confirm ("More info" → "Run anyway").
 2. On first compile the app offers to install the firmware toolchain (PlatformIO, ~300 MB,
