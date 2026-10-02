@@ -37,6 +37,31 @@ fn disable_browser_accelerators(window: &tauri::WebviewWindow) {
     });
 }
 
+/// Whether the main window may show `url`: only the application itself
+/// (`tauri://localhost`, or `http(s)://tauri.localhost` on Windows) and, in
+/// debug builds, the development server.
+fn is_app_url(url: &tauri::Url) -> bool {
+    url.scheme() == "tauri"
+        || url.host_str() == Some("tauri.localhost")
+        || (cfg!(debug_assertions) && matches!(url.host_str(), Some("localhost") | Some("127.0.0.1")))
+}
+
+/// The window shows the application and nothing else. Any other navigation
+/// (the mouse's Back button reaching the webview's empty first page, a file
+/// dropped outside the drop handler, a link) would replace the whole interface
+/// with an empty or foreign page, so it is cancelled.
+fn navigation_guard<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
+    tauri::plugin::Builder::new("navigation-guard")
+        .on_navigation(|_webview, url| {
+            let allowed = is_app_url(url);
+            if !allowed {
+                eprintln!("navigation to {url} blocked");
+            }
+            allowed
+        })
+        .build()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let cwd = std::env::current_dir().unwrap_or_default();
@@ -55,6 +80,7 @@ pub fn run() {
             }
         }))
         .plugin(tauri_plugin_dialog::init())
+        .plugin(navigation_guard())
         .manage(AppState {
             build_lock: Mutex::new(()),
             launch_file: Mutex::new(launch_file),
@@ -85,4 +111,19 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running Embedded Systems Virtual Lab");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_app_url;
+
+    #[test]
+    fn only_the_application_is_shown() {
+        for ok in ["tauri://localhost/", "http://tauri.localhost/", "https://tauri.localhost/index.html#x"] {
+            assert!(is_app_url(&ok.parse().unwrap()), "{ok}");
+        }
+        for blocked in ["about:blank", "file:///C:/Users/me/project.evlab", "https://example.com/", "data:text/html,hi"] {
+            assert!(!is_app_url(&blocked.parse().unwrap()), "{blocked}");
+        }
+    }
 }

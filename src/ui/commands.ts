@@ -256,6 +256,11 @@ export function installShortcuts(): () => void {
       if (ed().page !== 'guide') openGuideForContext();
       return e.preventDefault();
     }
+    // Back (Alt+← or a keyboard's Back key) leaves the guide like its Back button.
+    if (((e.altKey && k === 'ArrowLeft') || k === 'BrowserBack') && ed().page === 'guide') {
+      closeGuide();
+      return e.preventDefault();
+    }
     // A full-window page (start screen, guide) covers the editor: only its own keys apply.
     if (ed().page) {
       if (ctrl && k.toLowerCase() === 'o') return run('open');
@@ -384,6 +389,19 @@ export function installShortcuts(): () => void {
       }
     }
   };
+  // The mouse's Back and Forward buttons would make the webview navigate away from the
+  // application (an empty window); Back leaves the guide like its Back button instead.
+  const mouse = (e: MouseEvent) => {
+    if (e.button !== 3 && e.button !== 4) return;
+    e.preventDefault();
+    if (e.type === 'mouseup' && e.button === 3 && ed().page === 'guide') closeGuide();
+  };
   window.addEventListener('keydown', handler);
-  return () => window.removeEventListener('keydown', handler);
+  window.addEventListener('mousedown', mouse, true);
+  window.addEventListener('mouseup', mouse, true);
+  return () => {
+    window.removeEventListener('keydown', handler);
+    window.removeEventListener('mousedown', mouse, true);
+    window.removeEventListener('mouseup', mouse, true);
+  };
 }
