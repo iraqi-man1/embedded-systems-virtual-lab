@@ -43,7 +43,7 @@ function produced(): Diagnostic[] {
     b.wire(r, '2', bat2, '-');
     const h = simulate(b, {});
     h.run(0.2);
-    out.push(...h.diagnostics());
+    out.push(...(h.diagnostics() as Diagnostic[]));
   }
   // Circuit checks: 5 V to GND, 5 V to 3.3 V, a module with only one wire, a visual-only part, an unknown part.
   {
