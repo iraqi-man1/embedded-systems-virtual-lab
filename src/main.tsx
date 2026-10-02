@@ -7,6 +7,7 @@ import { createRoot } from 'react-dom/client';
 import './styles/theme.css';
 import './styles/app.css';
 import './styles/home.css';
+import './styles/guide.css';
 import './ui/editor/monacoSetup';
 import { registerExternalPackages } from './app/registry';
 import { t } from './i18n';

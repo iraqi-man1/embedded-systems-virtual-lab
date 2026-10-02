@@ -6,6 +6,7 @@ import { useEditor } from '../../state/editor';
 import { useProject } from '../../state/project';
 import { commands } from '../commands';
 import { MenuItem, MenuLabel, MenuSeparator, MenuSwatches, SubMenu } from '../common/Menu';
+import { openGuide } from '../guide/open';
 import { assignProbe } from '../instruments/probes';
 import { autoRouteWires, bringToFront, clearWirePoints, paste, setNetWireColor, setWireColor } from '../workspace/actions';
 
@@ -42,6 +43,8 @@ export function CanvasMenuItems() {
         <MenuItem label={t('Send to Back')} icon="back" onSelect={() => inst && bringToFront(inst.id, false)} />
         <MenuSeparator />
         <MenuItem label={t('Properties…')} icon="settings" onSelect={() => useEditor.getState().setPrefs({ showInspector: true })} />
+        <MenuItem label={t('Open in Parts Guide')} icon="book" shortcut="F1" onSelect={() => inst && openGuide(inst.type)} />
+        <MenuSeparator />
         <Cmd id="delete" />
       </>
     );

@@ -24,6 +24,7 @@ import { ThemeItems } from '../shell/MenuBar';
 import { fitView } from '../workspace/actions';
 import { CircuitPreview } from './CircuitPreview';
 import { ExampleGallery } from './ExampleGallery';
+import { openGuide } from '../guide/open';
 
 type Tab = 'recent' | 'new' | 'examples' | 'learn';
 
@@ -236,6 +237,7 @@ function LearnTab() {
     [t('Start a wire'), t('Click a pin')],
     [t('Rotate / delete the selection'), 'R / Del'],
     [t('Run / stop the simulation'), 'F5 / Shift+F5'],
+    [t('Learn about a part'), t('Rest the mouse on it, or press F1')],
     [t('Find any command'), 'Ctrl+Shift+P'],
   ];
   return (
@@ -271,6 +273,9 @@ function LearnTab() {
           <h3>{t('Try it')}</h3>
           <button className="btn primary" onClick={() => void loadExample('blink')}>
             <Icon name="sparkles" /> {t('Open the Blink example')}
+          </button>
+          <button className="btn" onClick={() => openGuide()}>
+            <Icon name="book" /> {t('Parts guide: what each part does and how to wire it')}
           </button>
           <button className="btn" onClick={commands.shortcuts.run}>
             <Icon name="keyboard" /> {t('All keyboard shortcuts')}

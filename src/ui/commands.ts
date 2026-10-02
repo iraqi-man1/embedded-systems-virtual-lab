@@ -31,6 +31,7 @@ import {
   selectAll,
   zoomBy,
 } from './workspace/actions';
+import { closeGuide, openGuideForContext } from './guide/open';
 
 export interface Command {
   id: string;
@@ -179,6 +180,7 @@ export const commands: Record<string, Command> = {
   toolchain: cmd('toolchain', 'Firmware Toolchain…', 'Install or check the compiler used to build Arduino code.', { icon: 'wrench', run: () => ed().set({ dialog: 'toolchain' }) }),
   palette: cmd('palette', 'Command Palette…', 'Search and run any command by name.', { icon: 'command', shortcut: 'Ctrl+Shift+P', run: () => ed().set({ palette: { mode: 'commands' } }) }),
   quickAdd: cmd('quickAdd', 'Add a Part…', 'Type a part name and add it to the canvas.', { icon: 'plus', shortcut: 'Ctrl+K', run: () => ed().set({ palette: { mode: 'add' } }) }),
+  guide: cmd('guide', 'Parts Guide', 'What each part is, what it is for and how to connect it.', { icon: 'book', shortcut: 'F1', run: () => openGuideForContext() }),
   shortcuts: cmd('shortcuts', 'Keyboard Shortcuts', 'Every mouse gesture and keyboard shortcut.', { icon: 'keyboard', shortcut: '?', run: () => ed().set({ dialog: 'shortcuts' }) }),
   about: cmd('about', 'About', null, { icon: 'info', run: () => ed().set({ dialog: 'about' }) }),
 };
@@ -212,7 +214,12 @@ export function installShortcuts(): () => void {
       if (!c.enabled || c.enabled()) c.run();
       e.preventDefault();
     };
-    // A full-window page (start screen) covers the editor: only its own keys apply.
+    // F1: the parts guide, on the part under the mouse or the selected one (the code editor keeps its own F1).
+    if (k === 'F1' && !(e.target as HTMLElement | null)?.closest?.('.monaco-editor')) {
+      if (ed().page !== 'guide') openGuideForContext();
+      return e.preventDefault();
+    }
+    // A full-window page (start screen, guide) covers the editor: only its own keys apply.
     if (ed().page) {
       if (ctrl && k.toLowerCase() === 'o') return run('open');
       if (ctrl && k.toLowerCase() === 'n') return run('new');
@@ -220,7 +227,8 @@ export function installShortcuts(): () => void {
       if (ctrl && e.shiftKey && k.toLowerCase() === 'p') return run('palette');
       if (isBrowserShortcut(e) || k === 'F5') return e.preventDefault();
       if (k === 'Escape' && !ed().dialog && !ed().palette && !inMenu(e)) {
-        ed().set({ page: null });
+        if (ed().page === 'guide') closeGuide();
+        else ed().set({ page: null });
         return e.preventDefault();
       }
       return;

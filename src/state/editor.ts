@@ -72,6 +72,8 @@ interface Prefs {
   rightDragPan: boolean;
   /** Open on the start screen (recent projects, templates, examples). */
   showStartScreen: boolean;
+  /** Resting the mouse on a part shows what it is and what it is for. */
+  hoverCards: boolean;
 }
 
 const PREFS_KEY = 'evlab.prefs.v1';
@@ -109,6 +111,7 @@ export function defaultPrefs(): Prefs {
     librarySimOnly: false,
     rightDragPan: true,
     showStartScreen: true,
+    hoverCards: true,
   };
 }
 
@@ -131,7 +134,11 @@ interface EditorState extends Prefs {
   /** Theme currently shown (resolves 'system'). */
   appliedTheme: ThemeId;
   /** Full-window page shown over the editor (null = the editor). */
-  page: null | 'home';
+  page: null | 'home' | 'guide';
+  /** Part shown in the parts guide (null: the overview). */
+  guideType: string | null;
+  /** Where the guide's Back button goes. */
+  guideReturn: null | 'home';
   selectedComponents: string[];
   selectedWires: string[];
   viewport: { x: number; y: number; zoom: number };
@@ -174,6 +181,8 @@ export const useEditor = create<EditorState>((set, get) => ({
   ...initialPrefs,
   appliedTheme: resolveTheme(initialPrefs.theme, systemPrefersDark()),
   page: initialPrefs.showStartScreen ? 'home' : null,
+  guideType: null,
+  guideReturn: null,
   selectedComponents: [],
   selectedWires: [],
   viewport: { x: 80, y: 60, zoom: 1 },

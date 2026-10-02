@@ -1,0 +1,123 @@
+/* Parts guide page and the part card shown when resting on a part. */
+.guide-search { width: min(420px, 40vw); margin-inline-start: 12px; }
+.guide-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 264px minmax(0, 1fr); }
+
+/* Sidebar: the library, by category. */
+.guide-nav { overflow-y: auto; padding: 10px 8px 24px; border-inline-end: 1px solid var(--border); background: var(--bg-panel); }
+.guide-nav-group { margin-top: 10px; }
+.guide-nav-cat { display: flex; align-items: center; gap: 6px; padding: 4px 10px; color: var(--text-3); font-size: var(--fs-xs); font-weight: 600; }
+.guide-nav-item { display: flex; align-items: center; gap: 8px; width: 100%; height: 28px; padding: 0 10px; border: 0; border-radius: var(--radius); background: none; color: var(--text-2); font-size: var(--fs-sm); text-align: start; cursor: pointer; }
+.guide-nav-item:hover { background: var(--bg-hover); color: var(--text); }
+.guide-nav-item.on { background: var(--accent-soft); color: var(--text); font-weight: 600; }
+.guide-nav-item .name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.guide-nav-item.overview { font-weight: 600; color: var(--text); }
+.guide-empty { padding: 16px 10px; color: var(--text-3); font-size: var(--fs-xs); }
+.guide .dot { display: inline-block; }
+
+.guide-main { overflow-y: auto; min-width: 0; }
+
+/* A part's page reads like a friendly datasheet. */
+.guide-part { max-width: 1100px; margin: 0 auto; padding: 26px 40px 64px; }
+.guide-eyebrow { color: var(--text-3); font-size: var(--fs-xs); }
+.guide-head h1 { margin: 4px 0 0; font: 600 28px/1.2 'Segoe UI Variable Display', var(--font-ui); }
+.guide-en { margin-top: 2px; color: var(--text-3); font-family: var(--font-mono); font-size: 12px; }
+.guide-head-row { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+
+.guide-top { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 28px; margin-top: 22px; align-items: start; }
+.guide-figure { margin: 0; }
+.guide-figure figcaption { margin-top: 6px; color: var(--text-3); font-size: var(--fs-xs); }
+.pf.card-canvas { position: relative; height: 330px; aspect-ratio: auto; border: 1px solid var(--border); border-radius: 12px; }
+.pf .world { pointer-events: none; }
+.pf-pins { position: absolute; inset: 0; overflow: visible; }
+.pf-pin { fill: color-mix(in srgb, var(--accent) 25%, transparent); stroke: var(--accent); stroke-width: 1.2; cursor: help; transition: r 90ms ease-out; }
+.pf-pin.ground { fill: color-mix(in srgb, var(--text) 18%, transparent); stroke: var(--text-2); }
+.pf-pin.power { fill: rgba(231, 76, 60, 0.25); stroke: #e74c3c; }
+.pf-pin.on { fill: var(--accent); stroke: var(--bg-panel); stroke-width: 2; filter: drop-shadow(0 0 4px var(--accent)); }
+.pf-tag { position: absolute; transform: translate(-50%, 12px); padding: 2px 8px; border-radius: 999px; background: var(--accent); color: #fff; font: 600 11.5px var(--font-mono); white-space: nowrap; pointer-events: none; box-shadow: var(--shadow); }
+.pf-tag.above { transform: translate(-50%, calc(-100% - 12px)); }
+
+.guide-about h2, .guide-sec h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 15px; font-weight: 600; }
+.guide-about h2:not(:first-child) { margin-top: 20px; }
+.guide-lede { margin: 0; color: var(--text); font-size: 14.5px; line-height: 1.65; }
+.guide-uses { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.guide-uses li { position: relative; padding-inline-start: 16px; color: var(--text-2); line-height: 1.5; }
+.guide-uses li::before { content: ''; position: absolute; inset-inline-start: 2px; top: 0.6em; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.count { font-family: var(--font-mono); font-size: 10.5px; font-weight: 400; padding: 0 6px; border-radius: 999px; background: var(--bg-hover); color: var(--text-3); }
+
+.guide-sec { margin-top: 32px; }
+.guide-wiring.with-code { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 22px; align-items: start; }
+.guide-steps { margin: 0; padding: 0; list-style: none; counter-reset: step; display: flex; flex-direction: column; gap: 10px; }
+.guide-steps li { position: relative; padding-inline-start: 36px; min-height: 24px; line-height: 1.55; color: var(--text); counter-increment: step; }
+.guide-steps li::before { content: counter(step); position: absolute; inset-inline-start: 0; top: -1px; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font: 600 12px var(--font-mono); }
+.guide-steps li:not(:last-child)::after { content: ''; position: absolute; inset-inline-start: 11.5px; top: 26px; bottom: -8px; width: 1px; background: var(--border); }
+
+.guide-code { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--bg-panel-2); }
+.guide-code-head { display: flex; align-items: center; justify-content: space-between; padding: 4px 6px 4px 12px; border-bottom: 1px solid var(--border); color: var(--text-3); font-size: var(--fs-xs); }
+:root[dir='rtl'] .guide-code-head { padding: 4px 12px 4px 6px; }
+.guide-code pre { margin: 0; padding: 12px 14px; max-height: 380px; overflow: auto; font: 12px/1.55 var(--font-mono); color: var(--text); text-align: left; }
+.btn.ghost { border-color: transparent; background: none; }
+
+.guide-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
+.guide-pins { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+.guide-pins th { padding: 8px 12px; text-align: start; color: var(--text-3); font-size: var(--fs-xs); font-weight: 600; background: var(--bg-panel-2); border-bottom: 1px solid var(--border); }
+.guide-pins td { padding: 7px 12px; border-bottom: 1px solid var(--border); vertical-align: top; line-height: 1.5; color: var(--text-2); }
+.guide-pins tr:last-child td { border-bottom: 0; }
+.guide-pins tbody tr:hover, .guide-pins tbody tr.on { background: var(--accent-soft); }
+.guide-pins .pin-name { white-space: nowrap; color: var(--text); font: 600 12px var(--font-mono); }
+.guide-pins .pin-name .times { color: var(--text-3); font-weight: 400; }
+.guide-pins .kind { display: inline-block; width: 8px; height: 8px; margin-inline-end: 7px; border-radius: 2px; background: var(--accent); vertical-align: 0; }
+.guide-pins .kind.ground { background: var(--text-2); }
+.guide-pins .kind.power { background: #e74c3c; }
+.guide-pins .kind.passive, .guide-pins .kind.nc { background: var(--text-3); }
+.guide-pins td.board-col { white-space: nowrap; font: 12px var(--font-mono); color: var(--text); }
+.guide-pins th.board-col { white-space: nowrap; }
+.guide-pins .signals { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-inline-start: 6px; }
+.guide-pins .sig { padding: 0 5px; border-radius: 4px; border: 1px solid var(--border); color: var(--text-3); font: 10.5px var(--font-mono); }
+.guide-note { margin: 8px 0 0; color: var(--text-3); font-size: var(--fs-xs); line-height: 1.5; }
+.guide-url { font-family: var(--font-mono); user-select: text; }
+
+.guide-tips { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.guide-tips li { display: flex; gap: 9px; align-items: flex-start; padding: 9px 12px; border-radius: 8px; background: color-mix(in srgb, var(--warn) 8%, var(--bg-panel)); line-height: 1.5; }
+.guide-tips li svg { flex: none; margin-top: 3px; color: var(--warn); }
+
+.guide-sim { padding: 10px 14px; border-radius: 8px; border-inline-start: 3px solid var(--text-3); background: var(--bg-panel); }
+.guide-sim.full { border-inline-start-color: var(--ok); }
+.guide-sim.partial { border-inline-start-color: var(--warn); }
+.guide-sim p { margin: 0; line-height: 1.55; }
+.guide-sim .guide-sim-notes { margin-top: 6px; color: var(--text-3); font-size: var(--fs-xs); }
+
+/* Overview: every part as a tile. */
+.guide-overview { max-width: 1240px; margin: 0 auto; padding: 26px 40px 64px; }
+.guide-intro h1 { margin: 0 0 6px; font: 600 28px/1.2 'Segoe UI Variable Display', var(--font-ui); }
+.guide-intro p { margin: 0; max-width: 70ch; color: var(--text-2); font-size: 14px; line-height: 1.55; }
+.guide-legend { display: flex; flex-wrap: wrap; gap: 6px 22px; margin-top: 10px; color: var(--text-3); font-size: var(--fs-xs); }
+.guide-legend .dot { margin-inline: 8px 3px; vertical-align: 0; }
+.guide-cat { margin-top: 28px; }
+.guide-cat h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 15px; font-weight: 600; }
+.guide-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(156px, 1fr)); gap: 10px; }
+.guide-tile { display: flex; flex-direction: column; padding: 0; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-panel); color: var(--text); overflow: hidden; cursor: pointer; text-align: start; }
+.guide-tile:hover { border-color: var(--accent); }
+.guide-tile .card-canvas { aspect-ratio: 4 / 3; }
+.guide-tile-name { display: flex; align-items: center; gap: 7px; padding: 7px 10px; font-size: var(--fs-sm); line-height: 1.3; }
+
+@media (max-width: 900px) {
+  .guide-body { grid-template-columns: 1fr; }
+  .guide-nav { display: none; }
+  .guide-top, .guide-wiring.with-code { grid-template-columns: 1fr; }
+  .guide-part, .guide-overview { padding: 18px 16px 48px; }
+}
+
+/* The card shown when the mouse rests on a part. */
+.part-card { z-index: var(--z-tooltip); width: 300px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-panel-2); box-shadow: var(--shadow); color: var(--text); font-size: var(--fs-sm); animation: pop-in 110ms ease-out; }
+.part-card-head { display: flex; align-items: center; gap: 7px; }
+.part-card-head .ref { padding: 0 6px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); font: 600 11px var(--font-mono); }
+.part-card-head .name { flex: 1; min-width: 0; font-weight: 600; }
+.part-card-values { display: flex; flex-wrap: wrap; gap: 2px 12px; margin-top: 6px; color: var(--text-3); font-size: var(--fs-xs); }
+.part-card-values b { color: var(--text); font-weight: 600; }
+.part-card-what { margin: 6px 0 0; color: var(--text-2); line-height: 1.5; }
+.part-card-uses { margin: 5px 0 0; color: var(--text-2); font-size: var(--fs-xs); line-height: 1.5; }
+.part-card-uses .k { color: var(--text-3); }
+.part-card-foot { margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--border); color: var(--text-3); font-size: 11px; }
+
+/* `code` inside guide sentences. */
+.inline-code { padding: 0 4px; border-radius: 4px; background: var(--bg-hover); font: 0.92em var(--font-mono); white-space: pre-wrap; }

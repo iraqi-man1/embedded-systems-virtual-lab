@@ -14,10 +14,13 @@ import {
   Box,
   Cable,
   ChartLine,
+  Check,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   ChevronsRight,
   CircleCheck,
+  CircleHelp,
   CircleDot,
   CircleX,
   ClipboardPaste,
@@ -117,6 +120,9 @@ const ICONS: Record<string, LucideIcon> = {
   chart: ChartLine,
   'chevron-down': ChevronDown,
   'chevron-right': ChevronRight,
+  'chevron-left': ChevronLeft,
+  check: Check,
+  help: CircleHelp,
   ok: CircleCheck,
   probe: CircleDot,
   error: CircleX,
@@ -200,7 +206,7 @@ const ICONS: Record<string, LucideIcon> = {
 };
 
 /** Icons that point along the reading direction: mirrored in right-to-left layouts. */
-const DIRECTIONAL = new Set(['chevron-right', 'chevrons-right']);
+const DIRECTIONAL = new Set(['chevron-right', 'chevron-left', 'chevrons-right']);
 
 export function Icon({ name, size, className, fill }: { name: string; size?: number; className?: string; fill?: string }) {
   const C = ICONS[name] ?? Box;

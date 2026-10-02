@@ -14,6 +14,7 @@ import { Icon } from '../common/Icon';
 import { Tip } from '../common/Tooltip';
 import { clearWirePoints, deleteSelection, flipSelection, rotateSelection, setNetWireColor, setWireColor, autoRouteWires } from '../workspace/actions';
 import { pinLabel } from '../instruments/probes';
+import { openGuide } from '../guide/open';
 
 const SUPPORT_LABEL: Record<ComponentDefinition['simulation']['support'], MessageKey> = { full: 'Simulated', partial: 'Partially simulated', 'visual-only': 'Visual only' };
 
@@ -131,7 +132,14 @@ function ComponentInspector({ inst, def }: { inst: ComponentInstance; def: Compo
   return (
     <>
       <div className="insp-head">
-        <h3>{def.name}</h3>
+        <div className="insp-title">
+          <h3>{def.name}</h3>
+          <Tip content={t('Open in Parts Guide')} shortcut="F1" direct>
+            <button className="icon-btn" aria-label={t('Open in Parts Guide')} onClick={() => openGuide(def.type)}>
+              <Icon name="help" />
+            </button>
+          </Tip>
+        </div>
         <div className="sub">
           <span className={`badge ${def.simulation.support}`}>{t(SUPPORT_LABEL[def.simulation.support])}</span>
           <span>

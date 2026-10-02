@@ -138,6 +138,9 @@ export function SettingsDialog() {
         <Row label={t('Pan with the right mouse button')} description={t('Drag with the right button to move around; a right click without moving still opens the menu.')}>
           <Switch checked={s.rightDragPan} label={t('Pan with the right mouse button')} onChange={(rightDragPan) => set({ rightDragPan })} />
         </Row>
+        <Row label={t('Part info on hover')} description={t('Resting the mouse on a part shows what it is and what it is for. F1 opens its page in the parts guide.')}>
+          <Switch checked={s.hoverCards} label={t('Part info on hover')} onChange={(hoverCards) => set({ hoverCards })} />
+        </Row>
         <Row label={t('Show grid')} description={t('Dots every 0.1 inch (the breadboard pitch).')}>
           <Switch checked={s.showGrid} label={t('Show grid')} onChange={(showGrid) => set({ showGrid })} />
         </Row>

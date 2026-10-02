@@ -32,6 +32,7 @@ import { fileTitle, openRecent } from '../../app/fileOps';
 import { SimControlsLayer } from './SimControls';
 import { useWireToolbarVisible, WireToolbar } from './WireToolbar';
 import { ContextMenuGate, type HeldMenu } from './contextMenuGate';
+import { PartHoverCard, usePartHover } from './PartHoverCard';
 
 type Drag =
   /** `button` 2: right-button pan, which only starts once the pointer moved past the threshold. */
@@ -112,6 +113,7 @@ export function Workspace() {
   // Right button: drag pans, click opens the context menu.
   const [gate] = useState(() => new ContextMenuGate(DRAG_THRESHOLD));
   const [hover, setHover] = useState<IndexedPin | null>(null);
+  const partHover = usePartHover();
   const [cursor, setCursor] = useState<Point>({ x: 0, y: 0 });
   const [marquee, setMarquee] = useState<Overlay['marquee']>(null);
   const [dragging, setDragging] = useState(false);
@@ -347,10 +349,16 @@ export function Workspace() {
     setCursor(world);
     ed.set({ cursor: world });
     const d = drag.current;
+    let onPin = false;
     if (!d || d.kind === 'pin' || d.kind === 'wire-end') {
       const h = hitPin(index, world, Math.max(4.5, 7 / ed.viewport.zoom));
       if (h !== hover) setHover(h);
+      onPin = !!h;
     }
+    // Resting on a part (not on one of its pins, which have their own tooltip) shows its card.
+    const compEl = !d && !onPin && !ed.wiring && ed.tool === 'select' && ed.hoverCards && e.buttons === 0 ? (e.target as Element).closest('[data-comp]') : null;
+    const compId = compEl?.getAttribute('data-comp') ?? null;
+    partHover.track(compId, e.clientX, e.clientY, compId ? (circuit.components.find((c) => c.id === compId)?.type ?? null) : null);
     if (!d) return;
     switch (d.kind) {
       case 'pan':
@@ -784,6 +792,12 @@ export function Workspace() {
     );
   }
 
+  // What the part under the resting pointer is.
+  let hoverCard: React.ReactNode = null;
+  const cardInst = partHover.card && !tip && !dragging && !marquee ? circuit.components.find((c) => c.id === partHover.card!.id) : undefined;
+  const cardDef = cardInst && lookup(cardInst.type);
+  if (partHover.card && cardInst && cardDef) hoverCard = <PartHoverCard card={partHover.card} inst={cardInst} def={cardDef} simulating={simulating} />;
+
   // Floating wire toolbar anchored above the selected wires.
   const wireBarVisible = useWireToolbarVisible() && !dragging && !marquee;
   let wireBar: React.ReactNode = null;
@@ -868,7 +882,10 @@ export function Workspace() {
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
-      onPointerLeave={() => setHover(null)}
+      onPointerLeave={() => {
+        setHover(null);
+        partHover.cancel();
+      }}
       onContextMenu={onContextMenu}
       onDoubleClick={onDoubleClick}
       onDragOver={onDragOver}
@@ -960,6 +977,7 @@ export function Workspace() {
       </ContextMenu>
       {tip}
       {wireBar}
+      {hoverCard}
     </>
   );
 }

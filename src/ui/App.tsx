@@ -18,6 +18,7 @@ import { StatusBar } from './shell/StatusBar';
 import { Toolbar } from './shell/Toolbar';
 import { Workspace } from './workspace/Workspace';
 import { HomeScreen } from './home/HomeScreen';
+import { PartsGuide } from './guide/PartsGuide';
 import { applyTheme, resolveTheme, systemPrefersDark } from './themes';
 
 type SizeKey = 'libraryWidth' | 'inspectorHeight' | 'codeWidth' | 'dockHeight';
@@ -168,6 +169,7 @@ export function App() {
         </div>
         <StatusBar />
         {page === 'home' && <HomeScreen />}
+        {page === 'guide' && <PartsGuide />}
         <Dialogs />
         <DialogHost />
         <CommandPalette />

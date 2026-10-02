@@ -5,6 +5,10 @@ import { tr, type MessageKey } from '../../i18n';
 import { useT } from '../../i18n/react';
 import { useEditor } from '../../state/editor';
 import { addComponentAtCenter } from '../workspace/actions';
+import { guideEntry } from '../../components/builtin/guide';
+import { partName, partWhat, pick } from '../guide/guideModel';
+import { openGuide } from '../guide/open';
+import { Prose } from '../guide/Prose';
 import { Icon } from '../common/Icon';
 import { Tip } from '../common/Tooltip';
 
@@ -17,7 +21,7 @@ const EMPTY_DRAG_IMAGE = (() => {
   return img;
 })();
 
-const CATEGORY_ICON: Record<string, string> = {
+export const CATEGORY_ICON: Record<string, string> = {
   Boards: 'chip',
   Prototyping: 'grid',
   Power: 'zap',
@@ -30,6 +34,29 @@ const CATEGORY_ICON: Record<string, string> = {
   'Integrated Circuits': 'cpu',
   Communication: 'cable',
 };
+
+const CATEGORY_ORDER = ['Boards', 'Prototyping', 'Power', 'Passive', 'Semiconductors', 'Input', 'Output', 'Sensors', 'Actuators', 'Integrated Circuits', 'Communication'];
+
+/** Library categories in teaching order (boards first, communication modules last). */
+export function sortedCategories() {
+  return registry.categories().sort((a, b) => (CATEGORY_ORDER.indexOf(a.name) + 1 || 99) - (CATEGORY_ORDER.indexOf(b.name) + 1 || 99));
+}
+
+/** Library search, also by the Arabic names and uses from the parts guide. */
+function searchParts(query: string): ComponentDefinition[] {
+  const found = registry.search(query);
+  if (!/[\u0600-\u06ff]/.test(query)) return found;
+  const words = query.trim().split(/\s+/);
+  const seen = new Set(found.map((d) => d.type));
+  const arabic = registry.all().filter((d) => {
+    const g = guideEntry(d.type);
+    const hay = g ? [g.ar, g.what[1], ...g.uses.map((u) => u[1])].join(' ') : '';
+    return !seen.has(d.type) && words.every((w) => hay.includes(w));
+  });
+  // Name matches first.
+  arabic.sort((a, b) => Number(!guideEntry(a.type)!.ar.includes(words[0])) - Number(!guideEntry(b.type)!.ar.includes(words[0])));
+  return [...found, ...arabic];
+}
 
 /** Small preview: inline SVG as an image, Wokwi elements rendered lazily and scaled down. */
 const Thumb = memo(function Thumb({ def }: { def: ComponentDefinition }) {
@@ -90,8 +117,18 @@ const Item = memo(function Item({ def, fav, active }: ItemProps) {
         onDoubleClick={() => addComponentAtCenter(def.type)}
       >
         <Thumb def={def} />
-        <span className="name">{def.name}</span>
+        <span className="name">{partName(def)}</span>
         <span className={`dot ${def.simulation.support}`} aria-label={t(SUPPORT_LABEL[def.simulation.support])} />
+        <button
+          className="icon-btn guide-btn"
+          aria-label={t('Open in Parts Guide')}
+          onClick={(e) => {
+            e.stopPropagation();
+            openGuide(def.type);
+          }}
+        >
+          <Icon name="help" size={13} />
+        </button>
         <button
           className={`icon-btn star${fav ? ' on' : ''}`}
           aria-label={fav ? t('Remove from favourites') : t('Add to favourites')}
@@ -123,10 +160,8 @@ export function LibraryPanel() {
 
   const favSet = new Set(favorites);
   const filter = (d: ComponentDefinition) => !simOnly || d.simulation.support !== 'visual-only';
-  const results = useMemo(() => (query ? registry.search(query).filter(filter) : []), [query, simOnly]); // eslint-disable-line react-hooks/exhaustive-deps
-  const cats = registry.categories();
-  const order = ['Boards', 'Prototyping', 'Power', 'Passive', 'Semiconductors', 'Input', 'Output', 'Sensors', 'Actuators', 'Integrated Circuits', 'Communication'];
-  cats.sort((a, b) => (order.indexOf(a.name) + 1 || 99) - (order.indexOf(b.name) + 1 || 99));
+  const results = useMemo(() => (query ? searchParts(query).filter(filter) : []), [query, simOnly]); // eslint-disable-line react-hooks/exhaustive-deps
+  const cats = sortedCategories();
   const toggle = (name: string) => {
     const s = new Set(collapsed);
     if (s.has(name)) s.delete(name);
@@ -260,11 +295,19 @@ export function LibraryPanel() {
 function InfoCard({ def }: { def: ComponentDefinition }) {
   const t = useT();
   const pins = def.pins.filter((p) => p.kind !== 'socket');
+  const g = guideEntry(def.type);
   return (
     <div className="lib-tooltip">
-      <h4>{def.name}</h4>
+      <h4>{partName(def)}</h4>
       <span className={`badge ${def.simulation.support}`}>{t(SUPPORT_LABEL[def.simulation.support])}</span>
-      <p>{def.docs.summary}</p>
+      <p>
+        <Prose text={partWhat(def)} />
+      </p>
+      {g && g.uses.length > 0 && (
+        <p>
+          <b>{t('Used for:')}</b> <Prose text={g.uses.slice(0, 2).map(pick).join(' · ')} />
+        </p>
+      )}
       {def.simulation.notes && <p style={{ fontSize: 11 }}>{def.simulation.notes}</p>}
       {pins.length > 0 && (
         <div className="pins">
@@ -273,7 +316,7 @@ function InfoCard({ def }: { def: ComponentDefinition }) {
         </div>
       )}
       {def.pins.some((p) => p.kind === 'socket') && <div className="pins">{t('{n} holes', { n: def.pins.length })}</div>}
-      <div className="hint">{t('Drag onto the canvas or double-click to add')}</div>
+      <div className="hint">{t('Drag onto the canvas or double-click to add. The ? button opens the parts guide.')}</div>
     </div>
   );
 }
