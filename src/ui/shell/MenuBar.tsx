@@ -94,7 +94,7 @@ const MENUS: { name: MessageKey; items: Entry[] }[] = [
     name: 'Simulation',
     items: ['compile', '-', 'run', 'pause', 'step', 'stepInstr', 'reset', 'stop', '-', { sub: 'Speed', icon: 'gauge', render: () => <SpeedItems /> }, '-', 'probeLogic', 'probeScope', '-', 'toolchain'],
   },
-  { name: 'Help', items: ['guide', '-', 'palette', 'quickAdd', '-', 'examples', 'shortcuts', '-', 'report', 'about'] },
+  { name: 'Help', items: ['guide', 'tour', '-', 'palette', 'quickAdd', '-', 'examples', 'shortcuts', '-', 'report', 'about'] },
 ];
 
 const TOGGLES: Record<string, () => boolean> = {

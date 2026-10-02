@@ -86,6 +86,12 @@ await visible('.home', 'start screen');
 await page.click('text=Go to the editor');
 await page.click('text=Load the Blink example');
 await page.waitForTimeout(700);
+// On a first start the tour starts by itself (a popover too): Esc ends it.
+if (await page.waitForSelector('.tour-callout', { timeout: 3000 }).then(() => true, () => false)) {
+  await visible('.tour-callout', 'first-run tour');
+  await shot('tour');
+  await page.keyboard.press('Escape');
+}
 
 const passes = [
   { name: 'light', theme: 'light', arabic: false },

@@ -293,6 +293,19 @@ try {
   await page.waitForSelector('.home', { state: 'detached', timeout: 10000 }).catch(() => undefined);
   await showing('editor', 'new project');
 
+  // On a first start the tour starts by itself: it shows over the editor, and Esc ends it.
+  const tour = await page.waitForSelector('.tour-callout', { timeout: 5000 }).then(
+    () => true,
+    () => false,
+  );
+  if (!guideOnly) check('the first-run tour starts', tour);
+  if (tour) {
+    await showing('editor', 'first-run tour');
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('.tour-callout', { state: 'detached', timeout: 3000 }).catch(() => undefined);
+    check('Esc ends the tour', (await page.locator('.tour-callout').count()) === 0);
+  }
+
   // Editor › F1 › parts › each way back: the editor, whole.
   const ways = [
     ['the Back button', () => click('.guide .home-top .btn', 'guide back')],

@@ -83,6 +83,8 @@ interface Prefs {
   rightDragPan: boolean;
   /** Open on the start screen (recent projects, templates, examples). */
   showStartScreen: boolean;
+  /** The first-run tour was seen (finished or skipped). */
+  tourDone: boolean;
   /** Save the project file by itself a moment after each change (once the project has a file). */
   autosaveFile: boolean;
   /** Template that New Project starts from: the one used last ('' until one is chosen: the empty project). */
@@ -136,6 +138,7 @@ export function defaultPrefs(): Prefs {
     showStartScreen: true,
     newTemplate: '',
     autosaveFile: true,
+    tourDone: false,
     hoverCards: true,
     showMinimap: true,
     wheelAction: 'zoom',
@@ -191,6 +194,8 @@ interface EditorState extends Prefs {
   dragType: string | null;
   /** The floating code editor is being dragged over its place: letting go docks it. */
   codeDocking: boolean;
+  /** Step of the tour being shown (null: none). */
+  tourStep: number | null;
   /** When the project file was last saved by itself (status bar). */
   autoSavedAt: number | null;
   /** Quick value editor open on a part, at a point of the window. */
@@ -241,6 +246,7 @@ export const useEditor = create<EditorState>((set, get) => ({
   codeDocking: false,
   quickEdit: null,
   autoSavedAt: null,
+  tourStep: null,
   palette: null,
   revealLine: null,
 

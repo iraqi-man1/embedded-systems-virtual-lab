@@ -730,3 +730,16 @@ body.panel-resizing, body.panel-resizing * { user-select: none !important; }
 .link-btn { margin-inline-start: 6px; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; cursor: pointer; }
 .link-btn:hover { text-decoration: underline; }
 .note-fix { margin-top: 2px; color: var(--text-2); font-size: var(--fs-xs); }
+
+/* First-run tour: the part being explained stays bright, the rest dims (without blocking clicks). */
+.tour-shade { position: fixed; z-index: var(--z-dropdown); border-radius: var(--radius-lg); box-shadow: 0 0 0 3px var(--accent), 0 0 0 9999px rgba(10, 16, 24, 0.42); pointer-events: none; transition: left 200ms ease, top 200ms ease, width 200ms ease, height 200ms ease; }
+/* Nothing to point at (the welcome): the whole window dims. */
+.tour-shade.whole { border-radius: 0; box-shadow: none; background: rgba(10, 16, 24, 0.42); }
+.tour-callout { z-index: var(--z-modal); width: 340px; padding: 12px 14px; border: 1px solid var(--accent); border-radius: var(--radius-lg); background: var(--bg-panel-2); box-shadow: var(--shadow); color: var(--text); animation: pop-in 120ms ease-out; }
+.tour-head { display: flex; align-items: center; gap: 7px; color: var(--accent); }
+.tour-title { flex: 1; font-weight: 700; color: var(--text); font-size: var(--fs-md); }
+.tour-count { color: var(--text-3); font: 11px var(--font-mono); }
+.tour-text { margin: 8px 0 12px; color: var(--text-2); line-height: 1.55; }
+.tour-foot { display: flex; align-items: center; gap: 6px; }
+.tour-foot .spacer { flex: 1; }
+@media (prefers-reduced-motion: reduce) { .tour-shade { transition: none; } }

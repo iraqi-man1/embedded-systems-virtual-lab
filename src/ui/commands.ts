@@ -242,6 +242,7 @@ export const commands: Record<string, Command> = {
   quickAdd: cmd('quickAdd', 'Add a Part…', 'Type a part name and add it to the canvas.', { icon: 'plus', shortcut: 'Ctrl+K', run: () => ed().set({ palette: { mode: 'add' } }) }),
   guide: cmd('guide', 'Parts Guide', 'What each part is, what it is for and how to connect it.', { icon: 'book', shortcut: 'F1', run: () => openGuideForContext() }),
   shortcuts: cmd('shortcuts', 'Keyboard Shortcuts', 'Every mouse gesture and keyboard shortcut.', { icon: 'keyboard', shortcut: '?', run: () => ed().set({ dialog: 'shortcuts' }) }),
+  tour: cmd('tour', 'Take the Tour', 'A quick look around the lab: the parts, the canvas, the code, Run and the instruments.', { icon: 'sparkles', run: () => ed().set({ tourStep: 0, page: null, dialog: null }) }),
   report: cmd('report', 'Report a Problem…', 'The problems the lab recorded, with the details to copy into a report for your teacher or the developers.', { icon: 'bug', run: () => ed().set({ dialog: 'report' }) }),
   about: cmd('about', 'About', null, { icon: 'info', run: () => ed().set({ dialog: 'about' }) }),
 };

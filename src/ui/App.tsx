@@ -19,6 +19,7 @@ import { Dialogs, Toasts } from './shell/Dialogs';
 import { MenuBar } from './shell/MenuBar';
 import { StatusBar } from './shell/StatusBar';
 import { Toolbar } from './shell/Toolbar';
+import { installTourStart, Tour } from './shell/Tour';
 import { Workspace } from './workspace/Workspace';
 import { HomeScreen } from './home/HomeScreen';
 import { PartsGuide } from './guide/PartsGuide';
@@ -148,10 +149,12 @@ export function App() {
   useEffect(() => {
     const off = installShortcuts();
     const offLifecycle = installLifecycle();
+    const offTour = installTourStart();
     void refreshToolchain();
     return () => {
       off();
       offLifecycle();
+      offTour();
     };
   }, []);
 
@@ -245,6 +248,9 @@ export function App() {
         </ErrorBoundary>
         <ErrorBoundary area="Notifications" variant="silent">
           <Toasts />
+        </ErrorBoundary>
+        <ErrorBoundary area="Tour" variant="silent" onError={() => useEditor.getState().set({ tourStep: null })}>
+          <Tour />
         </ErrorBoundary>
       </div>
     </TooltipProvider>
