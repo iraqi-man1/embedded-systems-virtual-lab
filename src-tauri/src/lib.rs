@@ -37,6 +37,38 @@ fn disable_browser_accelerators(window: &tauri::WebviewWindow) {
     });
 }
 
+/// Creates the main window from its configuration (`create: false` in
+/// tauri.conf.json). On Windows, `EVLAB_WEBVIEW_DEBUG_PORT` opens the WebView2
+/// DevTools port on localhost, so a test can drive the real application
+/// (tools/e2e-desktop.mjs); WebView2 ignores its own environment variable for
+/// this because the window passes its browser arguments explicitly.
+fn main_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<tauri::WebviewWindow<R>> {
+    use tauri::Manager;
+    let config = app
+        .config()
+        .app
+        .windows
+        .iter()
+        .find(|w| w.label == "main")
+        .cloned()
+        .expect("tauri.conf.json defines the main window");
+    #[cfg(windows)]
+    let config = {
+        let mut config = config;
+        if let Some(port) = std::env::var("EVLAB_WEBVIEW_DEBUG_PORT").ok().and_then(|p| p.parse::<u16>().ok()) {
+            // wry's own defaults, plus the port.
+            config.additional_browser_args = Some(format!(
+                "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --remote-debugging-port={port}"
+            ));
+        }
+        config
+    };
+    if let Some(window) = app.get_webview_window(&config.label) {
+        return Ok(window);
+    }
+    tauri::WebviewWindowBuilder::from_config(app, &config)?.build()
+}
+
 /// Whether the main window may show `url`: only the application itself
 /// (`tauri://localhost`, or `http(s)://tauri.localhost` on Windows) and, in
 /// debug builds, the development server.
@@ -85,14 +117,12 @@ pub fn run() {
             build_lock: Mutex::new(()),
             launch_file: Mutex::new(launch_file),
         })
-        .setup(|_app| {
+        .setup(|app| {
+            let window = main_window(app.handle())?;
             #[cfg(all(windows, not(debug_assertions)))]
-            {
-                use tauri::Manager;
-                if let Some(window) = _app.get_webview_window("main") {
-                    disable_browser_accelerators(&window);
-                }
-            }
+            disable_browser_accelerators(&window);
+            #[cfg(not(all(windows, not(debug_assertions))))]
+            let _ = window;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

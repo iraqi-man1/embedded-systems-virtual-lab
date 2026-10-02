@@ -89,7 +89,8 @@ function windowsDiagnostics() {
 if (exe) {
   const port = 9333;
   app = spawn(resolve(exe), [], {
-    env: { ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port}` },
+    // The app opens the WebView2 DevTools port for this variable (src-tauri/src/lib.rs, main_window).
+    env: { ...process.env, EVLAB_WEBVIEW_DEBUG_PORT: String(port) },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   app.stdout.on('data', (d) => process.stdout.write(`[app] ${d}`));
