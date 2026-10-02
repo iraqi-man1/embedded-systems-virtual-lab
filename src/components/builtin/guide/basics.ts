@@ -429,9 +429,58 @@ const PMOS: GuideEntry = {
   },
 };
 
+const PICO: GuideEntry = {
+  ar: 'لوحة Raspberry Pi Pico',
+  what: [
+    'A low-cost board with the RP2040 chip (two Cortex-M0+ cores), 26 GPIO pins and 3.3 V logic. Here it runs real MicroPython: you write main.py in Python and the board runs it when it starts.',
+    'لوحة منخفضة التكلفة بالشريحة RP2040 (نواتان Cortex-M0+) فيها 26 طرف GPIO ومنطق 3.3 فولت. هنا تشغّل MicroPython حقيقية: تكتب الملف main.py بلغة بايثون وتشغّله اللوحة عند بدء التشغيل.',
+  ],
+  uses: [
+    ['Learn Python on a microcontroller (MicroPython).', 'تعلّم بايثون على متحكم دقيق (MicroPython).'],
+    ['PWM on every pin, three analog inputs (GP26–GP28), and I2C, SPI and UART buses.', 'PWM على كل الأطراف، وثلاثة مداخل تماثلية (GP26–GP28)، ونواقل I2C و SPI و UART.'],
+    ['Try Python lines at the `>>>` prompt (the REPL) in the Serial Monitor.', 'جرّب أسطر بايثون عند المحث `>>>` (الـ REPL) في مراقب المنفذ التسلسلي.'],
+  ],
+  steps: [
+    ['Place the Pico next to a breadboard and connect one of its GND pins to the breadboard’s − rail.', 'ضع الـ Pico بجانب لوحة التجارب وصِل أحد أطراف GND فيها بخط السالب (−) في لوحة التجارب.'],
+    ['Power 3.3 V parts from the 3V3 pin, not from VBUS (VBUS is 5 V).', 'غذِّ القطع التي تعمل على 3.3 فولت من الطرف 3V3 وليس من VBUS (لأن VBUS يساوي 5 فولت).'],
+    ['Wire each signal to a GP pin: an LED through a 220 Ω resistor to GP15, a potentiometer wiper to GP26, GP27 or GP28.', 'صِل كل إشارة بطرف GP: الـ LED عبر مقاومة 220 أوم إلى GP15، والطرف الأوسط للمقاومة المتغيرة إلى GP26 أو GP27 أو GP28.'],
+    ['Write the program in `main.py` in the Code panel and press Run: MicroPython starts, your `.py` files are copied to the board and `main.py` runs.', 'اكتب البرنامج في الملف `main.py` في لوحة الكود واضغط تشغيل: تبدأ MicroPython وتُنسخ ملفات `.py` إلى اللوحة ثم يعمل `main.py`.'],
+    ['`print()` output appears in the Serial Monitor; Ctrl+C there stops the program and gives you the `>>>` prompt.', 'مخرجات `print()` تظهر في مراقب المنفذ التسلسلي، و Ctrl+C هناك يوقف البرنامج ويعطيك المحث `>>>`.'],
+  ],
+  tips: [
+    ['Its pins work at 3.3 V: 5 V signals need a level shifter or a divider.', 'أطرافها تعمل على 3.3 فولت: إشارات 5 فولت تحتاج محوّل مستوى أو مقسّم جهد.'],
+    ['The on-board LED is on GP25: `Pin(25, Pin.OUT)`.', 'الـ LED المدمج على الطرف GP25: `Pin(25, Pin.OUT)`.'],
+    ['A button between a GP pin and GND needs `Pin.PULL_UP`, otherwise the input floats.', 'الزر الموصول بين طرف GP و GND يحتاج `Pin.PULL_UP`، وإلا يبقى الدخل عائماً.'],
+    ['A Python error stops the program: the Serial Monitor shows the traceback and the line is marked in the code.', 'خطأ بايثون يوقف البرنامج: يعرض مراقب المنفذ التسلسلي رسالة الخطأ (Traceback) ويُعلَّم السطر في الكود.'],
+  ],
+  code: `from machine import Pin
+import time
+
+led = Pin(25, Pin.OUT)   # the on-board LED
+
+while True:
+    led.toggle()
+    time.sleep(0.5)
+    print("blink")`,
+  pins: {
+    '3V3': ['3.3 V output for sensors and modules.', 'خرج 3.3 فولت للحساسات والوحدات.'],
+    VBUS: ['5 V from USB.', '5 فولت من USB.'],
+    VSYS: ['Main supply input, 1.8–5.5 V.', 'دخل التغذية الرئيسي، من 1.8 إلى 5.5 فولت.'],
+    GND: ['Ground.', 'الأرضي.'],
+    GP26: ['GPIO, analog input ADC0.', 'GPIO، مدخل تماثلي ADC0.'],
+    GP27: ['GPIO, analog input ADC1.', 'GPIO، مدخل تماثلي ADC1.'],
+    GP28: ['GPIO, analog input ADC2.', 'GPIO، مدخل تماثلي ADC2.'],
+    RUN: ['Pull LOW to reset.', 'اسحبه إلى LOW لإعادة التشغيل.'],
+    '3V3_EN': ['Pull LOW to switch the 3.3 V regulator off.', 'اسحبه إلى LOW لإطفاء منظّم 3.3 فولت.'],
+    ADC_VREF: ['Reference voltage of the ADC.', 'الجهد المرجعي لمحوّل ADC.'],
+    AGND: ['Analog ground.', 'الأرضي التماثلي.'],
+  },
+};
+
 export const BASICS: Record<string, GuideEntry> = {
   'evlab.arduino-uno': UNO,
   'evlab.arduino-nano': NANO,
+  'evlab.rpi-pico': PICO,
   'evlab.breadboard-half': BREADBOARD,
   'evlab.breadboard-full': { ...BREADBOARD, ar: 'لوحة تجارب كاملة' },
   'evlab.breadboard-mini': BREADBOARD_MINI,

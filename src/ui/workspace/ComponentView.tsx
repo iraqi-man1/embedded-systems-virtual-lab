@@ -142,7 +142,7 @@ export const ComponentView = memo(function ComponentView({ inst, def, selected, 
   let body;
   if (def.visual.kind === 'wokwi') body = <WokwiElement inst={inst} def={def} tag={def.visual.tag} preview={preview} />;
   else if (def.visual.kind === 'svg') body = <SvgVisual svg={def.visual.svg} />;
-  else body = renderBuiltin(def.visual.renderer, inst, def);
+  else body = renderBuiltin(def.visual.renderer, inst, def, preview);
   return (
     <div
       className={`comp${selected ? ' selected' : ''}${inert ? ' inert' : ''}${problem ? ` problem-${problem}` : ''}`}

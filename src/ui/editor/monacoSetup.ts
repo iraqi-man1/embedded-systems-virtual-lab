@@ -1,10 +1,11 @@
 /**
  * Offline Monaco setup: the editor and its worker are bundled locally
- * (never fetched from a CDN), and Arduino language helpers are registered.
+ * (never fetched from a CDN), and Arduino and MicroPython helpers are registered.
  */
 import * as monaco from 'monaco-editor';
 import EditorWorker from 'monaco-editor/editor/editor.worker?worker';
 import { registerArduinoLanguage } from './arduinoLanguage';
+import { registerPythonLanguage } from './pythonLanguage';
 import { THEMES } from '../themes';
 
 declare global {
@@ -37,5 +38,6 @@ for (const th of THEMES) {
 }
 
 registerArduinoLanguage(monaco);
+registerPythonLanguage(monaco);
 
 export { monaco };

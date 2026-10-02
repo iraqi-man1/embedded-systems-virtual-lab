@@ -148,7 +148,7 @@ export class AvrEmulator implements McuEmulator {
     this.adcOnly.clear();
     for (const [pinId, m] of Object.entries(this.def.pinMap)) {
       if ('adcOnly' in m) this.adcOnly.set(pinId, m.adcOnly);
-      else {
+      else if ('port' in m) {
         const port = this.ports.get(m.port);
         if (port) this.bindings.set(pinId, { port, bit: m.bit, adc: m.adc });
       }

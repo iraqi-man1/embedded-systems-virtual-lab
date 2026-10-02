@@ -7,9 +7,12 @@ import type { Diagnostic } from '../core/circuit/diagnostics';
 import type { ComponentInstance, PropValue } from '../core/model/circuit';
 import type { Project } from '../core/project/schema';
 import { buildSimSetup, type ProbeRequest } from '../core/sim/setup';
+import type { ScriptProgram } from '../core/sim/mcu/mcu';
+import { DEFAULT_MAIN_PY, MAIN_FILE, languageOf, sourcesFor, type FirmwareLanguage } from '../core/project/firmware';
+import { TracebackReader, errorLocation, type PythonError } from '../core/toolchain/pythonTraceback';
 import type { McuStatus, SimCommand, SimEvent, SimRunState, StepKind } from '../core/sim/types';
 import { bytesToText } from '../core/instruments/decoders';
-import { countLines, stampLines } from '../core/instruments/serialLog';
+import { countLines, decodeSerialText, stampLines } from '../core/instruments/serialLog';
 import { compileRequestFor, type CompileDiagnostic, type ToolchainStatus } from '../core/toolchain/types';
 import { lookup } from '../app/registry';
 import { t } from '../i18n';
@@ -59,6 +62,10 @@ interface SimState {
   /** Simulation time at which each line of `serial` began (for timestamps). */
   serialStamps: Record<string, number[]>;
   compile: CompileState;
+  /** MicroPython boards: the files copied to the board when it last started (null when stopped). */
+  uploaded: { hash: string; files: Record<string, string> } | null;
+  /** Errors the running Python program stopped with (from its tracebacks). */
+  scriptErrors: CompileDiagnostic[];
   toolchain: ToolchainStatus | null;
   starting: boolean;
   set(p: Partial<SimState>): void;
@@ -75,6 +82,8 @@ export const useSim = create<SimState>((set) => ({
   serial: {},
   serialStamps: {},
   compile: EMPTY_COMPILE,
+  uploaded: null,
+  scriptErrors: [],
   toolchain: null,
   starting: false,
   set: (p) => set(p),
@@ -84,6 +93,7 @@ export const useSim = create<SimState>((set) => ({
 let worker: Worker | null = null;
 let lastStoreUpdate = 0;
 const serialDecoder = new Map<string, string>(); // partial line per board (plotter)
+const tracebacks = new Map<string, TracebackReader>(); // MicroPython boards
 
 function getWorker(): Worker {
   if (!worker) {
@@ -125,7 +135,11 @@ function handleEvent(ev: SimEvent) {
           const pending = (serialDecoder.get(s.componentId) ?? '') + text;
           const lines = pending.split(/\r?\n/);
           serialDecoder.set(s.componentId, lines.pop() ?? '');
-          for (const line of lines) captures.pushPlotterLine(line);
+          for (const line of lines) {
+            captures.pushPlotterLine(line);
+            const err = tracebacks.get(s.componentId)?.line(line);
+            if (err) reportScriptError(err);
+          }
         }
       }
       const now = performance.now();
@@ -139,7 +153,7 @@ function handleEvent(ev: SimEvent) {
       useSim.setState({ diagnostics: ev.diagnostics });
       break;
     case 'state':
-      useSim.setState({ state: ev.state, ...(ev.state === 'stopped' ? { speed: 0, voltages: [], driven: [], mcus: [] } : {}) });
+      useSim.setState({ state: ev.state, ...(ev.state === 'stopped' ? { speed: 0, voltages: [], driven: [], mcus: [], uploaded: null } : {}) });
       if (ev.state === 'stopped') visualBus.reset();
       break;
     case 'error':
@@ -156,8 +170,16 @@ export function findTargetBoard(project: Project): ComponentInstance | undefined
 
 export function sourceHash(project: Project, board: ComponentInstance | undefined): string {
   const def = board && lookup(board.type);
-  return JSON.stringify([def?.mcu?.toolchain, project.firmware.files]);
+  return JSON.stringify([def?.mcu?.toolchain, sourcesFor(languageOf(def?.mcu), project.firmware.files)]);
 }
+
+/** Language of the code the project's target board runs (Arduino without a board). */
+export function targetLanguage(project: Project): FirmwareLanguage {
+  const board = findTargetBoard(project);
+  return languageOf(board && lookup(board.type)?.mcu);
+}
+
+export const useTargetLanguage = () => useProject((s) => targetLanguage(s.project));
 
 /**
  * Firmware build state shown in the status bar: `none` without a
@@ -166,10 +188,12 @@ export function sourceHash(project: Project, board: ComponentInstance | undefine
  */
 export type BuildState = 'none' | 'unbuilt' | 'compiling' | 'built' | 'modified' | 'failed';
 
-export function buildStateOf(project: Project, compile: CompileState): BuildState {
+export function buildStateOf(project: Project, compile: CompileState, uploaded: SimState['uploaded'] = null): BuildState {
   const board = findTargetBoard(project);
   const def = board && lookup(board.type);
   if (!board || !def?.mcu || def.simulation.support === 'visual-only') return 'none';
+  // MicroPython runs the files as they are: the only state is whether the running board has the latest ones.
+  if (def.mcu.runtime) return !uploaded ? 'none' : uploaded.hash === sourceHash(project, board) ? 'built' : 'modified';
   if (compile.status === 'compiling') return 'compiling';
   if (compile.status === 'error') return 'failed';
   if (!compile.hex[board.id] || !compile.built) return 'unbuilt';
@@ -178,7 +202,8 @@ export function buildStateOf(project: Project, compile: CompileState): BuildStat
 
 export function useBuildState(): BuildState {
   const compile = useSim((s) => s.compile);
-  return useProject((s) => buildStateOf(s.project, compile));
+  const uploaded = useSim((s) => s.uploaded);
+  return useProject((s) => buildStateOf(s.project, compile, uploaded));
 }
 
 function probeRequests(project: Project): ProbeRequest[] {
@@ -188,10 +213,72 @@ function probeRequests(project: Project): ProbeRequest[] {
   ];
 }
 
+// ------------------------------------------------- interpreter boards
+/** Interpreter images (MicroPython UF2) by path, fetched once from the application's files. */
+const runtimeImages = new Map<string, Uint8Array>();
+const runtimeLoads = new Map<string, Promise<Uint8Array>>();
+
+function loadRuntime(path: string): Promise<Uint8Array> {
+  const have = runtimeImages.get(path);
+  if (have) return Promise.resolve(have);
+  let load = runtimeLoads.get(path);
+  if (!load) {
+    load = (async () => {
+      const res = await fetch(new URL(path, document.baseURI));
+      if (!res.ok) throw new Error(`${path}: HTTP ${res.status}`);
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      runtimeImages.set(path, bytes);
+      return bytes;
+    })();
+    runtimeLoads.set(path, load);
+    load.catch(() => runtimeLoads.delete(path));
+  }
+  return load;
+}
+
+/** The Python program for the target board: the interpreter image and the project's .py files. */
+function scriptPrograms(project: Project): Record<string, ScriptProgram> {
+  const board = findTargetBoard(project);
+  const runtime = board && lookup(board.type)?.mcu?.runtime;
+  const image = runtime && runtimeImages.get(runtime.image);
+  if (!board || !runtime || !image) return {};
+  const files = sourcesFor('micropython', project.firmware.files).map((f) => ({ name: f.name, content: f.content }));
+  return { [board.id]: { kind: runtime.kind, image, files } };
+}
+
+/** A Pico project needs main.py: create one (a blink starter) when it is missing. */
+function ensureMainPy(): boolean {
+  const { project } = useProject.getState();
+  if (project.firmware.files.some((f) => f.name === MAIN_FILE.micropython)) return false;
+  useProject.getState().updateProject((p) => {
+    p.firmware.files.unshift({ name: MAIN_FILE.micropython, content: DEFAULT_MAIN_PY });
+  });
+  useEditor.getState().notify(t('Created main.py — the Pico runs it when it starts. Edit it in the Code panel.'), 'info');
+  return true;
+}
+
+/** Remembers which files the board got, and starts reading its tracebacks afresh. */
+function markUploaded(project: Project, board: ComponentInstance) {
+  const files = Object.fromEntries(sourcesFor('micropython', project.firmware.files).map((f) => [f.name, f.content]));
+  useSim.setState({ uploaded: { hash: sourceHash(project, board), files }, scriptErrors: [] });
+  tracebacks.set(board.id, new TracebackReader());
+}
+
+/** A traceback ended the Python program: show it in Problems and at its line in the editor. */
+function reportScriptError(err: PythonError) {
+  const { project } = useProject.getState();
+  const at = errorLocation(err, project.firmware.files.map((f) => f.name));
+  const message = decodeSerialText(err.message);
+  const diag: CompileDiagnostic = { file: at.file, line: at.line, column: 1, severity: 'error', message };
+  useSim.setState({ scriptErrors: [...useSim.getState().scriptErrors, diag] });
+  // Isolated so the file name and the (English) Python message keep their order in Arabic.
+  useEditor.getState().notify(t('{file} line {line}: {error}', { file: `\u2066${at.file}\u2069`, line: at.line, error: `\u2066${message}\u2069` }), 'error');
+}
+
 function currentSetup() {
   const { project } = useProject.getState();
   const netlist = getNetlist(project.circuit);
-  return buildSimSetup(project.circuit, lookup, netlist, useSim.getState().compile.hex, probeRequests(project));
+  return buildSimSetup(project.circuit, lookup, netlist, useSim.getState().compile.hex, probeRequests(project), scriptPrograms(project));
 }
 
 // ----------------------------------------------------------------- actions
@@ -219,10 +306,11 @@ export async function compileFirmware(): Promise<boolean> {
     editor.notify(t('{part} cannot be simulated yet ({reason}).', { part: def.name, reason: def.simulation.notes ?? t('visual-only') }), 'warning');
     return false;
   }
+  if (def.mcu.runtime) return uploadScripts();
   const sim = useSim.getState();
   useSim.setState({ compile: { ...sim.compile, status: 'compiling', log: `${t('Compiling for {board} ({target})…', { board: def.name, target: def.mcu.toolchain.board })}\n` } });
   try {
-    const res = await toolchain.compile(compileRequestFor(def.mcu, project.firmware.files));
+    const res = await toolchain.compile(compileRequestFor(def.mcu, sourcesFor('arduino', project.firmware.files)));
     const hex = res.success && res.hex ? { ...useSim.getState().compile.hex, [board.id]: res.hex } : useSim.getState().compile.hex;
     useSim.setState({
       compile: {
@@ -231,7 +319,7 @@ export async function compileFirmware(): Promise<boolean> {
         diagnostics: res.diagnostics,
         hex,
         hash: res.success ? sourceHash(project, board) : null,
-        built: res.success ? Object.fromEntries(project.firmware.files.map((f) => [f.name, f.content])) : useSim.getState().compile.built,
+        built: res.success ? Object.fromEntries(sourcesFor('arduino', project.firmware.files).map((f) => [f.name, f.content])) : useSim.getState().compile.built,
         flashBytes: res.flashBytes,
         ramBytes: res.ramBytes,
         durationMs: res.durationMs,
@@ -265,7 +353,8 @@ export async function compileFirmware(): Promise<boolean> {
 function serialNote(boardId: string, note: string) {
   const { serial, serialStamps, simTime } = useSim.getState();
   const text = serial[boardId] ?? '';
-  const line = `${text && !text.endsWith('\n') ? '\n' : ''}── ${note} ──\n`;
+  // Serial text holds one character per byte (the monitor decodes UTF-8), so the note is stored as its UTF-8 bytes.
+  const line = String.fromCharCode(...new TextEncoder().encode(`${text && !text.endsWith('\n') ? '\n' : ''}── ${note} ──\n`));
   const stamps = serialStamps[boardId]?.slice() ?? [];
   stampLines(text, line, stamps, simTime);
   useSim.setState({ serial: { ...serial, [boardId]: text + line }, serialStamps: { ...serialStamps, [boardId]: stamps } });
@@ -278,16 +367,51 @@ function reflash(boardId: string, label: string) {
   useEditor.getState().notify(t('New firmware flashed — {board} restarted', { board: label }), 'success');
 }
 
+/**
+ * MicroPython boards have nothing to compile: "Compile" copies the .py files
+ * to the running board and restarts it, or starts the simulation.
+ */
+async function uploadScripts(): Promise<boolean> {
+  if (useSim.getState().state === 'stopped') {
+    await startSimulation();
+    return true;
+  }
+  ensureMainPy();
+  const { project } = useProject.getState();
+  const board = findTargetBoard(project)!;
+  try {
+    await loadRuntime(lookup(board.type)!.mcu!.runtime!.image);
+  } catch (e) {
+    useEditor.getState().notify(t('Could not load MicroPython: {error}', { error: (e as Error).message }), 'error');
+    return false;
+  }
+  markUploaded(project, board);
+  send({ type: 'update-circuit', setup: currentSetup(), restart: [board.id] });
+  serialNote(board.id, t('files copied, {board} restarted', { board: board.label }));
+  useEditor.getState().notify(t('Code copied to {board} — it restarted', { board: board.label }), 'success');
+  return true;
+}
+
 export async function startSimulation() {
   const sim = useSim.getState();
   if (sim.state === 'paused') return resumeSimulation();
   if (sim.state === 'running' || sim.starting) return;
   useSim.setState({ starting: true });
   try {
-    const { project } = useProject.getState();
+    let { project } = useProject.getState();
     const board = findTargetBoard(project);
     const def = board && lookup(board.type);
-    if (board && def?.mcu && def.simulation.support !== 'visual-only') {
+    if (board && def?.mcu?.runtime) {
+      // MicroPython: no build; the interpreter starts and gets the .py files.
+      if (ensureMainPy()) project = useProject.getState().project;
+      try {
+        await loadRuntime(def.mcu.runtime.image);
+      } catch (e) {
+        useEditor.getState().notify(t('Could not load MicroPython: {error}', { error: (e as Error).message }), 'error');
+        return;
+      }
+      markUploaded(project, board);
+    } else if (board && def?.mcu && def.simulation.support !== 'visual-only') {
       const c = useSim.getState().compile;
       if (c.hash !== sourceHash(project, board) || !c.hex[board.id]) {
         const ok = await compileFirmware();

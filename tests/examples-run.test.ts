@@ -58,7 +58,9 @@ const EXPECT: Record<string, { seconds: number; serial?: RegExp; visual?: (v: Re
 };
 
 describe.skipIf(process.env.EVLAB_E2E !== '1')('examples end-to-end (compile + simulate)', () => {
-  for (const ex of ALL_EXAMPLES) {
+  // MicroPython examples run without a compiler (tests/micropython.test.ts).
+  const compiled = ALL_EXAMPLES.filter((ex) => !ex.build(registry).circuit.components.some((c) => lookup(c.type)?.mcu?.runtime));
+  for (const ex of compiled) {
     it(ex.id, () => {
       const p = ex.build(registry);
       const board = p.circuit.components.find((c) => lookup(c.type)?.mcu);

@@ -7,6 +7,7 @@
 import type { Annotation, CircuitDocument } from '../model/circuit';
 import type { PinRef } from '../model/circuit';
 import { version } from '../../../package.json';
+import type { FirmwareLanguage } from './firmware';
 
 export const PROJECT_FORMAT = 'evlab-project';
 export const PROJECT_VERSION = 1;
@@ -37,7 +38,8 @@ export interface Project {
   };
   circuit: CircuitDocument;
   firmware: {
-    language: 'arduino';
+    /** Informational: the language actually used follows the target board (see firmware.ts). */
+    language: FirmwareLanguage;
     files: SourceFile[];
     /** Component id of the board the firmware is compiled for (null = first board). */
     target: string | null;

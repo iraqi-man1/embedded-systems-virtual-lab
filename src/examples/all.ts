@@ -2,5 +2,6 @@
 import { EXAMPLES } from './catalog';
 import { EXAMPLES_2 } from './catalog2';
 import { EXAMPLES_3 } from './catalog3';
+import { EXAMPLES_PICO } from './catalogPico';
 
-export const ALL_EXAMPLES = [...EXAMPLES, ...EXAMPLES_2, ...EXAMPLES_3];
+export const ALL_EXAMPLES = [...EXAMPLES, ...EXAMPLES_2, ...EXAMPLES_3, ...EXAMPLES_PICO];

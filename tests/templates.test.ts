@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { buildNetlist } from '../src/core/circuit/netlist';
 import { runStaticErc } from '../src/core/circuit/erc';
 import { TEMPLATES } from '../src/examples/templates';
+import { MAIN_FILE, languageOf } from '../src/core/project/firmware';
 import { lookup, registry } from './helpers';
 
 describe('project templates', () => {
@@ -10,7 +11,9 @@ describe('project templates', () => {
     it(`${tpl.id} builds a valid project`, () => {
       const p = tpl.build(registry, 'My project');
       expect(p.meta.name).toBe('My project');
-      expect(p.firmware.files[0].name).toBe('sketch.ino');
+      // The code starts as the main file of the language the template's board runs.
+      const board = p.circuit.components.find((c) => lookup(c.type)?.mcu);
+      expect(p.firmware.files[0].name).toBe(MAIN_FILE[languageOf(board && lookup(board.type)?.mcu)]);
       for (const c of p.circuit.components) expect(lookup(c.type), c.type).toBeTruthy();
       const netlist = buildNetlist(p.circuit, lookup);
       const errors = runStaticErc(p.circuit, netlist, lookup).filter((d) => d.severity === 'error');
@@ -19,6 +22,15 @@ describe('project templates', () => {
       expect(netlist.insertions).toEqual([]);
     });
   }
+
+  it('pico-breadboard puts 3.3 V and GND on the bottom rails', () => {
+    const p = TEMPLATES.find((x) => x.id === 'pico-breadboard')!.build(registry, 'x');
+    const netlist = buildNetlist(p.circuit, lookup);
+    const bb = p.circuit.components.find((c) => c.type === 'evlab.breadboard-half')!;
+    expect(netlist.nets[netlist.netOf({ componentId: bb.id, pinId: 'bp.10' })!].powerVoltages).toEqual([3.3]);
+    expect(netlist.nets[netlist.netOf({ componentId: bb.id, pinId: 'bn.10' })!].hasGround).toBe(true);
+    expect(p.firmware.language).toBe('micropython');
+  });
 
   it.each(['uno-breadboard', 'nano-breadboard', 'logic'])('%s puts 5 V and GND on the bottom rails', (id) => {
     const p = TEMPLATES.find((x) => x.id === id)!.build(registry, 'x');

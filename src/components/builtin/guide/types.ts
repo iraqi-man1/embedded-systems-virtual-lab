@@ -17,7 +17,7 @@ export interface GuideEntry {
   steps?: L[];
   /** Tips and common mistakes. */
   tips?: L[];
-  /** A short example program (Arduino C++). */
+  /** A short example program (Arduino C++, or MicroPython for the Pico). */
   code?: string;
   /**
    * What each pin does, by pin id or by the shared name of numbered pins

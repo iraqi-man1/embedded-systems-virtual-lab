@@ -11,6 +11,7 @@ import {
   startSimulation,
   stepSimulation,
   stopSimulation,
+  targetLanguage,
   useSim,
 } from '../state/sim';
 import {
@@ -101,6 +102,20 @@ function cmd(id: string, label: MessageKey, description: MessageKey | null, rest
   };
 }
 
+/** One command whose name and explanation follow the language of the target board. */
+function byLanguage(arduino: Command, python: Command): Command {
+  const pick = () => (targetLanguage(useProject.getState().project) === 'micropython' ? python : arduino);
+  return {
+    ...arduino,
+    get label() {
+      return pick().label;
+    },
+    get description() {
+      return pick().description;
+    },
+  };
+}
+
 const oneSelected = () => ed().selectedComponents.length + ed().selectedAnnotations.length > 0;
 const partSelected = () => ed().selectedComponents.length > 0;
 
@@ -170,12 +185,17 @@ export const commands: Record<string, Command> = {
   focusCanvas: cmd('focusCanvas', 'Focus Canvas (hide/restore panels)', 'Hide every panel around the canvas; run again to bring them back.', { icon: 'fit', shortcut: 'Ctrl+`', run: toggleFocusCanvas }),
   toggleCode: cmd('toggleCode', 'Code Editor', 'Show or hide the firmware code editor.', { icon: 'code', run: () => ed().setPrefs({ showCode: !ed().showCode }) }),
   toggleDock: cmd('toggleDock', 'Instruments Panel', 'Show or hide the serial monitor, oscilloscope, logic analyzer and other instruments.', { icon: 'panel-bottom', run: () => ed().setPrefs({ showDock: !ed().showDock }) }),
-  compile: cmd('compile', 'Compile Firmware', 'Build the code for the board with the real compiler and show any errors. While running, flashes the new build.', {
-    icon: 'build',
-    shortcut: 'Ctrl+B',
-    run: () => void compileFirmware(),
-    enabled: () => useSim.getState().compile.status !== 'compiling',
-  }),
+  compile: byLanguage(
+    cmd('compile', 'Compile Firmware', 'Build the code for the board with the real compiler and show any errors. While running, flashes the new build.', {
+      icon: 'build',
+      shortcut: 'Ctrl+B',
+      run: () => void compileFirmware(),
+      enabled: () => useSim.getState().compile.status !== 'compiling',
+    }),
+    cmd('compile', 'Upload Code to Board', 'MicroPython needs no compiling: copies the .py files to the running board and restarts it, or starts the simulation.', {
+      run: () => void compileFirmware(),
+    }),
+  ),
   run: cmd('run', 'Run / Resume', 'Compile if needed and start the simulation (or continue after a pause).', {
     icon: 'play',
     shortcut: 'F5',

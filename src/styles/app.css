@@ -317,6 +317,7 @@ input[type='checkbox'] { accent-color: var(--accent); }
 .code-tab.active { background: var(--bg-panel-2); color: var(--text); box-shadow: inset 0 2px 0 var(--accent); }
 .code-tab .x { opacity: 0.5; }
 .code-tab .x:hover { opacity: 1; }
+.code-tab.unused { font-style: italic; opacity: 0.6; }
 .code-tab { direction: ltr; }
 .code-toolbar { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-bottom: 1px solid var(--border); background: var(--bg-panel); flex: none; }
 .code-toolbar .info { color: var(--text-3); font-size: var(--fs-xs); margin-inline-start: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -487,6 +488,8 @@ kbd { direction: ltr; unicode-bidi: plaintext; font-family: var(--font-mono); fo
 .mcu-reg { display: flex; flex-direction: column; align-items: center; padding: 2px 0; border-radius: 3px; background: var(--bg-panel-2); font-size: var(--fs-xs); }
 .mcu-reg .name { color: var(--text-3); font-size: 10px; }
 .mcu-reg.changed { background: var(--accent-soft); color: var(--accent); }
+.mcu-regs.wide { grid-template-columns: repeat(4, 1fr); }
+.mcu-runtime { color: var(--text-2); font-size: var(--fs-sm); line-height: 1.45; }
 .mcu-pins { overflow: auto; min-height: 0; }
 .mcu-pins table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
 .mcu-pins th { position: sticky; top: 0; background: var(--bg-panel); text-align: start; font-weight: 600; color: var(--text-2); padding: 4px 10px; border-bottom: 1px solid var(--border); }

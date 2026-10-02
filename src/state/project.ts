@@ -9,6 +9,7 @@ import { nanoid } from 'nanoid';
 import type { CircuitDocument, ComponentInstance, PropValue, Wire } from '../core/model/circuit';
 import type { ComponentDefinition } from '../core/model/component';
 import { newProject, type Project, type SourceFile } from '../core/project/schema';
+import { canRemoveFile, isMainFile } from '../core/project/firmware';
 import { defaultProps } from '../core/sim/setup';
 import { snapComponentPosition } from '../core/circuit/geometry';
 
@@ -120,12 +121,12 @@ export const useProject = create<ProjectState>((set, get) => ({
   },
   removeFile(name) {
     get().updateProject((p) => {
-      p.firmware.files = p.firmware.files.filter((f) => f.name !== name || f.name === 'sketch.ino');
+      if (canRemoveFile(name, p.firmware.files)) p.firmware.files = p.firmware.files.filter((f) => f.name !== name);
     });
   },
   renameFile(from, to) {
     get().updateProject((p) => {
-      if (from === 'sketch.ino' || from === to || p.firmware.files.some((f) => f.name === to)) return;
+      if (isMainFile(from) || from === to || p.firmware.files.some((f) => f.name === to)) return;
       const f = p.firmware.files.find((x) => x.name === from);
       if (f) f.name = to;
     });

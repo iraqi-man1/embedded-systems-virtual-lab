@@ -1,8 +1,10 @@
 /** Built-in renderers for components drawn by the application itself. */
-import { memo, type ReactElement } from 'react';
+import { memo, useEffect, useState, type ReactElement } from 'react';
 import type { ComponentInstance } from '../../core/model/circuit';
 import type { ComponentDefinition } from '../../core/model/component';
 import { breadboardLayout, type BreadboardSize } from '../../components/visuals/breadboard';
+import { picoSvg } from '../../components/visuals/pico';
+import { visualBus } from '../../state/visualBus';
 
 const Breadboard = memo(function Breadboard({ size }: { size: BreadboardSize }) {
   const l = breadboardLayout(size);
@@ -79,7 +81,21 @@ function Placeholder({ def }: { def: ComponentDefinition }) {
   );
 }
 
-export function renderBuiltin(renderer: string, inst: ComponentInstance, def: ComponentDefinition): ReactElement {
+const PICO_OFF = picoSvg(false);
+const PICO_ON = picoSvg(true);
+
+/** Raspberry Pi Pico; its LED (GP25) follows the simulation. */
+function PicoBoard({ id, preview }: { id: string; preview?: boolean }) {
+  const [led, setLed] = useState(false);
+  useEffect(() => {
+    if (preview) return;
+    return visualBus.register(id, (state) => setLed(!!state?.led));
+  }, [id, preview]);
+  return <div style={{ lineHeight: 0 }} dangerouslySetInnerHTML={{ __html: led ? PICO_ON : PICO_OFF }} />;
+}
+
+export function renderBuiltin(renderer: string, inst: ComponentInstance, def: ComponentDefinition, preview?: boolean): ReactElement {
+  if (renderer === 'rpi-pico') return <PicoBoard id={inst.id} preview={preview} />;
   if (renderer.startsWith('breadboard-')) return <Breadboard size={renderer.slice(11) as BreadboardSize} />;
   if (renderer === 'junction') return <Junction />;
   if (renderer === 'net-label') return <NetLabel inst={inst} def={def} />;

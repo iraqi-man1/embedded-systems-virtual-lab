@@ -49,3 +49,23 @@ export function hexDump(text: string, limit = HEX_LIMIT): string {
   }
   return rows.join('\n');
 }
+
+/**
+ * Serial text is stored one character per byte (so the hex view shows the
+ * real bytes); this decodes it as UTF-8 for reading, so Arabic and other
+ * non-ASCII text printed by the program shows correctly. An incomplete
+ * character at the very end (its other bytes still on the way) is held back.
+ */
+export function decodeSerialText(raw: string): string {
+  let ascii = true;
+  for (let i = 0; i < raw.length; i++) {
+    if (raw.charCodeAt(i) > 0x7f) {
+      ascii = false;
+      break;
+    }
+  }
+  if (ascii) return raw;
+  const bytes = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i) & 0xff;
+  return new TextDecoder('utf-8').decode(bytes, { stream: true });
+}

@@ -321,11 +321,19 @@ export interface McuDefinition {
   resetPin?: string;
   /** Electrical characteristics of the GPIO drivers. */
   gpio?: { rOut: number; rPullUp: number; absMaxCurrent: number; recommendedCurrent: number };
+  /**
+   * The board runs an interpreter instead of compiled firmware: the user's
+   * files are copied onto it and run (MicroPython). `image` is the
+   * interpreter's UF2 file, relative to the application's public folder.
+   */
+  runtime?: { kind: 'micropython'; image: string; version: string };
 }
 
 export type McuPinMapping =
   | { port: string; bit: number; adc?: number; pwm?: boolean }
-  | { adcOnly: number };
+  | { adcOnly: number }
+  /** RP2040-style GPIO number (and ADC channel for GP26–GP29). */
+  | { gpio: number; adc?: number };
 
 export interface ComponentDocs {
   summary: string;

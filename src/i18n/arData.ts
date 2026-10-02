@@ -291,4 +291,20 @@ export const EXAMPLES_AR: Record<string, { title: string; summary: string }> = {
     title: 'ميزان استواء (MPU-6050 + OLED)',
     summary: 'اقرأ الميل من مقياس التسارع MPU-6050 عبر I²C وارسم ميزان فقاعة على شاشة SSD1306 OLED. اسحب لوحة الإمالة بجانب الحساس أثناء المحاكاة.',
   },
+  'pico-blink': {
+    title: 'وميض على Pico (MicroPython)',
+    summary: 'بايثون على لوحة Raspberry Pi Pico: الـ LED الأخضر على اللوحة و LED على الطرف GP15 يومضان بالتناوب. اضغط Ctrl+C في مراقب المنفذ التسلسلي لإيقاف البرنامج وكتابة أوامر بايثون عند المحث >>>.',
+  },
+  'pico-button': {
+    title: 'زر ضغط على Pico (MicroPython)',
+    summary: 'اقرأ زر ضغط على الطرف GP15 باستخدام Pin.PULL_UP وأضئ الـ LED على GP14 ما دام مضغوطاً. انقر الزر أثناء المحاكاة؛ تطبع print() كل ضغطة.',
+  },
+  'pico-potentiometer': {
+    title: 'تعتيم بالمقاومة المتغيرة على Pico (MicroPython)',
+    summary: 'تقرأ ADC(28).read_u16() مقاومة متغيرة ويضبط PWM سطوع الـ LED على GP15. أدِر المقبض أثناء المحاكاة؛ تُرسل القيم إلى مراقب المنفذ التسلسلي والراسم.',
+  },
+  'pico-traffic-light': {
+    title: 'إشارة مرور على Pico (MicroPython)',
+    summary: 'ثلاثة LED على الأطراف GP6 و GP13 و GP15 تتنقل بين الأحمر، والأحمر مع الأصفر، والأخضر، والأصفر، مكتوبة كدالة بايثون صغيرة.',
+  },
 };

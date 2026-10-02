@@ -18,7 +18,8 @@ function useProblems() {
   const erc = useErc();
   const sim = useSim((s) => s.diagnostics);
   const compile = useSim((s) => s.compile.diagnostics);
-  return { erc, sim, compile };
+  const script = useSim((s) => s.scriptErrors);
+  return { erc, sim, compile, script };
 }
 
 /** Selects the parts a problem refers to and brings them into view. */
@@ -33,13 +34,20 @@ function revealComponents(ids?: string[]) {
 
 function ProblemsPanel() {
   const t = useT();
-  const { erc, sim, compile } = useProblems();
+  const { erc, sim, compile, script } = useProblems();
   const items = [
     ...compile.map((d) => ({
       severity: d.severity,
       message: d.message,
       where: `${d.file}:${d.line}:${d.column}`,
       source: t('compiler'),
+      onClick: () => useEditor.getState().set({ revealLine: { file: d.file, line: d.line, nonce: Math.random() }, showCode: true }),
+    })),
+    ...script.map((d) => ({
+      severity: d.severity,
+      message: d.message,
+      where: `${d.file}:${d.line}`,
+      source: 'MicroPython',
       onClick: () => useEditor.getState().set({ revealLine: { file: d.file, line: d.line, nonce: Math.random() }, showCode: true }),
     })),
     ...sim.map((d) => ({ severity: d.severity, message: d.message, where: '', source: t('simulation'), onClick: () => revealComponents(d.componentIds) })),
@@ -118,8 +126,8 @@ const TABS: { id: DockTab; label: MessageKey; icon: string }[] = [
 export function BottomDock() {
   const t = useT();
   const tab = useEditor((s) => s.dockTab);
-  const { erc, sim, compile } = useProblems();
-  const all = [...erc, ...sim, ...compile];
+  const { erc, sim, compile, script } = useProblems();
+  const all = [...erc, ...sim, ...compile, ...script];
   const errors = all.filter((d) => d.severity === 'error').length;
   const warnings = all.filter((d) => d.severity === 'warning').length;
   return (
@@ -153,7 +161,7 @@ export function BottomDock() {
 }
 
 export function useProblemCounts() {
-  const { erc, sim, compile } = useProblems();
-  const all = [...erc, ...sim, ...compile];
+  const { erc, sim, compile, script } = useProblems();
+  const all = [...erc, ...sim, ...compile, ...script];
   return { errors: all.filter((d) => d.severity === 'error').length, warnings: all.filter((d) => d.severity === 'warning').length };
 }

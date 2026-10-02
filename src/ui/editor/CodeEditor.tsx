@@ -5,23 +5,25 @@ import { t } from '../../i18n';
 import { useT } from '../../i18n/react';
 import { useEditor } from '../../state/editor';
 import { useProject } from '../../state/project';
-import { compileFirmware, findTargetBoard, useBuildState, useSim } from '../../state/sim';
+import { compileFirmware, findTargetBoard, useBuildState, useSim, useTargetLanguage } from '../../state/sim';
+import { MAIN_FILE, canRemoveFile, fileNameProblem, isMainFile, isPythonFile, type FirmwareLanguage } from '../../core/project/firmware';
 import { confirmDialog } from '../common/Dialog';
 import { Icon } from '../common/Icon';
 import { Tip } from '../common/Tooltip';
 
 /** Why a file name can't be used, or null when it can. */
-function fileNameError(name: string, others: string[]): string | null {
-  if (!/^[A-Za-z0-9_-]+\.(h|hpp|c|cpp)$/.test(name)) return t('Use letters, digits, - or _ and end in .h, .hpp, .c or .cpp');
+function fileNameError(language: FirmwareLanguage, name: string, others: string[]): string | null {
+  if (fileNameProblem(language, name))
+    return language === 'micropython' ? t('Use letters, digits or _ (not starting with a digit) and end in .py') : t('Use letters, digits, - or _ and end in .h, .hpp, .c or .cpp');
   if (others.includes(name)) return t('A file with this name already exists');
   return null;
 }
 
 /** Inline name field for a new or renamed file: Enter applies, Esc cancels. */
-function FileNameInput({ initial, others, onDone }: { initial: string; others: string[]; onDone: (name: string | null) => void }) {
+function FileNameInput({ language, initial, others, onDone }: { language: FirmwareLanguage; initial: string; others: string[]; onDone: (name: string | null) => void }) {
   useT();
   const [value, setValue] = useState(initial);
-  const error = fileNameError(value.trim(), others);
+  const error = fileNameError(language, value.trim(), others);
   const done = useRef(false);
   const finish = (name: string | null) => {
     if (done.current) return;
@@ -55,7 +57,7 @@ function FileNameInput({ initial, others, onDone }: { initial: string; others: s
 }
 
 const uriFor = (name: string) => monaco.Uri.parse(`file:///sketch/${name}`);
-const languageFor = (name: string) => (/\.(c)$/.test(name) ? 'c' : 'cpp');
+const languageFor = (name: string) => (isPythonFile(name) ? 'python' : /\.(c)$/.test(name) ? 'c' : 'cpp');
 /** True while the project pushes content into Monaco (not a user edit). */
 let applyingFromProject = false;
 
@@ -71,9 +73,17 @@ export function CodeEditor() {
   const wordWrap = useEditor((s) => s.editorWordWrap);
   const revealLine = useEditor((s) => s.revealLine);
   const compile = useSim((s) => s.compile);
+  const scriptErrors = useSim((s) => s.scriptErrors);
+  const uploaded = useSim((s) => s.uploaded);
   const simState = useSim((s) => s.state);
   const buildState = useBuildState();
-  const [active, setActive] = useState('sketch.ino');
+  const language = useTargetLanguage();
+  const python = language === 'micropython';
+  const mainFile = MAIN_FILE[language];
+  const [active, setActive] = useState(() => {
+    const names = useProject.getState().project.firmware.files.map((f) => f.name);
+    return names.includes(mainFile) ? mainFile : (names[0] ?? mainFile);
+  });
   const circuit = useProject((s) => s.project.circuit);
   const target = findTargetBoard(useProject.getState().project);
   const targetDef = target ? lookup(target.type) : undefined;
@@ -116,6 +126,8 @@ export function CodeEditor() {
       let model = monaco.editor.getModel(uri);
       if (!model) {
         model = monaco.editor.createModel(f.content, languageFor(f.name), uri);
+        // Python indents by four spaces (PEP 8, and what MicroPython examples use).
+        if (isPythonFile(f.name)) model.updateOptions({ tabSize: 4, insertSpaces: true });
         model.onDidChangeContent(() => {
           if (!applyingFromProject) useProject.getState().setFile(f.name, model!.getValue());
         });
@@ -125,8 +137,14 @@ export function CodeEditor() {
         applyingFromProject = false;
       }
     }
-    if (!names.has(active)) setActive('sketch.ino');
-  }, [files, active, projectCreated]);
+    if (!names.has(active)) setActive(names.has(mainFile) ? mainFile : (files[0]?.name ?? mainFile));
+  }, [files, active, projectCreated, mainFile]);
+
+  // A project opened for the other language starts on its own main file.
+  useEffect(() => {
+    if (files.some((f) => f.name === mainFile)) setActive(mainFile);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mainFile, projectCreated]);
 
   useEffect(() => {
     const model = monaco.editor.getModel(uriFor(active));
@@ -141,12 +159,13 @@ export function CodeEditor() {
     editorRef.current?.updateOptions({ fontSize, wordWrap: wordWrap ? 'on' : 'off' });
   }, [fontSize, wordWrap]);
 
-  // Compiler diagnostics -> markers.
+  // Compiler diagnostics and Python errors -> markers.
   useEffect(() => {
+    const diagnostics = [...compile.diagnostics, ...scriptErrors];
     for (const f of files) {
       const model = monaco.editor.getModel(uriFor(f.name));
       if (!model) continue;
-      const markers = compile.diagnostics
+      const markers = diagnostics
         .filter((d) => d.file === f.name)
         .map((d) => ({
           severity:
@@ -159,7 +178,7 @@ export function CodeEditor() {
         }));
       monaco.editor.setModelMarkers(model, 'evlab', markers);
     }
-  }, [compile.diagnostics, files]);
+  }, [compile.diagnostics, scriptErrors, files]);
 
   useEffect(() => {
     if (!revealLine || !editorRef.current) return;
@@ -184,15 +203,25 @@ export function CodeEditor() {
     setActive(name);
   };
   const newFileName = () => {
+    const ext = python ? 'py' : 'h';
     for (let i = 1; ; i++) {
-      const n = i === 1 ? 'helpers.h' : `helpers${i}.h`;
+      const n = i === 1 ? `helpers.${ext}` : `helpers${i}.${ext}`;
       if (!names.includes(n)) return n;
     }
   };
+  /** Files as the board last got them: the build (Arduino) or the copy on the board (MicroPython). */
+  const builtFiles = python ? (uploaded?.files ?? null) : compile.built;
+  const changed = (f: { name: string; content: string }) => !!builtFiles && f.name in builtFiles && builtFiles[f.name] !== f.content;
+  const boardName = targetDef?.name ?? '';
 
   const boards = circuit.components.filter((c) => lookup(c.type)?.mcu);
-  const statusText =
-    compile.status === 'compiling'
+  const statusText = python
+    ? scriptErrors.length
+      ? t('The program stopped with an error — see Problems')
+      : simState !== 'stopped' && buildState === 'modified'
+        ? t('The board runs the previous version of the code')
+        : `${targetDef?.mcu?.chip ?? ''} · MicroPython ${targetDef?.mcu?.runtime?.version ?? ''}`
+    : compile.status === 'compiling'
       ? t('Compiling…')
       : buildState === 'modified'
         ? simState !== 'stopped'
@@ -211,22 +240,28 @@ export function CodeEditor() {
       <div className="code-tabs">
         {files.map((f) =>
           naming?.from === f.name ? (
-            <FileNameInput key={f.name} initial={f.name} others={names.filter((n) => n !== f.name)} onDone={finishNaming} />
+            <FileNameInput key={f.name} language={isPythonFile(f.name) ? 'micropython' : 'arduino'} initial={f.name} others={names.filter((n) => n !== f.name)} onDone={finishNaming} />
           ) : (
             <Tip
               key={f.name}
               direct
-              content={`${f.name === 'sketch.ino' ? t('Main sketch') : t('Double-click to rename')}${compile.built && compile.built[f.name] !== f.content ? ` · ${t('changed since the last build')}` : ''}`}
+              content={[
+                f.name === MAIN_FILE.arduino ? t('Main sketch') : f.name === MAIN_FILE.micropython ? t('Main program: the board runs it when it starts') : t('Double-click to rename'),
+                isPythonFile(f.name) !== python && targetDef ? t('Not used: {board} runs {language}', { board: boardName, language: python ? 'MicroPython' : 'Arduino C++' }) : '',
+                changed(f) ? (python ? t('changed since it was copied to the board') : t('changed since the last build')) : '',
+              ]
+                .filter(Boolean)
+                .join(' · ')}
             >
               <div
-                className={`code-tab${f.name === active ? ' active' : ''}`}
+                className={`code-tab${f.name === active ? ' active' : ''}${isPythonFile(f.name) !== python && targetDef ? ' unused' : ''}`}
                 onClick={() => setActive(f.name)}
-                onDoubleClick={() => f.name !== 'sketch.ino' && setNaming({ from: f.name })}
+                onDoubleClick={() => !isMainFile(f.name) && setNaming({ from: f.name })}
               >
                 <Icon name="code" size={13} />
                 {f.name}
-                {compile.built && compile.built[f.name] !== f.content && <span className="mod-dot" aria-label={t('Changed since the last build')} />}
-                {f.name !== 'sketch.ino' && (
+                {changed(f) && <span className="mod-dot" aria-label={python ? t('Changed since it was copied to the board') : t('Changed since the last build')} />}
+                {canRemoveFile(f.name, files) && (
                   <span
                     className="x"
                     role="button"
@@ -251,20 +286,32 @@ export function CodeEditor() {
             </Tip>
           ),
         )}
-        {naming && naming.from === null && <FileNameInput initial={newFileName()} others={names} onDone={finishNaming} />}
-        <Tip content={t('Add a source file (.h, .c, .cpp)')} direct>
+        {naming && naming.from === null && <FileNameInput language={language} initial={newFileName()} others={names} onDone={finishNaming} />}
+        <Tip content={python ? t('Add a Python module (.py) to import from main.py') : t('Add a source file (.h, .c, .cpp)')} direct>
           <button className="icon-btn" style={{ alignSelf: 'center', marginInlineStart: 4 }} aria-label={t('Add file')} onClick={() => setNaming({ from: null })} disabled={!!naming}>
             <Icon name="plus" />
           </button>
         </Tip>
       </div>
       <div className="code-toolbar">
-        <Tip content={simState !== 'stopped' ? t('Compile and flash the running board') : t('Compile the firmware')} shortcut="Ctrl+B">
-          <button className="tb-btn" onClick={() => void compileFirmware()} disabled={compile.status === 'compiling'}>
-            <Icon name="build" />
-            <span className="label">{t('Compile')}</span>
-          </button>
-        </Tip>
+        {python ? (
+          <Tip
+            content={simState !== 'stopped' ? t('Copy the files to the running board and restart it') : t('MicroPython needs no compiling: start the simulation and run main.py')}
+            shortcut="Ctrl+B"
+          >
+            <button className={`tb-btn${simState !== 'stopped' && buildState === 'modified' ? ' accent' : ''}`} onClick={() => void compileFirmware()}>
+              <Icon name={simState !== 'stopped' ? 'reset' : 'play'} />
+              <span className="label">{simState !== 'stopped' ? t('Upload & restart') : t('Run main.py')}</span>
+            </button>
+          </Tip>
+        ) : (
+          <Tip content={simState !== 'stopped' ? t('Compile and flash the running board') : t('Compile the firmware')} shortcut="Ctrl+B">
+            <button className="tb-btn" onClick={() => void compileFirmware()} disabled={compile.status === 'compiling'}>
+              <Icon name="build" />
+              <span className="label">{t('Compile')}</span>
+            </button>
+          </Tip>
+        )}
         {boards.length > 1 && (
           <select
             className="tb-select"
@@ -279,7 +326,7 @@ export function CodeEditor() {
             ))}
           </select>
         )}
-        {simState !== 'stopped' && buildState === 'modified' && (
+        {simState !== 'stopped' && buildState === 'modified' && !python && (
           <Tip content={t('Compile and flash the running board; the rest of the circuit keeps running')} shortcut="Ctrl+B">
             <button className="tb-btn accent" onClick={() => void compileFirmware()}>
               <Icon name="reset" />

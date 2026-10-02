@@ -1,5 +1,6 @@
 import type { ComponentDefinition, McuDefinition, McuPinMapping, PinDefinition } from '../../core/model/component';
 import { dipIc, headerModule, type PinSpec } from '../visuals/svgParts';
+import { PICO_HEIGHT, PICO_PINS, PICO_WIDTH } from '../visuals/pico';
 import { visualOnly, wokwiPins, wokwiSize } from './helpers';
 
 /** ATmega328P Arduino pin mapping (Uno, Nano, Pro Mini). */
@@ -196,23 +197,62 @@ function devBoard(
 
 const pw = (id: string, voltage?: number): PinSpec => ({ id, kind: 'power', voltage });
 
-export const rpiPico = devBoard(
-  'evlab.rpi-pico',
-  'Raspberry Pi Pico',
-  'RP2040',
-  ['raspberry', 'pico', 'rp2040', 'cortex-m0+'],
-  ['GP0', 'GP1', 'GND', 'GP2', 'GP3', 'GP4', 'GP5', 'GND', 'GP6', 'GP7', 'GP8', 'GP9', 'GND', 'GP10', 'GP11', 'GP12', 'GP13', 'GND', 'GP14', 'GP15'].map(
-    (p, i) => (p === 'GND' ? `GND.${i}` : p),
-  ),
-  ['VBUS', 'VSYS', 'GND', '3V3_EN', '3V3', 'ADC_VREF', 'GP28', 'AGND', 'GP27', 'GP26', 'RUN', 'GP22', 'GND', 'GP21', 'GP20', 'GP19', 'GP18', 'GND', 'GP17', 'GP16']
-    .reverse()
-    .map((p, i) => (p === 'GND' ? `GND.b${i}` : p === '3V3' ? pw('3V3', 3.3) : p === 'VBUS' ? pw('VBUS', 5) : p)),
-  '#0e7a3a',
-  'RP2040',
-  'Raspberry Pi RP2040 board, dual Cortex-M0+ @ 133 MHz, 26 GPIO, 3.3 V logic.',
-  'rp2040js',
-  8,
-);
+/** Raspberry Pi Pico running MicroPython on the emulated RP2040 (rp2040js). */
+function picoPinMap(): Record<string, McuPinMapping> {
+  const map: Record<string, McuPinMapping> = {};
+  for (let g = 0; g <= 28; g++) {
+    if (g === 23 || g === 24) continue; // power-supply control and VBUS sense, not on the headers
+    map[`GP${g}`] = g >= 26 ? { gpio: g, adc: g - 26 } : { gpio: g };
+  }
+  return map;
+}
+
+export const rpiPico: ComponentDefinition = {
+  type: 'evlab.rpi-pico',
+  name: 'Raspberry Pi Pico',
+  category: 'Boards',
+  subcategory: 'RP2040',
+  tags: ['raspberry', 'pico', 'rp2040', 'cortex-m0+', 'micropython', 'python'],
+  designator: 'U',
+  visual: { kind: 'builtin', renderer: 'rpi-pico' },
+  size: { width: PICO_WIDTH, height: PICO_HEIGHT },
+  pins: PICO_PINS,
+  internalConnections: [['GND.2', 'GND.7', 'GND.12', 'GND.17', 'GND.b2', 'GND.b7', 'GND.b17', 'AGND']],
+  properties: [],
+  simulation: {
+    support: 'full',
+    model: 'mcu-board',
+    notes:
+      'RP2040 emulated by rp2040js running the official MicroPython firmware: CPU, GPIO, PWM, ADC (GP26–GP28), I2C and SPI ' +
+      '(to the parts on those pins), timers, flash file system and the USB serial REPL. GPIO drivers are modelled ' +
+      'electrically at 3.3 V. Not modelled: the second core, UART on the pins, Wi-Fi.',
+  },
+  controls: [{ kind: 'keys', keys: [{ id: 'reset', label: 'RESET (click to restart MicroPython)', x: 31, y: 42.4, w: 11, h: 11, round: false, input: 'reset' }] }],
+  mcu: {
+    core: 'rp2040',
+    chip: 'rp2040',
+    clockHz: 125_000_000,
+    vcc: 3.3,
+    flashBytes: 2 * 1024 * 1024,
+    sramBytes: 264 * 1024,
+    toolchain: { platform: 'micropython', board: 'rpi_pico', framework: 'micropython' },
+    runtime: { kind: 'micropython', image: 'firmware/micropython-rpi-pico.uf2', version: '1.27.0' },
+    pinMap: picoPinMap(),
+    supplies: [
+      { pin: '3V3', voltage: 3.3, maxCurrent: 0.3, rInternal: 0.3 },
+      { pin: 'VBUS', voltage: 5, maxCurrent: 0.5, rInternal: 0.1 },
+      { pin: 'VSYS', voltage: 4.75, maxCurrent: 0.5, rInternal: 0.2 },
+    ],
+    resetPin: 'RUN',
+    indicators: [{ prop: 'led', source: { pin: 'GP25' } }],
+    gpio: { rOut: 50, rPullUp: 50_000, absMaxCurrent: 0.05, recommendedCurrent: 0.012 },
+  },
+  docs: {
+    summary: 'Raspberry Pi RP2040 board, dual Cortex-M0+ at 125 MHz, 26 GPIO, 3.3 V logic. Programmed in Python (MicroPython): main.py runs at start-up.',
+    notes: 'The serial monitor is the MicroPython REPL: after main.py ends, type Python at the >>> prompt. Ctrl+C stops the program, Ctrl+D restarts it.',
+    datasheetUrl: 'https://www.raspberrypi.com/documentation/microcontrollers/raspberry-pi-pico.html',
+  },
+};
 
 export const stm32BluePill = devBoard(
   'evlab.stm32-bluepill',

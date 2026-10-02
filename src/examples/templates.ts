@@ -7,7 +7,9 @@ import type { ComponentInstance } from '../core/model/circuit';
 import type { ComponentRegistry } from '../core/registry/registry';
 import { newProject, type Project } from '../core/project/schema';
 import type { MessageKey } from '../i18n';
+import { DEFAULT_MAIN_PY } from '../core/project/firmware';
 import { CircuitBuilder, WIRE } from './builder';
+import { picoBase } from './catalogPico';
 
 export interface TemplateInfo {
   id: string;
@@ -42,6 +44,13 @@ function project(name: string, sketch: string, b?: CircuitBuilder): Project {
   const p = newProject(name);
   p.firmware.files = [{ name: 'sketch.ino', content: sketch }];
   if (b) p.circuit = b.doc;
+  return p;
+}
+
+function pythonProject(name: string, main: string, b: CircuitBuilder): Project {
+  const p = newProject(name);
+  p.firmware = { language: 'micropython', files: [{ name: 'main.py', content: main }], target: null };
+  p.circuit = b.doc;
   return p;
 }
 
@@ -111,6 +120,25 @@ export const TEMPLATES: TemplateInfo[] = [
         b.wire(nano, pin, bb, railHole(b, bb, rail, p.x), color);
       }
       return project(name, SERIAL_SKETCH, b);
+    },
+  },
+  {
+    id: 'pico-breadboard',
+    title: 'Raspberry Pi Pico + MicroPython',
+    description: 'A Pico under a breadboard with 3.3 V and GND on the bottom rails, and a main.py that blinks its LED.',
+    icon: 'code',
+    build: (r, name) => {
+      const { b, pico, bb } = picoBase(r);
+      // 3V3 is on the bottom pin row: around the left side up to the + rail.
+      const v33 = b.pin(pico, '3V3');
+      const plus = b.pin(bb, 'bp.1');
+      const x = plus.x - 38.4;
+      b.wire(pico, '3V3', bb, 'bp.1', WIRE.red, [
+        { x: v33.x, y: v33.y + 19.2 },
+        { x, y: v33.y + 19.2 },
+        { x, y: plus.y },
+      ]);
+      return pythonProject(name, DEFAULT_MAIN_PY, b);
     },
   },
   {

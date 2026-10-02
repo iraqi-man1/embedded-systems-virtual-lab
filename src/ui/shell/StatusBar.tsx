@@ -3,7 +3,9 @@ import type { MessageKey } from '../../i18n';
 import { useT } from '../../i18n/react';
 import { useEditor } from '../../state/editor';
 import { useProject } from '../../state/project';
-import { compileFirmware, useBuildState, useSim, type BuildState } from '../../state/sim';
+import { compileFirmware, useBuildState, useSim, useTargetLanguage, type BuildState } from '../../state/sim';
+import { lookup } from '../../app/registry';
+import { pcAddress } from '../../core/sim/mcu/mcu';
 import { isTauri } from '../../platform';
 import { Icon } from '../common/Icon';
 import { Tip } from '../common/Tooltip';
@@ -22,8 +24,11 @@ function BuildItem() {
   const t = useT();
   const state = useBuildState();
   const compile = useSim((s) => s.compile);
+  const python = useTargetLanguage() === 'micropython';
   if (state === 'none') return null;
-  const b = BUILD[state];
+  // MicroPython: only worth showing when the running board has older files than the editor.
+  if (python && state !== 'modified') return null;
+  const b = python ? { text: 'Modified' as const, icon: 'pencil', tip: 'Code changed since it was copied to the board — click to copy it and restart the board (Ctrl+B)' as const } : BUILD[state];
   const sizes =
     state === 'built' && compile.flashBytes != null
       ? t(' · flash {flash} B, RAM {ram} B', { flash: compile.flashBytes.toLocaleString('en-US'), ram: (compile.ramBytes ?? 0).toLocaleString('en-US') })
@@ -57,6 +62,10 @@ export function StatusBar() {
   const wires = useProject((s) => s.project.circuit.wires.length);
   const { errors, warnings } = useProblemCounts();
   const mcu = mcus[0];
+  const mcuCore = useProject((s) => {
+    const c = mcu && s.project.circuit.components.find((x) => x.id === mcu.componentId);
+    return c ? lookup(c.type)?.mcu?.core : undefined;
+  });
   return (
     <div className="statusbar">
       <span className={`item state-${state}`}>
@@ -66,7 +75,7 @@ export function StatusBar() {
       {mcu && state !== 'stopped' && (
         <Tip content={t('CPU cycles · program counter (MCU tab for details)')} side="top" direct>
           <span className="item mono clickable" role="button" onClick={() => useEditor.getState().set({ dockTab: 'mcu', showDock: true })}>
-            <Icon name="cpu" /> {t('{cycles} cycles · PC {pc}', { cycles: mcu.cycles.toLocaleString('en-US'), pc: `0x${(mcu.pc * 2).toString(16).padStart(4, '0')}` })}
+            <Icon name="cpu" /> {t('{cycles} cycles · PC {pc}', { cycles: mcu.cycles.toLocaleString('en-US'), pc: `0x${pcAddress(mcuCore, mcu.pc).toString(16).padStart(mcuCore === 'rp2040' ? 8 : 4, '0')}` })}
           </span>
         </Tip>
       )}

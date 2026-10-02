@@ -4,7 +4,7 @@ import { t as translate, type MessageKey } from '../../i18n';
 import { useT } from '../../i18n/react';
 import { useEditor } from '../../state/editor';
 import { useProject } from '../../state/project';
-import { setSimulationSettings, useSim } from '../../state/sim';
+import { setSimulationSettings, useSim, useTargetLanguage } from '../../state/sim';
 import { commands } from '../commands';
 import { Icon } from '../common/Icon';
 import { DropdownMenu, MenuCheckItem, MenuItem, MenuLabel, MenuSeparator, MenuSwatches, SubMenu } from '../common/Menu';
@@ -169,6 +169,7 @@ export function Toolbar() {
   const simTime = useSim((s) => s.simTime);
   const speed = useSim((s) => s.speed);
   const compiling = useSim((s) => s.compile.status === 'compiling');
+  const python = useTargetLanguage() === 'micropython';
   const starting = useSim((s) => s.starting);
   const settings = useProject((s) => s.project.simulation);
   const wireColor = useEditor((s) => s.wireColor);
@@ -262,7 +263,7 @@ export function Toolbar() {
       )}
       <div className="group" data-group="sim">
         <div className="divider" />
-        <Btn id="compile" label={compiling ? t('Compiling…') : t('Compile')} />
+        <Btn id="compile" label={python ? t('Upload') : compiling ? t('Compiling…') : t('Compile')} />
         {simState === 'running' ? (
           <Btn id="pause" label={t('Pause')} />
         ) : (

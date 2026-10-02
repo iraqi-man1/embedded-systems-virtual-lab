@@ -5,6 +5,7 @@
 import type { McuDefinition } from '../model/component';
 import type { PropValue } from '../model/circuit';
 import type { Diagnostic } from '../circuit/diagnostics';
+import type { ScriptProgram } from './mcu/mcu';
 
 export interface SimComponentSetup {
   id: string;
@@ -22,6 +23,8 @@ export interface SimComponentSetup {
   params: Record<string, unknown>;
   mcu?: McuDefinition;
   firmware?: string;
+  /** Interpreter boards (MicroPython): the interpreter image and the project's files. */
+  program?: ScriptProgram;
 }
 
 export interface ProbeSetup {
@@ -77,7 +80,7 @@ export interface McuStatus {
   componentId: string;
   cycles: number;
   pc: number;
-  /** pinId -> drive state ('low' | 'high' | 'input' | 'input-pullup'). */
+  /** pinId -> drive state ('low' | 'high' | 'input' | 'input-pullup' | 'input-pulldown'). */
   pins: Record<string, string>;
   serialBaud: number;
   debug?: McuDebug;
@@ -85,11 +88,15 @@ export interface McuStatus {
 
 /** What the MCU panel shows besides pin drive states. */
 export interface McuDebug {
-  /** R0..R31. */
+  /** Register file layout (AVR by default). */
+  arch?: 'avr' | 'arm';
+  /** R0..R31 (AVR) or R0..R12 (ARM). */
   r: number[];
   sp: number;
+  /** SREG (AVR) or xPSR (ARM). */
   sreg: number;
   ramEnd: number;
+  lr?: number;
   /** Share of the last frame each wired output pin was high (PWM duty, 0..1). */
   duty: Record<string, number>;
   /** Level each wired input pin reads. */

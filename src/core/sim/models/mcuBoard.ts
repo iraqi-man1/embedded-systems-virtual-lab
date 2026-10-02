@@ -50,43 +50,48 @@ class McuBoardModel implements SimModel {
     this.def = def;
     this.gpio = { ...DEFAULT_GPIO, ...def.gpio };
     this.mcu = createMcu(def);
-    this.hasFirmware = !!ctx.setup.firmware;
-    if (ctx.setup.firmware) this.mcu.load({ format: 'ihex', data: ctx.setup.firmware });
+    this.hasFirmware = !!ctx.setup.firmware || !!ctx.setup.program;
+    if (ctx.setup.program && this.mcu.loadProgram) this.mcu.loadProgram(ctx.setup.program);
+    else if (ctx.setup.firmware) this.mcu.load({ format: 'ihex', data: ctx.setup.firmware });
     this.mcu.onPinChange = (pin) => this.pinChanged(pin);
     this.mcu.onSerialByte = (b) => {
       this.txActivity = 0.05;
       ctx.serialOut([b]);
     };
     for (const p of this.mcu.pins) this.lastDrive.set(p, this.mcu.pinDrive(p));
-    // Hardware buses reach devices wired to this board's bus pins.
+    // Hardware buses reach devices wired to this board's bus pins (any pin that can carry the
+    // signal: one pair on the Uno, almost every GPIO on the RP2040).
     this.mcu.i2cResolver = (address) => {
-      const sda = this.busNet('i2c:SDA');
-      const scl = this.busNet('i2c:SCL');
-      if (sda < 0 || scl < 0) return null;
+      const sda = this.busNets('i2c:SDA');
+      const scl = this.busNets('i2c:SCL');
+      if (!sda.size || !scl.size) return null;
       for (const m of ctx.models()) {
         const d = m.i2c;
-        if (d && d.address === address && m.ctx.net(d.sdaPin) === sda && m.ctx.net(d.sclPin) === scl) return d;
+        if (d && d.address === address && sda.has(m.ctx.net(d.sdaPin)) && scl.has(m.ctx.net(d.sclPin))) return d;
       }
       return null;
     };
     this.mcu.spiResolver = () => {
-      const mosi = this.busNet('spi:MOSI');
-      const sck = this.busNet('spi:SCK');
-      if (mosi < 0 || sck < 0) return null;
+      const mosi = this.busNets('spi:MOSI');
+      const sck = this.busNets('spi:SCK');
+      if (!mosi.size || !sck.size) return null;
       for (const m of ctx.models()) {
         const d = m.spi;
-        if (d && m.ctx.net(d.mosiPin) === mosi && m.ctx.net(d.sckPin) === sck && d.selected()) return d;
+        if (d && mosi.has(m.ctx.net(d.mosiPin)) && sck.has(m.ctx.net(d.sckPin)) && d.selected()) return d;
       }
       return null;
     };
   }
 
-  /** Net of the board pin carrying a bus signal such as "i2c:SDA". */
-  private busNet(signal: string): number {
+  /** Nets of the wired board pins that can carry a bus signal such as "i2c:SDA". */
+  private busNets(signal: string): Set<number> {
+    const nets = new Set<number>();
     for (const [pin, signals] of Object.entries(this.ctx.setup.pinSignals ?? {})) {
-      if (signals.includes(signal) && pin in this.ctx.setup.mcu!.pinMap) return this.ctx.net(pin);
+      if (!signals.includes(signal) || !(pin in this.ctx.setup.mcu!.pinMap)) continue;
+      const n = this.ctx.net(pin);
+      if (n >= 0 && this.ctx.netPinCount(n) > 1) nets.add(n);
     }
-    return -1;
+    return nets;
   }
 
   private get gnd(): number {
@@ -130,6 +135,9 @@ class McuBoardModel implements SimModel {
         case 'input-pullup':
           s.voltageSource(n, gnd, vcc, this.gpio.rPullUp);
           break;
+        case 'input-pulldown':
+          s.resistor(n, gnd, this.gpio.rPullUp);
+          break;
         default:
           break; // high impedance
       }
@@ -151,7 +159,7 @@ class McuBoardModel implements SimModel {
       const driven = isl >= 0 && result.islandDriven[isl] && isl === gndIsland;
       const volts = driven ? v[n] - v[gnd] : NaN;
       if (driven) this.mcu.setAnalogVoltage(pin, Math.max(0, Math.min(vcc, volts)));
-      if (drive === 'input' || drive === 'input-pullup') {
+      if (drive === 'input' || drive === 'input-pullup' || drive === 'input-pulldown') {
         if (!driven) {
           // Floating: hardware reads noise. Keep the last level, flag it if wired to something.
           if (this.ctx.netPinCount(n) > 1) this.floating.add(pin);
@@ -278,7 +286,7 @@ class McuBoardModel implements SimModel {
     const inputs: Record<string, boolean> = {};
     for (const [pin, level] of this.inputLevel) {
       const d = this.mcu.pinDrive(pin);
-      if (d === 'input' || d === 'input-pullup') inputs[pin] = level;
+      if (d === 'input' || d === 'input-pullup' || d === 'input-pulldown') inputs[pin] = level;
     }
     return { ...regs, duty: this.duty, inputs, floating: [...this.floating] };
   }
@@ -291,7 +299,7 @@ class McuBoardModel implements SimModel {
       out.push({
         code: 'no-firmware',
         severity: 'info',
-        message: `${label}: no firmware loaded — compile the sketch to run code on this board.`,
+        message: this.def.runtime ? `${label}: no main.py — add a main.py file to run Python on this board.` : `${label}: no firmware loaded — compile the sketch to run code on this board.`,
         componentIds: [id],
         source: 'simulation',
       });
@@ -322,7 +330,7 @@ class McuBoardModel implements SimModel {
       out.push({
         code: 'floating-input',
         severity: 'warning',
-        message: `${label} pin ${pin} is a floating input: nothing pulls it high or low, so reads are unpredictable. Use INPUT_PULLUP or add a pull-up/pull-down resistor.`,
+        message: `${label} pin ${pin} is a floating input: nothing pulls it high or low, so reads are unpredictable. ${this.def.runtime ? 'Use Pin.PULL_UP (or Pin.PULL_DOWN)' : 'Use INPUT_PULLUP'} or add a pull-up/pull-down resistor.`,
         componentIds: [id],
         source: 'simulation',
       });

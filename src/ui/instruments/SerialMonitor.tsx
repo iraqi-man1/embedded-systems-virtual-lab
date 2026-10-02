@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { HEX_LIMIT, hexDump, withTimestamps } from '../../core/instruments/serialLog';
+import { decodeSerialText, HEX_LIMIT, hexDump, withTimestamps } from '../../core/instruments/serialLog';
+import { lookup } from '../../app/registry';
 import { t } from '../../i18n';
 import { useT } from '../../i18n/react';
 import { storage } from '../../platform';
@@ -28,15 +29,19 @@ export function SerialMonitor() {
   const timestamps = useEditor((s) => s.serialTimestamps);
   const view = useEditor((s) => s.serialView);
   const clearOnRun = useEditor((s) => s.serialClearOnRun);
-  const shown = useMemo(
-    () => (view === 'hex' ? hexDump(text) : timestamps ? withTimestamps(text, stamps ?? []) : text),
-    [text, stamps, view, timestamps],
-  );
+  const shown = useMemo(() => {
+    if (view === 'hex') return hexDump(text);
+    const decoded = decodeSerialText(text);
+    return timestamps ? withTimestamps(decoded, stamps ?? []) : decoded;
+  }, [text, stamps, view, timestamps]);
+  /** MicroPython boards: the serial port is the USB REPL. */
+  const python = !!(board && lookup(board.type)?.mcu?.runtime);
   const baud = useSim((s) => s.mcus.find((m) => m.componentId === board?.id)?.serialBaud);
   const running = useSim((s) => s.state !== 'stopped');
   const [auto, setAuto] = useState(true);
   const [input, setInput] = useState('');
-  const [ending, setEnding] = useState<keyof typeof ENDINGS>('nl');
+  const [ending, setEnding] = useState<keyof typeof ENDINGS>(python ? 'cr' : 'nl');
+  useEffect(() => setEnding(python ? 'cr' : 'nl'), [python]);
   const [history, setHistory] = useState<string[]>([]);
   const [hIdx, setHIdx] = useState(-1);
   const out = useRef<HTMLPreElement>(null);
@@ -57,10 +62,24 @@ export function SerialMonitor() {
     <div className="dock-body">
       <div className="inst-bar">
         <span style={{ color: 'var(--text-2)' }}>
-          {board ? `${board.label} · USART0` : t('No board')}
-          {baud && text ? ` · ${t('{baud} baud', { baud: Math.round(baud) })}` : ''}
+          {board ? `${board.label} · ${python ? t('USB (MicroPython REPL)') : 'USART0'}` : t('No board')}
+          {!python && baud && text ? ` · ${t('{baud} baud', { baud: Math.round(baud) })}` : ''}
         </span>
         <span className="grow" />
+        {python && (
+          <>
+            <Tip content={t('Stop the running program (KeyboardInterrupt) and get the >>> prompt')}>
+              <button className="tb-btn" disabled={!running} onClick={() => sendSerial('\x03')}>
+                <span className="label mono">Ctrl+C</span>
+              </button>
+            </Tip>
+            <Tip content={t('Soft reset: restart MicroPython and run main.py again')}>
+              <button className="tb-btn" disabled={!running} onClick={() => sendSerial('\x04')}>
+                <span className="label mono">Ctrl+D</span>
+              </button>
+            </Tip>
+          </>
+        )}
         <Tip content={t('Prefix lines with the simulation time')}>
           <button className={`tb-btn${timestamps ? ' active' : ''}`} aria-pressed={timestamps} disabled={view === 'hex'} onClick={() => useEditor.getState().setPrefs({ serialTimestamps: !timestamps })}>
             <Icon name="clock" />
@@ -100,14 +119,20 @@ export function SerialMonitor() {
       <pre ref={out} className="serial-out">
         {shown || (
           <span className="placeholder" style={{ color: 'var(--text-3)' }}>
-            {running ? t('Waiting for serial output…') : t('Serial output appears here when the simulation runs. Use Serial.begin() in your sketch.')}
+            {running
+              ? python
+                ? t('Starting MicroPython and copying your files to the board…')
+                : t('Waiting for serial output…')
+              : python
+                ? t('Output of print() and the MicroPython REPL appear here when the simulation runs.')
+                : t('Serial output appears here when the simulation runs. Use Serial.begin() in your sketch.')}
           </span>
         )}
       </pre>
       <div className="serial-in">
         <input
           className="input"
-          placeholder={running ? t('Type a message and press Enter to send to the board') : t('Start the simulation to send data')}
+          placeholder={running ? (python ? t('Type Python and press Enter (>>> REPL)') : t('Type a message and press Enter to send to the board')) : t('Start the simulation to send data')}
           dir="auto"
           disabled={!running}
           value={input}
