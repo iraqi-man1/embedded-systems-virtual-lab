@@ -14,15 +14,15 @@ Editor and PlatformIO.
 
 **[⬇ Download the Windows installer](../../releases/latest)**
 
-![I²C LCD example running: firmware drives an LCD over the emulated TWI bus while a potentiometer is read on A0](docs/images/screenshot-dark.png)
+![Arduino Uno potentiometer dimmer running: the oscilloscope shows the 490 Hz PWM on pin 9 at the duty set by the knob on A0](docs/images/screenshot-dark.png)
 
 | Python on a Raspberry Pi Pico — ADC and PWM, values in the REPL | 27 ready-to-run examples on the start screen |
 |---|---|
 | ![MicroPython potentiometer dimmer running on a simulated Pico](docs/images/screenshot-python.png) | ![Example gallery on the start screen](docs/images/screenshot-examples.png) |
 
-| Light theme — traffic light running on a breadboard | Arabic interface — the Parts Guide |
+| Light theme — an I²C LCD on the emulated TWI bus, MCU panel open | Arabic interface — the Parts Guide |
 |---|---|
-| ![Traffic light example in the light theme](docs/images/screenshot-light.png) | ![Parts Guide page for the Raspberry Pi Pico in Arabic](docs/images/screenshot-arabic.png) |
+| ![I2C LCD driven by an Arduino Uno in the light theme, with the MCU panel showing pins and registers](docs/images/screenshot-light.png) | ![Parts Guide page for the Raspberry Pi Pico in Arabic](docs/images/screenshot-arabic.png) |
 
 ## Highlights
 
@@ -86,7 +86,7 @@ Editor and PlatformIO.
 
 ## Getting started (users)
 
-1. Download `EmbeddedSystemsVirtualLab_0.2.0_x64-setup.exe` (or the `.msi`) from the
+1. Download `EmbeddedSystemsVirtualLab_0.3.0_x64-setup.exe` (or the `.msi`) from the
    [Releases page](../../releases/latest) and run it. Windows 10/11 x64; the installer is not
    code-signed yet, so SmartScreen may ask you to confirm ("More info" → "Run anyway").
 2. The start screen opens: pick an example, a template or a recent project. Switch the

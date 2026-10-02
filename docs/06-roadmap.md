@@ -4,7 +4,7 @@ What the lab can grow into next, grouped by area. Items are ideas with a directi
 commitments; [04 — Simulation fidelity](04-simulation-fidelity.md) lists what is simulated today
 and its limits.
 
-## Recently added
+## Added in 0.3.0
 
 - Start screen with recent projects (live previews), templates, examples and a Learn tab.
 - English and Arabic interface, with a right-to-left layout for Arabic.
@@ -64,5 +64,3 @@ and its limits.
   schematic view generated from the same circuit.
 - Several projects open in tabs; smart alignment guides; locking parts in place; customisable
   keyboard shortcuts.
-- Release: these features ship under version 0.2.0 until the version number is raised (raising
-  it publishes a new release when merged).

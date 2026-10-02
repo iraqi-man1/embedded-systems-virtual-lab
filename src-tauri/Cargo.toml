@@ -1,6 +1,6 @@
 [package]
 name = "evlab"
-version = "0.2.0"
+version = "0.3.0"
 description = "Embedded Systems Virtual Lab"
 edition = "2021"
 rust-version = "1.77"
