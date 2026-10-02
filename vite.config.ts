@@ -22,5 +22,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
+    // Many tests run seconds of firmware on the emulated boards: allow for a busy machine.
+    testTimeout: 30_000,
   },
 } as never);
