@@ -7,7 +7,8 @@ toolchain and executed on a cycle-accurate ATmega328P emulator that drives the s
 circuit. Prefer Python? Put a **Raspberry Pi Pico** on the canvas: the real MicroPython
 firmware runs on an emulated RP2040, with an interactive `>>>` prompt in the Serial Monitor.
 
-The interface is available in **English and Arabic** (right-to-left).
+The interface is available in **English and Arabic** (right-to-left). Projects from
+**Wokwi** open in the lab, and yours can be saved for Wokwi.
 
 Built with Tauri 2, React, TypeScript, avr8js, rp2040js, MicroPython, Wokwi Elements, Monaco
 Editor and PlatformIO.
@@ -27,6 +28,19 @@ Editor and PlatformIO.
 | The code editor floats anywhere — a Pico traffic light running in MicroPython | Live readings — a resistor's voltage, current and power while Blink runs |
 |---|---|
 | ![The code editor floating over the canvas beside a running Raspberry Pi Pico traffic light](docs/images/screenshot-floating.png) | ![The card of a resistor showing 2.79 V, 12.7 mA and 35.4 mW, 14 % of its power rating](docs/images/screenshot-readings.png) |
+
+## New in 0.4.0
+
+- **Fixed:** the window no longer goes blank after the Parts Guide, and *New project* on the
+  start screen creates the project straight away.
+- **The code editor floats:** drag it anywhere over the lab, drag it back to dock it.
+- **Faster work:** double-click a part to set its value, lock parts (Ctrl+L), the project file
+  saves itself, Version History, code export/import and snippets, interface size 80–150 %.
+- **Learn while you work:** live voltage, current and power on a part's card, Problems in
+  Arabic with how to fix them, Arduino help in Arabic, a first-run tour.
+- **Wokwi projects** in and out (File › Wokwi).
+
+All changes are in the [release notes](../../releases/tag/v0.4.0).
 
 ## Highlights
 
