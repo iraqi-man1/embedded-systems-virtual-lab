@@ -2,7 +2,7 @@
 import { newDocument, openDocument, saveDocument } from '../app/fileOps';
 import { t, type MessageKey } from '../i18n';
 import { themeInfo, type ThemePref } from './themes';
-import { useEditor } from '../state/editor';
+import { useEditor, type NoteTool } from '../state/editor';
 import { flushCoalesced, useProject } from '../state/project';
 import {
   compileFirmware,
@@ -65,7 +65,12 @@ function toggleFocusCanvas() {
     beforeFocus = null;
   }
 }
-const hasSelection = () => ed().selectedComponents.length + ed().selectedWires.length > 0;
+const hasSelection = () => ed().selectedComponents.length + ed().selectedWires.length + ed().selectedAnnotations.length > 0;
+
+/** Chooses a drawing tool for notes; choosing it again goes back to selecting. */
+function pickTool(tool: NoteTool) {
+  ed().set({ tool: ed().tool === tool ? 'select' : tool, wiring: null });
+}
 
 /** Chooses a theme and remembers it as the light or dark choice of the quick toggle. */
 export function setTheme(pref: ThemePref) {
@@ -95,7 +100,8 @@ function cmd(id: string, label: MessageKey, description: MessageKey | null, rest
   };
 }
 
-const oneSelected = () => ed().selectedComponents.length > 0;
+const oneSelected = () => ed().selectedComponents.length + ed().selectedAnnotations.length > 0;
+const partSelected = () => ed().selectedComponents.length > 0;
 
 export const commands: Record<string, Command> = {
   home: cmd('home', 'Start Screen', 'Recent projects, templates, examples and getting started.', { icon: 'home', run: () => ed().set({ page: 'home', wiring: null }) }),
@@ -122,9 +128,9 @@ export const commands: Record<string, Command> = {
   duplicate: cmd('duplicate', 'Duplicate', 'Make a copy of the selected parts next to them.', { icon: 'duplicate', shortcut: 'Ctrl+D', run: duplicateSelection, enabled: oneSelected }),
   delete: cmd('delete', 'Delete', 'Remove the selected parts and wires.', { icon: 'trash', shortcut: 'Del', run: deleteSelection, enabled: hasSelection }),
   selectAll: cmd('selectAll', 'Select All', null, { shortcut: 'Ctrl+A', run: selectAll }),
-  rotate: cmd('rotate', 'Rotate 90° CW', 'Turn the selected parts a quarter turn clockwise.', { icon: 'rotate', shortcut: 'R', run: () => rotateSelection(90), enabled: oneSelected }),
-  rotateCcw: cmd('rotateCcw', 'Rotate 90° CCW', 'Turn the selected parts a quarter turn counter-clockwise.', { icon: 'rotate-ccw', shortcut: 'Shift+R', run: () => rotateSelection(-90), enabled: oneSelected }),
-  flip: cmd('flip', 'Flip Horizontal', 'Mirror the selected parts left to right.', { icon: 'flip', shortcut: 'H', run: flipSelection, enabled: oneSelected }),
+  rotate: cmd('rotate', 'Rotate 90° CW', 'Turn the selected parts a quarter turn clockwise.', { icon: 'rotate', shortcut: 'R', run: () => rotateSelection(90), enabled: partSelected }),
+  rotateCcw: cmd('rotateCcw', 'Rotate 90° CCW', 'Turn the selected parts a quarter turn counter-clockwise.', { icon: 'rotate-ccw', shortcut: 'Shift+R', run: () => rotateSelection(-90), enabled: partSelected }),
+  flip: cmd('flip', 'Flip Horizontal', 'Mirror the selected parts left to right.', { icon: 'flip', shortcut: 'H', run: flipSelection, enabled: partSelected }),
   cycleWireColor: cmd('cycleWireColor', 'Cycle Wire Colour', 'Give the selected wires (or new wires) the next colour.', { icon: 'palette', shortcut: 'C', run: cycleWireColor }),
   alignLeft: cmd('alignLeft', 'Align Left', null, { icon: 'align-left', run: () => alignSelection('left'), enabled: () => ed().selectedComponents.length > 1 }),
   alignCenter: cmd('alignCenter', 'Align Centers', null, { icon: 'align-center', run: () => alignSelection('center'), enabled: () => ed().selectedComponents.length > 1 }),
@@ -139,6 +145,9 @@ export const commands: Record<string, Command> = {
   zoomReset: cmd('zoomReset', 'Actual Size (100%)', null, { shortcut: '0', run: () => setZoom(1) }),
   fit: cmd('fit', 'Fit to Window', 'Zoom so the whole circuit fits in the canvas.', { icon: 'fit', shortcut: 'F', run: () => fitView() }),
   zoomSelection: cmd('zoomSelection', 'Zoom to Selection', null, { icon: 'zoom-in', shortcut: 'Shift+F', run: zoomToSelection }),
+  toolText: cmd('toolText', 'Text Note', 'Click the canvas to write a note (Arabic or English).', { icon: 'type', shortcut: 'T', run: () => pickTool('text') }),
+  toolArrow: cmd('toolArrow', 'Arrow', 'Drag on the canvas to draw an arrow that points something out.', { icon: 'arrow', shortcut: 'A', run: () => pickTool('arrow') }),
+  toolFrame: cmd('toolFrame', 'Frame', 'Drag on the canvas to draw a titled frame around a group of parts.', { icon: 'frame', shortcut: 'B', run: () => pickTool('rect') }),
   minimap: cmd('minimap', 'Show Minimap', 'An overview of the whole circuit: click or drag in it to move around.', { icon: 'map', shortcut: 'M', run: () => ed().setPrefs({ showMinimap: !ed().showMinimap }) }),
   grid: cmd('grid', 'Show Grid', 'Dots every 0.1 inch (the breadboard pitch) on the canvas.', { icon: 'grid', shortcut: 'G', run: () => ed().setPrefs({ showGrid: !ed().showGrid }) }),
   snap: cmd('snap', 'Snap to Grid', 'Parts and wire bends land on the 0.1 inch grid.', { icon: 'magnet', run: () => ed().setPrefs({ snap: !ed().snap }) }),
@@ -286,6 +295,15 @@ export function installShortcuts(): () => void {
       case 'm':
       case 'M':
         return run('minimap');
+      case 't':
+      case 'T':
+        return run('toolText');
+      case 'a':
+      case 'A':
+        return run('toolArrow');
+      case 'b':
+      case 'B':
+        return run('toolFrame');
       case 'v':
       case 'V':
         return run('voltages');
@@ -324,7 +342,7 @@ export function installShortcuts(): () => void {
       case 'ArrowRight':
       case 'ArrowUp':
       case 'ArrowDown': {
-        if (!editor.selectedComponents.length) {
+        if (!editor.selectedComponents.length && !editor.selectedAnnotations.length) {
           // Nothing selected: the arrows move the view (faster with Shift).
           const d = e.shiftKey ? 240 : 48;
           panBy(k === 'ArrowLeft' ? d : k === 'ArrowRight' ? -d : 0, k === 'ArrowUp' ? d : k === 'ArrowDown' ? -d : 0);

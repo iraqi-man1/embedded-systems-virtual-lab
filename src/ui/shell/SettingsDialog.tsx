@@ -11,6 +11,7 @@ import { setTheme } from '../commands';
 import { confirmDialog } from '../common/Dialog';
 import { ModalFrame } from '../common/Dialog';
 import { Icon } from '../common/Icon';
+import { Segmented, Switch } from '../common/Controls';
 import { THEMES, themeInfo, type ThemeInfo } from '../themes';
 
 type Tab = 'general' | 'appearance' | 'canvas' | 'editor' | 'simulation' | 'data';
@@ -33,26 +34,6 @@ function Row({ label, description, children }: { label: string; description: str
         <div className="set-desc">{description}</div>
       </div>
       <div className="set-control">{children}</div>
-    </div>
-  );
-}
-
-function Switch({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
-  return (
-    <button type="button" role="switch" aria-checked={checked} aria-label={label} className={`switch${checked ? ' on' : ''}`} onClick={() => onChange(!checked)}>
-      <span className="knob" />
-    </button>
-  );
-}
-
-function Segmented<T extends string>({ value, options, onChange, label }: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void; label: string }) {
-  return (
-    <div className="segmented" role="radiogroup" aria-label={label}>
-      {options.map((o) => (
-        <button key={o.value} type="button" role="radio" aria-checked={value === o.value} className={value === o.value ? 'on' : ''} onClick={() => onChange(o.value)}>
-          {o.label}
-        </button>
-      ))}
     </div>
   );
 }

@@ -156,7 +156,12 @@ const PROBES: { tool: 'probe-logic' | 'probe-scope' | 'probe-meter-red'; icon: s
 const VIEW_TOGGLES = ['toggleLibrary', 'toggleInspector', 'toggleCode', 'toggleDock'] as const;
 
 /** Order in which groups move into the overflow menu when the window is narrow. */
-const HIDE_ORDER = ['probes', 'arrange', 'view', 'file', 'edit', 'speed'];
+const HIDE_ORDER = ['probes', 'notes', 'arrange', 'view', 'file', 'edit', 'speed'];
+const NOTE_TOOLS = [
+  ['toolText', 'text'],
+  ['toolArrow', 'arrow'],
+  ['toolFrame', 'rect'],
+] as const;
 
 export function Toolbar() {
   const t = useT();
@@ -167,6 +172,7 @@ export function Toolbar() {
   const starting = useSim((s) => s.starting);
   const settings = useProject((s) => s.project.simulation);
   const wireColor = useEditor((s) => s.wireColor);
+  const activeTool = useEditor((s) => s.tool);
   const darkBase = useEditor((s) => themeInfo(s.appliedTheme).base === 'dark');
   const panels = useEditor((s) => [s.showLibrary, s.showInspector, s.showCode, s.showDock].join());
   const panelOn = Object.fromEntries(panels.split(',').map((x, i) => [VIEW_TOGGLES[i], x === 'true'])) as Record<string, boolean>;
@@ -236,6 +242,14 @@ export function Toolbar() {
           <MenuButton icon="cable" title={t('Wire colour (selected and new wires)')} extra={<span className="color-dot" style={{ background: wireColor }} />}>
             <WireColorItems />
           </MenuButton>
+        </div>
+      )}
+      {shown('notes') && (
+        <div className="group" data-group="notes">
+          <div className="divider" />
+          {NOTE_TOOLS.map(([id, tool]) => (
+            <Btn key={id} id={id} active={activeTool === tool} />
+          ))}
         </div>
       )}
       {shown('probes') && (
@@ -326,6 +340,14 @@ export function Toolbar() {
                 <SubMenu label={t('Wire colour')} icon="cable">
                   <WireColorItems />
                 </SubMenu>
+                <MenuSeparator />
+              </>
+            )}
+            {hidden.includes('notes') && (
+              <>
+                {NOTE_TOOLS.map(([id]) => (
+                  <CmdItem key={id} id={id} />
+                ))}
                 <MenuSeparator />
               </>
             )}

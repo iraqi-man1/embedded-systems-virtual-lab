@@ -4,7 +4,7 @@
  * A project is a single UTF-8 JSON document. `version` is bumped whenever the
  * shape changes; `migrateProject` upgrades older files on load.
  */
-import type { CircuitDocument } from '../model/circuit';
+import type { Annotation, CircuitDocument } from '../model/circuit';
 import type { PinRef } from '../model/circuit';
 import { version } from '../../../package.json';
 
@@ -95,6 +95,17 @@ export function parseProject(text: string): Project {
   return migrateProject(raw);
 }
 
+const num = (v: unknown) => typeof v === 'number' && Number.isFinite(v);
+
+function isAnnotation(a: unknown): a is Annotation {
+  const n = a as Record<string, unknown> | null;
+  if (!n || typeof n !== 'object' || typeof n.id !== 'string') return false;
+  if (n.kind === 'text') return num(n.x) && num(n.y) && typeof n.text === 'string' && num(n.size);
+  if (n.kind === 'arrow') return num(n.x1) && num(n.y1) && num(n.x2) && num(n.y2);
+  if (n.kind === 'rect') return num(n.x) && num(n.y) && num(n.w) && num(n.h);
+  return false;
+}
+
 export function migrateProject(raw: unknown): Project {
   const r = raw as Partial<Project> & Record<string, unknown>;
   if (!r || typeof r !== 'object' || r.format !== PROJECT_FORMAT) {
@@ -108,6 +119,10 @@ export function migrateProject(raw: unknown): Project {
   const circuit = r.circuit as CircuitDocument | undefined;
   if (!circuit || !Array.isArray(circuit.components) || !Array.isArray(circuit.wires)) {
     throw new ProjectFormatError('Project has no valid circuit.');
+  }
+  // Canvas notes are optional; malformed ones are dropped rather than failing the whole project.
+  if (circuit.annotations !== undefined) {
+    circuit.annotations = Array.isArray(circuit.annotations) ? circuit.annotations.filter(isAnnotation) : undefined;
   }
   return {
     ...base,

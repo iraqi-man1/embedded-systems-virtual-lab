@@ -8,7 +8,9 @@ import { commands } from '../commands';
 import { MenuItem, MenuLabel, MenuSeparator, MenuSwatches, SubMenu } from '../common/Menu';
 import { openGuide } from '../guide/open';
 import { assignProbe } from '../instruments/probes';
-import { autoRouteWires, bringToFront, clearWirePoints, paste, setNetWireColor, setWireColor } from '../workspace/actions';
+import { autoRouteWires, bringToFront, clearWirePoints, editTextNote, noteToFront, paste, setNetWireColor, setWireColor } from '../workspace/actions';
+import { newText } from '../../core/circuit/annotations';
+import { nanoid } from 'nanoid';
 
 function Cmd({ id }: { id: string }) {
   useT();
@@ -72,11 +74,33 @@ export function CanvasMenuItems() {
     );
   }
 
+  if (menu.kind === 'annotation') {
+    const note = circuit.annotations?.find((a) => a.id === menu.id);
+    return (
+      <>
+        {note?.kind === 'text' && <MenuItem label={t('Edit text')} icon="pencil" onSelect={() => editTextNote(note)} />}
+        <MenuItem label={t('Properties…')} icon="settings" onSelect={() => useEditor.getState().setPrefs({ showInspector: true })} />
+        <MenuSeparator />
+        <Cmd id="copy" />
+        <Cmd id="duplicate" />
+        <MenuSeparator />
+        <MenuItem label={t('Bring to Front')} icon="front" onSelect={() => noteToFront(menu.id, true)} />
+        <MenuItem label={t('Send to Back')} icon="back" onSelect={() => noteToFront(menu.id, false)} />
+        <MenuSeparator />
+        <Cmd id="delete" />
+      </>
+    );
+  }
+
   const world = menu.world;
   return (
     <>
       <MenuItem label={t('Paste here')} icon="paste" disabled={!useEditor.getState().clipboard} onSelect={() => paste(world)} />
       <Cmd id="selectAll" />
+      <MenuSeparator />
+      <MenuItem label={t('Add a text note here')} icon="type" onSelect={() => editTextNote(newText(nanoid(10), world))} />
+      <Cmd id="toolArrow" />
+      <Cmd id="toolFrame" />
       <MenuSeparator />
       <Cmd id="fit" />
       <Cmd id="grid" />

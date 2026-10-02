@@ -13,6 +13,8 @@ import { getNetlist } from '../../state/derived';
 import { useEditor } from '../../state/editor';
 import { createInstance, nextLabel, useProject } from '../../state/project';
 import { autoRoute, selectionBounds } from './geometry';
+import { annotationBounds, movedFrom, translateAnnotation } from '../../core/circuit/annotations';
+import type { Annotation, TextNote } from '../../core/model/circuit';
 
 const ed = () => useEditor.getState();
 const proj = () => useProject.getState();
@@ -42,13 +44,15 @@ export function addComponentAtCenter(type: string) {
 }
 
 export function deleteSelection() {
-  const { selectedComponents, selectedWires } = ed();
-  if (!selectedComponents.length && !selectedWires.length) return;
+  const { selectedComponents, selectedWires, selectedAnnotations } = ed();
+  if (!selectedComponents.length && !selectedWires.length && !selectedAnnotations.length) return;
   const comps = new Set(selectedComponents);
   const wires = new Set(selectedWires);
+  const notes = new Set(selectedAnnotations);
   proj().edit((c) => {
     c.components = c.components.filter((x) => !comps.has(x.id));
     c.wires = c.wires.filter((w) => !wires.has(w.id) && !comps.has(w.from.componentId) && !comps.has(w.to.componentId));
+    if (notes.size && c.annotations) c.annotations = c.annotations.filter((a) => !notes.has(a.id));
   });
   ed().clearSelection();
 }
@@ -84,18 +88,21 @@ export function selectAll() {
   ed().select(
     c.components.map((x) => x.id),
     c.wires.map((w) => w.id),
+    (c.annotations ?? []).map((a) => a.id),
   );
 }
 
 function selectionAsDocument(): CircuitDocument | null {
-  const { selectedComponents } = ed();
-  if (!selectedComponents.length) return null;
+  const { selectedComponents, selectedAnnotations } = ed();
+  if (!selectedComponents.length && !selectedAnnotations.length) return null;
   const c = proj().project.circuit;
   const ids = new Set(selectedComponents);
+  const notes = new Set(selectedAnnotations);
   return {
     components: c.components.filter((x) => ids.has(x.id)),
     // Copy wires whose both ends are copied (selected or not).
     wires: c.wires.filter((w) => ids.has(w.from.componentId) && ids.has(w.to.componentId)),
+    annotations: (c.annotations ?? []).filter((a) => notes.has(a.id)),
   };
 }
 
@@ -112,7 +119,7 @@ export function cutSelection() {
 /** Pastes the clipboard offset by `offset` (or at `at`, top-left of the group). */
 export function paste(at?: { x: number; y: number }) {
   const clip = ed().clipboard;
-  if (!clip?.components.length) return;
+  if (!clip?.components.length && !clip?.annotations?.length) return;
   pasteDocument(clip, at);
 }
 
@@ -122,8 +129,10 @@ export function duplicateSelection() {
 }
 
 function pasteDocument(doc: CircuitDocument, at?: { x: number; y: number }) {
-  const minX = Math.min(...doc.components.map((c) => c.x));
-  const minY = Math.min(...doc.components.map((c) => c.y));
+  const notes = doc.annotations ?? [];
+  const noteBoxes = notes.map(annotationBounds);
+  const minX = Math.min(...doc.components.map((c) => c.x), ...noteBoxes.map((b) => b.x));
+  const minY = Math.min(...doc.components.map((c) => c.y), ...noteBoxes.map((b) => b.y));
   const dx = at ? at.x - minX : GRID * 3;
   const dy = at ? at.y - minY : GRID * 3;
   const idMap = new Map<string, string>();
@@ -143,13 +152,16 @@ function pasteDocument(doc: CircuitDocument, at?: { x: number; y: number }) {
     to: { componentId: idMap.get(w.to.componentId)!, pinId: w.to.pinId },
     points: w.points.map((p) => ({ x: p.x + dx, y: p.y + dy })),
   }));
+  const newNotes = notes.map((a) => movedFrom({ ...a, id: nanoid(10) }, dx, dy));
   proj().edit((c) => {
     c.components.push(...newComps);
     c.wires.push(...newWires);
+    if (newNotes.length) (c.annotations ??= []).push(...newNotes);
   });
   ed().select(
     newComps.map((c) => c.id),
     newWires.map((w) => w.id),
+    newNotes.map((a) => a.id),
   );
 }
 
@@ -164,8 +176,10 @@ export function withCarried(ids: Iterable<string>): Set<string> {
 
 export function nudgeSelection(dx: number, dy: number) {
   const ids = withCarried(ed().selectedComponents);
-  if (!ids.size) return;
+  const notes = new Set(ed().selectedAnnotations);
+  if (!ids.size && !notes.size) return;
   proj().edit((c) => {
+    for (const a of c.annotations ?? []) if (notes.has(a.id)) translateAnnotation(a, dx, dy);
     for (const inst of c.components) if (ids.has(inst.id)) {
       inst.x += dx;
       inst.y += dy;
@@ -430,4 +444,58 @@ export function centerOn(x: number, y: number, animate = false) {
     cancelAnimationFrame(animation);
     ed().set({ viewport: v });
   }
+}
+
+// ------------------------------------------------------------ canvas notes
+
+/** Adds a note and selects it. */
+export function addNote(a: Annotation) {
+  proj().edit((c) => {
+    (c.annotations ??= []).push(a);
+  });
+  ed().select([], [], [a.id]);
+}
+
+/** Changes a note's properties (one undo step per call). */
+export function updateNote(id: string, patch: Partial<Annotation>) {
+  proj().edit((c) => {
+    const a = c.annotations?.find((x) => x.id === id);
+    if (a) Object.assign(a, patch);
+  });
+}
+
+/** Starts typing in a text note (an existing one, or a new one at a point). */
+export function editTextNote(note: TextNote) {
+  ed().set({ editingNote: structuredClone(note), tool: 'select' });
+}
+
+/** Ends typing: saves the text, or removes the note when it was left empty. */
+export function finishTextNote(text: string) {
+  const note = ed().editingNote;
+  if (!note) return;
+  ed().set({ editingNote: null });
+  const trimmed = text.replace(/\s+$/, '');
+  const existing = proj().project.circuit.annotations?.find((a) => a.id === note.id);
+  if (!existing) {
+    if (trimmed) addNote({ ...note, text: trimmed });
+    return;
+  }
+  if (!trimmed) {
+    proj().edit((c) => {
+      c.annotations = c.annotations?.filter((a) => a.id !== note.id);
+    });
+    ed().clearSelection();
+  } else if (existing.kind === 'text' && existing.text !== trimmed) updateNote(note.id, { text: trimmed });
+}
+
+/** Puts a note above (or below) the other notes. */
+export function noteToFront(id: string, front = true) {
+  proj().edit((c) => {
+    const list = c.annotations;
+    const i = list?.findIndex((a) => a.id === id) ?? -1;
+    if (!list || i < 0) return;
+    const [a] = list.splice(i, 1);
+    if (front) list.push(a);
+    else list.unshift(a);
+  });
 }

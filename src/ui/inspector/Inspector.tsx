@@ -15,6 +15,7 @@ import { Tip } from '../common/Tooltip';
 import { clearWirePoints, deleteSelection, flipSelection, rotateSelection, setNetWireColor, setWireColor, autoRouteWires } from '../workspace/actions';
 import { pinLabel } from '../instruments/probes';
 import { openGuide } from '../guide/open';
+import { NoteInspector } from './NoteInspector';
 
 const SUPPORT_LABEL: Record<ComponentDefinition['simulation']['support'], MessageKey> = { full: 'Simulated', partial: 'Partially simulated', 'visual-only': 'Visual only' };
 
@@ -411,9 +412,21 @@ export function Inspector() {
   const t = useT();
   const selectedComponents = useEditor((s) => s.selectedComponents);
   const selectedWires = useEditor((s) => s.selectedWires);
+  const selectedNotes = useEditor((s) => s.selectedAnnotations);
   const circuit = useProject((s) => s.project.circuit);
+  const total = selectedComponents.length + selectedWires.length + selectedNotes.length;
   let content: React.ReactNode;
-  if (selectedComponents.length === 1) {
+  if (selectedNotes.length === 1 && total === 1) {
+    const note = circuit.annotations?.find((a) => a.id === selectedNotes[0]);
+    content = note ? <NoteInspector key={note.id} note={note} /> : null;
+  } else if (selectedNotes.length && total > 1) {
+    content = (
+      <div className="insp-head">
+        <h3>{t('{n} items selected', { n: total })}</h3>
+        <div className="sub">{t('{parts} parts · {wires} wires · {notes} notes', { parts: selectedComponents.length, wires: selectedWires.length, notes: selectedNotes.length })}</div>
+      </div>
+    );
+  } else if (selectedComponents.length === 1) {
     const inst = circuit.components.find((c) => c.id === selectedComponents[0]);
     const def = inst && lookup(inst.type);
     content = inst && def ? <ComponentInspector key={inst.id} inst={inst} def={def} /> : null;

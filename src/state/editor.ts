@@ -1,10 +1,12 @@
 /** Editor/UI state: selection, viewport, tools, panels, preferences. */
 import { create } from 'zustand';
-import type { CircuitDocument, PinRef, Point } from '../core/model/circuit';
+import type { CircuitDocument, PinRef, Point, TextNote } from '../core/model/circuit';
 import { detectLanguage, setLanguage, type Lang } from '../i18n';
 import { resolveTheme, systemPrefersDark, type ThemeId, type ThemePref } from '../ui/themes';
 
-export type Tool = 'select' | 'probe-logic' | 'probe-scope' | 'probe-meter-red' | 'probe-meter-black';
+export type Tool = 'select' | 'probe-logic' | 'probe-scope' | 'probe-meter-red' | 'probe-meter-black' | NoteTool;
+/** Drawing a text note, an arrow or a frame on the canvas. */
+export type NoteTool = 'text' | 'arrow' | 'rect';
 export type DockTab = 'serial' | 'plotter' | 'scope' | 'logic' | 'meter' | 'mcu' | 'problems' | 'output';
 export type Theme = ThemePref;
 
@@ -15,7 +17,7 @@ export interface Toast {
 }
 
 /** What the canvas context menu was opened on (the menu positions itself at the pointer). */
-export type ContextMenuState = { kind: 'component'; id: string } | { kind: 'wire'; id: string } | { kind: 'canvas'; world: { x: number; y: number } };
+export type ContextMenuState = { kind: 'component'; id: string } | { kind: 'wire'; id: string } | { kind: 'annotation'; id: string } | { kind: 'canvas'; world: { x: number; y: number } };
 
 /** A project file opened or saved recently (File › Open Recent). */
 export interface RecentProject {
@@ -147,6 +149,10 @@ interface EditorState extends Prefs {
   guideReturn: null | 'home';
   selectedComponents: string[];
   selectedWires: string[];
+  /** Selected canvas notes (text, arrows, frames). */
+  selectedAnnotations: string[];
+  /** Text note being typed (a new one is not in the document until it has text). */
+  editingNote: TextNote | null;
   viewport: { x: number; y: number; zoom: number };
   hoverPin: PinRef | null;
   /** Wire being drawn: start pin and waypoints placed so far. */
@@ -169,7 +175,7 @@ interface EditorState extends Prefs {
   setPrefs(partial: Partial<Prefs>): void;
   /** Restores default settings; keeps the language, favourites and recent lists. */
   resetPrefs(): void;
-  select(components: string[], wires?: string[]): void;
+  select(components: string[], wires?: string[], annotations?: string[]): void;
   clearSelection(): void;
   toggleFavorite(type: string): void;
   pushRecent(type: string): void;
@@ -191,6 +197,8 @@ export const useEditor = create<EditorState>((set, get) => ({
   guideReturn: null,
   selectedComponents: [],
   selectedWires: [],
+  selectedAnnotations: [],
+  editingNote: null,
   viewport: { x: 80, y: 60, zoom: 1 },
   hoverPin: null,
   wiring: null,
@@ -221,11 +229,12 @@ export const useEditor = create<EditorState>((set, get) => ({
     const { language, favorites, recent, recentProjects } = get();
     get().setPrefs({ ...defaultPrefs(), language, favorites, recent, recentProjects });
   },
-  select(components, wires = []) {
-    set({ selectedComponents: components, selectedWires: wires });
+  select(components, wires = [], annotations = []) {
+    set({ selectedComponents: components, selectedWires: wires, selectedAnnotations: annotations });
   },
   clearSelection() {
-    if (get().selectedComponents.length || get().selectedWires.length) set({ selectedComponents: [], selectedWires: [] });
+    const s = get();
+    if (s.selectedComponents.length || s.selectedWires.length || s.selectedAnnotations.length) set({ selectedComponents: [], selectedWires: [], selectedAnnotations: [] });
   },
   toggleFavorite(type) {
     const f = get().favorites;
