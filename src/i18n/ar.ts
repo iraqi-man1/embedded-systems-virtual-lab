@@ -838,6 +838,7 @@ export const AR = {
   'Move the code editor anywhere': 'تحريك محرر الشيفرة إلى أي مكان',
   'Drag its tab bar · double-click puts it back': 'اسحب شريط تبويباته · النقر المزدوج يعيده إلى مكانه',
   'Double-click it': 'انقر عليها نقراً مزدوجاً',
+  '↑ brings back what you sent': '↑ يعيد ما أرسلته',
   // ---------------------------------------------------- command descriptions
   'Take the code editor out into a window you can move anywhere; run again to put it back beside the canvas.': 'أخرج محرر الشيفرة في نافذة تحرّكها إلى أي مكان؛ نفّذ الأمر مرة أخرى لإعادته بجانب لوحة الرسم.',
   'The problems the lab recorded, with the details to copy into a report for your teacher or the developers.': 'المشكلات التي سجّلها المختبر، مع التفاصيل لنسخها في بلاغ لأستاذك أو للمطوّرين.',

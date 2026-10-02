@@ -71,6 +71,8 @@ interface Prefs {
   serialTimestamps: boolean;
   /** Serial monitor: text or hex dump. */
   serialView: 'text' | 'hex';
+  /** Serial monitor: lines sent, newest first (↑ and ↓ bring them back). */
+  serialHistory: string[];
   /** Collapsed library categories ('__fav', '__recent' for the pinned sections). */
   libraryCollapsed: string[];
   /** Library shows simulated parts only. */
@@ -122,6 +124,7 @@ export function defaultPrefs(): Prefs {
     serialClearOnRun: true,
     serialTimestamps: false,
     serialView: 'text',
+    serialHistory: [],
     libraryCollapsed: ['Communication', 'Integrated Circuits', 'Actuators', 'Sensors'],
     librarySimOnly: false,
     rightDragPan: true,

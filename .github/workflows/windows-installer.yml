@@ -95,6 +95,7 @@ jobs:
       # window or a problem the app recorded; a failure stops the release.
       - name: Test the built application (WebView2)
         shell: bash
+        timeout-minutes: 12
         run: |
           npm install --no-save playwright-core@1.56.1
           node tools/e2e-desktop.mjs --exe src-tauri/target/release/evlab.exe

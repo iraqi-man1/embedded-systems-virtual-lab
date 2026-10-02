@@ -42,7 +42,8 @@ export function SerialMonitor() {
   const [input, setInput] = useState('');
   const [ending, setEnding] = useState<keyof typeof ENDINGS>(python ? 'cr' : 'nl');
   useEffect(() => setEnding(python ? 'cr' : 'nl'), [python]);
-  const [history, setHistory] = useState<string[]>([]);
+  // Kept across instrument tabs and restarts.
+  const history = useEditor((s) => s.serialHistory);
   const [hIdx, setHIdx] = useState(-1);
   const out = useRef<HTMLPreElement>(null);
 
@@ -54,7 +55,7 @@ export function SerialMonitor() {
   const send = () => {
     if (!input && ending === 'none') return;
     sendSerial(input + ENDINGS[ending]);
-    if (input) setHistory((h) => [input, ...h.filter((x) => x !== input)].slice(0, 30));
+    if (input) useEditor.getState().setPrefs({ serialHistory: [input, ...history.filter((x) => x !== input)].slice(0, 30) });
     setInput('');
   };
 
@@ -132,7 +133,11 @@ export function SerialMonitor() {
       <div className="serial-in">
         <input
           className="input"
-          placeholder={running ? (python ? t('Type Python and press Enter (>>> REPL)') : t('Type a message and press Enter to send to the board')) : t('Start the simulation to send data')}
+          placeholder={
+            running
+              ? `${python ? t('Type Python and press Enter (>>> REPL)') : t('Type a message and press Enter to send to the board')}${history.length ? ` · ${t('↑ brings back what you sent')}` : ''}`
+              : t('Start the simulation to send data')
+          }
           dir="auto"
           disabled={!running}
           value={input}

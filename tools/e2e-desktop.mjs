@@ -58,6 +58,14 @@ let browser;
 let page;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// A step that hangs (a frozen page, an unanswered call) fails the test instead of the build.
+const watchdog = setTimeout(() => {
+  console.error('FAIL the test did not finish within 8 minutes');
+  if (process.platform === 'win32') windowsDiagnostics();
+  app?.kill();
+  process.exit(1);
+}, 8 * 60_000);
+
 /** Windows: what is on the screen and which WebView2 is installed, when the app cannot be reached. */
 function windowsDiagnostics() {
   const ps = (script) => {
@@ -98,7 +106,8 @@ if (exe) {
     app.kill();
     process.exit(1);
   }
-  browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
+  console.log('→ connecting to the WebView2 of the application');
+  browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`, { timeout: 30000 });
   for (let i = 0; i < 60 && !page; i++) {
     page = browser
       .contexts()
@@ -122,6 +131,7 @@ if (exe) {
 }
 
 const pageErrors = [];
+page.setDefaultTimeout(15000);
 page.on('pageerror', (e) => pageErrors.push(String(e)));
 page.on('console', (m) => m.type() === 'error' && pageErrors.push(m.text()));
 const cdp = await page.context().newCDPSession(page);
@@ -129,14 +139,18 @@ const cdp = await page.context().newCDPSession(page);
 // ------------------------------------------------------------------ checks
 let shotNo = 0;
 
+/** Fails a call that does not answer in time (a frozen page would otherwise hang the test). */
+const within = (promise, ms, what) => Promise.race([promise, sleep(ms).then(() => Promise.reject(new Error(`${what} did not answer in ${ms / 1000} s`)))]);
+
 /** The window shows `what` ('home' | 'guide' | 'editor'), on top and inside the window, and is not an empty picture. */
 async function showing(what, step) {
+  console.log(`→ ${step}`);
   await sleep(350);
   const name = `${String(++shotNo).padStart(2, '0')}-${step.replace(/\W+/g, '-').toLowerCase()}`;
-  const png = await page.screenshot().catch(() => null);
+  const png = await within(page.screenshot(), 20000, 'screenshot').catch(() => null);
   if (png) writeFileSync(join(out, `${name}.png`), png);
-  const state = await page
-    .evaluate(
+  const state = await within(
+    page.evaluate(
       async ({ what, b64 }) => {
         const vw = innerWidth;
         const vh = innerHeight;
@@ -181,8 +195,10 @@ async function showing(what, step) {
         return { problems, colours, href: location.href };
       },
       { what, b64: png ? png.toString('base64') : null },
-    )
-    .catch((e) => ({ problems: [`page not reachable: ${e.message}`], colours: -1, href: page.url() }));
+    ),
+    20000,
+    'the page',
+  ).catch((e) => ({ problems: [`page not reachable: ${e.message}`], colours: -1, href: page.url() }));
   if (state.colours >= 0 && state.colours < 8) state.problems.push(`the window is empty (${state.colours} colours)`);
   if (!/tauri\.localhost|tauri:\/\/|localhost:\d+/.test(state.href)) state.problems.push(`the window left the application: ${state.href}`);
   check(`${step}: ${what} shown`, !state.problems.length, state.problems.join('; '));
@@ -318,13 +334,18 @@ try {
 }
 
 // ------------------------------------------------------------------ problems recorded
-const recorded = await page.evaluate(() => localStorage.getItem('evlab.errors.v1')).catch(() => null);
+const recorded = await within(
+  page.evaluate(() => localStorage.getItem('evlab.errors.v1')),
+  10000,
+  'the page',
+).catch(() => null);
 const problems = recorded ? JSON.parse(recorded) : [];
 check('no problem recorded by the application', problems.length === 0, problems.map((p) => `[${p.area}] ${p.message}`).join(' | '));
 check('no page errors', pageErrors.length === 0, pageErrors.join(' | '));
 writeFileSync(join(out, 'report.txt'), `${log.join('\n')}\n\nRecorded problems:\n${JSON.stringify(problems, null, 2)}\n\nPage errors:\n${pageErrors.join('\n')}\n`);
 
-await browser.close().catch(() => undefined);
+clearTimeout(watchdog);
+await within(browser.close(), 10000, 'closing').catch(() => undefined);
 if (app) app.kill();
 console.log(failures ? `${failures} check(s) failed` : 'all desktop checks passed', `— screenshots in ${out}`);
 process.exit(failures ? 1 : 0);
