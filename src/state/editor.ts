@@ -162,7 +162,7 @@ interface EditorState extends Prefs {
   dockTab: DockTab;
   clipboard: CircuitDocument | null;
   contextMenu: ContextMenuState | null;
-  dialog: null | 'examples' | 'toolchain' | 'shortcuts' | 'about' | 'project' | 'settings';
+  dialog: null | 'examples' | 'toolchain' | 'shortcuts' | 'about' | 'project' | 'settings' | 'export';
   toasts: Toast[];
   /** Open command palette: run commands, or add a part (optionally at a canvas point). */
   palette: null | { mode: 'commands' | 'add' | 'find'; at?: { x: number; y: number } };

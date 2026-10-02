@@ -117,6 +117,25 @@ export const storage = {
     return fileName;
   },
 
+  /** Saves a binary export (PNG image) where the user chooses. Returns the path, or null if cancelled. */
+  async exportBinary(bytes: Uint8Array, fileName: string, filter: { name: string; extensions: string[] }, mime: string): Promise<string | null> {
+    if (isTauri) {
+      const { save } = await import('@tauri-apps/plugin-dialog');
+      const target = await save({ filters: [filter], defaultPath: fileName });
+      if (!target) return null;
+      // Raw body: megabytes of image data are not JSON-encoded.
+      const { invoke: raw } = await import('@tauri-apps/api/core');
+      await raw('write_binary_file', bytes, { headers: { path: encodeURIComponent(target) } });
+      return target;
+    }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([bytes as BlobPart], { type: mime }));
+    a.download = fileName;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    return fileName;
+  },
+
   /** Writes to `path`, or asks for a location when `path` is null. Returns the path used. */
   async saveProject(text: string, path: string | null, suggestedName: string): Promise<string | null> {
     if (isTauri) {

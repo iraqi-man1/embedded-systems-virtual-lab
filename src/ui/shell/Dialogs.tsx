@@ -10,6 +10,7 @@ import { ModalFrame } from '../common/Dialog';
 import { Icon } from '../common/Icon';
 import { ExampleGallery } from '../home/ExampleGallery';
 import { SettingsDialog } from './SettingsDialog';
+import { ExportDialog } from '../export/ExportDialog';
 
 function Modal({ title, small, wide, children, footer }: { title: string; small?: boolean; wide?: boolean; children: React.ReactNode; footer?: React.ReactNode }) {
   return (
@@ -213,6 +214,7 @@ export function Dialogs() {
   if (dialog === 'shortcuts') return <ShortcutsDialog />;
   if (dialog === 'about') return <AboutDialog />;
   if (dialog === 'settings') return <SettingsDialog />;
+  if (dialog === 'export') return <ExportDialog />;
   return null;
 }
 

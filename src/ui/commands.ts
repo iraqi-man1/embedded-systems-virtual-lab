@@ -33,6 +33,7 @@ import {
   zoomBy,
 } from './workspace/actions';
 import { closeGuide, openGuideForContext } from './guide/open';
+import { copyCircuitImage } from './export/copy';
 
 export interface Command {
   id: string;
@@ -190,6 +191,8 @@ export const commands: Record<string, Command> = {
   probeScope: cmd('probeScope', 'Probe with Oscilloscope', 'Click a pin to show its voltage over time on the oscilloscope.', { icon: 'waves', run: () => ed().set({ tool: 'probe-scope' }) }),
   toolchain: cmd('toolchain', 'Firmware Toolchain…', 'Install or check the compiler used to build Arduino code.', { icon: 'wrench', run: () => ed().set({ dialog: 'toolchain' }) }),
   palette: cmd('palette', 'Command Palette…', 'Search and run any command by name.', { icon: 'command', shortcut: 'Ctrl+Shift+P', run: () => ed().set({ palette: { mode: 'commands' } }) }),
+  exportImage: cmd('exportImage', 'Export Image…', 'Save the circuit as a high-resolution PNG (up to 768 DPI) or a vector SVG.', { icon: 'image', shortcut: 'Ctrl+Shift+E', run: () => ed().set({ dialog: 'export' }) }),
+  copyImage: cmd('copyImage', 'Copy as Image', 'Copy the selection, or the whole circuit, as a picture to paste into a document.', { icon: 'copy', shortcut: 'Ctrl+Shift+C', run: () => void copyCircuitImage() }),
   find: cmd('find', 'Find on Canvas…', 'Find a part, net, wire label or note by name and jump to it.', { icon: 'search', shortcut: 'Ctrl+F', run: () => ed().set({ palette: { mode: 'find' } }) }),
   quickAdd: cmd('quickAdd', 'Add a Part…', 'Type a part name and add it to the canvas.', { icon: 'plus', shortcut: 'Ctrl+K', run: () => ed().set({ palette: { mode: 'add' } }) }),
   guide: cmd('guide', 'Parts Guide', 'What each part is, what it is for and how to connect it.', { icon: 'book', shortcut: 'F1', run: () => openGuideForContext() }),
@@ -250,6 +253,7 @@ export function installShortcuts(): () => void {
     if (ctrl && k.toLowerCase() === 'o') return run('open');
     if (ctrl && k.toLowerCase() === 'n') return run('new');
     if (ctrl && k.toLowerCase() === 'b') return run('compile');
+    if (ctrl && e.shiftKey && k.toLowerCase() === 'e') return run('exportImage');
     if (ctrl && e.shiftKey && k.toLowerCase() === 'p') return run('palette');
     if (ctrl && !e.shiftKey && k.toLowerCase() === 'k') return run('quickAdd');
     // Ctrl+F finds in the circuit; in the code editor it stays the editor's own find.
@@ -266,6 +270,7 @@ export function installShortcuts(): () => void {
     if (isTyping(e) || inMenu(e)) return;
     if (ctrl && !e.shiftKey && k.toLowerCase() === 'z') return run('undo');
     if (ctrl && (k.toLowerCase() === 'y' || (e.shiftKey && k.toLowerCase() === 'z'))) return run('redo');
+    if (ctrl && e.shiftKey && k.toLowerCase() === 'c') return run('copyImage');
     if (ctrl && k.toLowerCase() === 'c') return run('copy');
     if (ctrl && k.toLowerCase() === 'x') return run('cut');
     if (ctrl && k.toLowerCase() === 'v') return run('paste');

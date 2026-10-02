@@ -22,26 +22,33 @@ function arrowHead(a: ArrowNote, atEnd: boolean): string {
   return `${tx},${ty} ${p(spread)} ${p(-spread)}`;
 }
 
-/** The visible end of the line stops inside the head so the tip stays sharp. */
-function shaft(a: ArrowNote) {
+/**
+ * The line and the heads of an arrow (also used by the image export). The
+ * line stops inside a head so the tip stays sharp.
+ */
+export function arrowGeometry(a: ArrowNote) {
   const len = Math.hypot(a.x2 - a.x1, a.y2 - a.y1) || 1;
   const cut = Math.min(len / 3, 4 + a.width * 1.6);
   const ux = (a.x2 - a.x1) / len;
   const uy = (a.y2 - a.y1) / len;
   const end = a.heads !== 'none';
   const start = a.heads === 'both';
-  return { x1: a.x1 + (start ? ux * cut : 0), y1: a.y1 + (start ? uy * cut : 0), x2: a.x2 - (end ? ux * cut : 0), y2: a.y2 - (end ? uy * cut : 0) };
+  return {
+    shaft: { x1: a.x1 + (start ? ux * cut : 0), y1: a.y1 + (start ? uy * cut : 0), x2: a.x2 - (end ? ux * cut : 0), y2: a.y2 - (end ? uy * cut : 0) },
+    heads: [...(end ? [arrowHead(a, true)] : []), ...(start ? [arrowHead(a, false)] : [])],
+  };
 }
 
 function Arrow({ a, selected }: { a: ArrowNote; selected: boolean }) {
   const color = noteColor(a.color);
-  const s = shaft(a);
+  const { shaft: s, heads } = arrowGeometry(a);
   return (
     <g className={`annot-arrow${selected ? ' selected' : ''}`}>
       {selected && <line className="annot-glow" x1={a.x1} y1={a.y1} x2={a.x2} y2={a.y2} strokeWidth={a.width + 8} />}
       <line x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} stroke={color} strokeWidth={a.width} strokeLinecap="round" strokeDasharray={a.dashed ? `${a.width * 3} ${a.width * 2.2}` : undefined} />
-      {a.heads !== 'none' && <polygon points={arrowHead(a, true)} fill={color} />}
-      {a.heads === 'both' && <polygon points={arrowHead(a, false)} fill={color} />}
+      {heads.map((h) => (
+        <polygon key={h} points={h} fill={color} />
+      ))}
       {/* Wide invisible line: easy to grab. */}
       <line className="annot-hit" data-annot={a.id} x1={a.x1} y1={a.y1} x2={a.x2} y2={a.y2} strokeWidth={Math.max(12, a.width + 10)} />
     </g>
@@ -53,11 +60,6 @@ function Frame({ a, selected }: { a: FrameNote; selected: boolean }) {
   const band = 10;
   return (
     <div className={`annot-frame${selected ? ' selected' : ''}`} style={{ left: a.x, top: a.y, width: a.w, height: a.h, borderColor: color, borderStyle: a.dashed ? 'dashed' : 'solid', ['--frame' as string]: color }}>
-      {a.title && (
-        <div className="annot-frame-title" data-annot={a.id} style={{ background: color }} dir="auto">
-          {a.title}
-        </div>
-      )}
       {/* The inside stays clickable for the parts; only the border grabs the frame. */}
       <div className="annot-band" data-annot={a.id} style={{ left: -band / 2, top: -band / 2, right: -band / 2, height: band }} />
       <div className="annot-band" data-annot={a.id} style={{ left: -band / 2, bottom: -band / 2, right: -band / 2, height: band }} />
@@ -76,6 +78,15 @@ function Text({ a, selected }: { a: TextNote; selected: boolean }) {
       style={{ left: a.x, top: a.y, fontSize: a.size, color: noteColor(a.color), fontWeight: a.bold ? 700 : 400 }}
     >
       {a.text}
+    </div>
+  );
+}
+
+/** A frame's title tab, drawn above the parts so a part inside the frame never hides it. */
+function FrameTitle({ a }: { a: FrameNote }) {
+  return (
+    <div className="annot-frame-title" data-annot={a.id} style={{ left: a.x + 12, top: a.y, background: noteColor(a.color) }} dir="auto">
+      {a.title}
     </div>
   );
 }
@@ -177,6 +188,7 @@ export function NoteLayer({ notes, selected, zoom, draft }: { notes: Annotation[
         {draft?.kind === 'rect' && <rect className="annot-draft" x={draft.x} y={draft.y} width={draft.w} height={draft.h} strokeWidth={1.5 / zoom} />}
         {single && !editing && <Handles a={single} zoom={zoom} />}
       </svg>
+      {notes.map((a) => (a.kind === 'rect' && a.title ? <FrameTitle key={a.id} a={a} /> : null))}
       {notes.map((a) => (a.kind === 'text' && a.id !== editing?.id ? <Text key={a.id} a={a} selected={selected.has(a.id)} /> : null))}
       {editing && <TextEditor key={editing.id} note={editing} />}
     </>

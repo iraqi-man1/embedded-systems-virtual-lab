@@ -76,6 +76,7 @@ pub fn run() {
             project_io::take_launch_file,
             project_io::read_text_file,
             project_io::write_text_file,
+            project_io::write_binary_file,
             project_io::autosave_write,
             project_io::autosave_read,
             project_io::autosave_clear,
