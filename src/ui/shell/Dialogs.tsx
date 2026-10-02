@@ -174,7 +174,7 @@ function ShortcutsDialog() {
     ['Toggle grid', 'G'],
     ['Show voltages on wires', 'V'],
     ['Wire colour (selected / new wire)', '1–9, C cycles'],
-    ['Pan', 'Middle-drag, or Space + drag'],
+    ['Pan', 'Right-drag, middle-drag, or Space + drag'],
     ['Zoom at cursor', 'Mouse wheel'],
     ['Start a wire', 'Click a pin (or drag from it)'],
     ['Add a bend while wiring', 'Click empty canvas'],

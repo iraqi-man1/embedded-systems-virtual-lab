@@ -29,9 +29,11 @@ import { loadExample } from '../../examples';
 import { fileTitle, openRecent } from '../../app/fileOps';
 import { SimControlsLayer } from './SimControls';
 import { useWireToolbarVisible, WireToolbar } from './WireToolbar';
+import { ContextMenuGate, type HeldMenu } from './contextMenuGate';
 
 type Drag =
-  | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number }
+  /** `button` 2: right-button pan, which only starts once the pointer moved past the threshold. */
+  | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number; button: number }
   | { kind: 'move'; start: Point; orig: Map<string, Point>; wires: Map<string, Point[]>; anchor: string; moved: boolean }
   | { kind: 'marquee'; start: Point; base: string[]; baseWires: string[] }
   | { kind: 'handle'; wireId: string; index: number }
@@ -103,6 +105,8 @@ export function Workspace() {
   const ref = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag | null>(null);
   const space = useRef(false);
+  // Right button: drag pans, click opens the context menu.
+  const [gate] = useState(() => new ContextMenuGate(DRAG_THRESHOLD));
   const [hover, setHover] = useState<IndexedPin | null>(null);
   const [cursor, setCursor] = useState<Point>({ x: 0, y: 0 });
   const [marquee, setMarquee] = useState<Overlay['marquee']>(null);
@@ -191,14 +195,21 @@ export function Workspace() {
 
   // ----------------------------------------------------------- pointer
   const onPointerDown = (e: React.PointerEvent) => {
-    if (e.button === 2) return;
+    if (e.button === 2) {
+      const ed = useEditor.getState();
+      if (!ed.rightDragPan) return;
+      // No pointer capture yet: a menu event fired on press (Linux/macOS) must keep its real target.
+      gate.down(e.clientX, e.clientY);
+      drag.current = { kind: 'pan', sx: e.clientX, sy: e.clientY, vx: ed.viewport.x, vy: ed.viewport.y, button: 2 };
+      return;
+    }
     // Overlay controls (hint buttons, zoom bar) handle their own clicks.
     if ((e.target as Element).closest('button, .canvas-hint .btns')) return;
     const el = ref.current!;
     el.focus();
     const ed = useEditor.getState();
     if (e.button === 1 || (e.button === 0 && space.current)) {
-      drag.current = { kind: 'pan', sx: e.clientX, sy: e.clientY, vx: ed.viewport.x, vy: ed.viewport.y };
+      drag.current = { kind: 'pan', sx: e.clientX, sy: e.clientY, vx: ed.viewport.x, vy: ed.viewport.y, button: e.button };
       el.setPointerCapture(e.pointerId);
       setDragging(true);
       return;
@@ -339,6 +350,12 @@ export function Workspace() {
     if (!d) return;
     switch (d.kind) {
       case 'pan':
+        if (d.button === 2 && !gate.dragging) {
+          // A right press only pans once it moved; until then it may still be a click (menu).
+          if (!gate.move(e.clientX, e.clientY)) break;
+          ref.current?.setPointerCapture(e.pointerId);
+          setDragging(true);
+        }
         ed.set({ viewport: { ...ed.viewport, x: d.vx + e.clientX - d.sx, y: d.vy + e.clientY - d.sy } });
         break;
       case 'move': {
@@ -416,6 +433,13 @@ export function Workspace() {
     const ed = useEditor.getState();
     const world = toWorld(e.clientX, e.clientY);
     switch (d.kind) {
+      case 'pan': {
+        if (d.button !== 2) break;
+        // A right click (no drag) on a platform that fired the menu on press: open it now.
+        const held = gate.up(performance.now());
+        if (held) replayContextMenu(held);
+        break;
+      }
       case 'move':
       case 'handle':
         useProject.getState().end();
@@ -460,8 +484,30 @@ export function Workspace() {
     }
   };
 
+  /** Re-fires a held-back `contextmenu` so the menu opens for what was right-clicked. */
+  const replayContextMenu = (held: HeldMenu) => {
+    const target = held.target instanceof Element && held.target.isConnected ? held.target : ref.current;
+    if (!target) return;
+    gate.replaying = true;
+    try {
+      target.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: held.x, clientY: held.y, button: 2, view: window }));
+    } finally {
+      gate.replaying = false;
+    }
+  };
+
+  const onPointerCancel = (e: React.PointerEvent) => {
+    gate.cancel();
+    onPointerUp(e);
+  };
+
   // Records what was right-clicked; the context menu (a portal) then opens at the pointer.
   const onContextMenu = (e: React.MouseEvent) => {
+    if (useEditor.getState().rightDragPan && !gate.contextMenu(performance.now(), { target: e.target, x: e.clientX, y: e.clientY })) {
+      // Part of a right-button drag (or decided at release): no menu now.
+      e.preventDefault();
+      return;
+    }
     const ed = useEditor.getState();
     if (ed.wiring || ed.tool !== 'select') {
       // Right-click cancels wiring/probing instead of opening the menu.
@@ -817,6 +863,7 @@ export function Workspace() {
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
       onPointerLeave={() => setHover(null)}
       onContextMenu={onContextMenu}
       onDoubleClick={onDoubleClick}

@@ -48,8 +48,15 @@ function numericProp(inst: ComponentInstance, def: ComponentDefinition, key: str
   return Number.isFinite(n) ? n : 0;
 }
 
-/** Stops canvas handlers (selection, marquee, panning) for events handled by a control. */
-const stop = (e: React.SyntheticEvent) => e.stopPropagation();
+/**
+ * Stops canvas handlers (selection, marquee) for events handled by a control.
+ * Middle/right-button presses still reach the canvas, so it pans from anywhere.
+ */
+const stop = (e: React.SyntheticEvent) => {
+  const button = (e as React.PointerEvent).button;
+  if (e.type === 'pointerdown' && (button === 1 || button === 2)) return;
+  e.stopPropagation();
+};
 
 /** Compact en-US number (never locale digits): 12 345 → 12.3k, 3.14159 → 3.14. */
 export function formatNumber(v: number, digits = 3) {
@@ -440,7 +447,7 @@ function SliderChip({ inst, def, c }: { inst: ComponentInstance; def: ComponentD
           max={1000}
           value={Math.round(toPos(value) * 1000)}
           aria-label={c.label ?? p?.label ?? c.prop}
-          onPointerDown={() => useProject.getState().begin()}
+          onPointerDown={(e) => e.button === 0 && useProject.getState().begin()}
           onPointerUp={() => useProject.getState().end()}
           onChange={(e) => editProp(inst.id, c.prop, fromPos(Number(e.target.value) / 1000), useProject.getState().txBase ? 'gesture' : 'coalesce')}
         />

@@ -57,6 +57,8 @@ interface Prefs {
   libraryCollapsed: string[];
   /** Library shows simulated parts only. */
   librarySimOnly: boolean;
+  /** Dragging with the right mouse button pans the canvas (a click still opens the menu). */
+  rightDragPan: boolean;
 }
 
 const PREFS_KEY = 'evlab.prefs.v1';
@@ -87,6 +89,7 @@ function loadPrefs(): Prefs {
     serialView: 'text',
     libraryCollapsed: ['Communication', 'Integrated Circuits', 'Actuators', 'Sensors'],
     librarySimOnly: false,
+    rightDragPan: true,
   };
   try {
     const raw = localStorage.getItem(PREFS_KEY);
@@ -177,6 +180,7 @@ export const useEditor = create<EditorState>((set, get) => ({
       serialView: s.serialView,
       libraryCollapsed: s.libraryCollapsed,
       librarySimOnly: s.librarySimOnly,
+      rightDragPan: s.rightDragPan,
     };
     try {
       localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
