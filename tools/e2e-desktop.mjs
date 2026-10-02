@@ -36,6 +36,8 @@ const arg = (name) => {
 };
 const exe = arg('--exe');
 const url = arg('--url');
+/** Only the parts guide round trips (they also exist in older versions, to compare). */
+const guideOnly = process.argv.includes('--guide-only');
 if (!exe === !url) {
   console.error('Usage: node tools/e2e-desktop.mjs --exe <app.exe> | --url <dev server>');
   process.exit(2);
@@ -287,7 +289,7 @@ try {
   check('the start screen is on the same tab', (await page.locator('.home-tab.on').count()) === 1 && (await page.locator('.home-tab:nth-child(4).on').count()) === 1);
 
   // New project: creates a project and opens the editor.
-  await click('.btn.new-project', 'new project');
+  await click(guideOnly ? 'text=Go to the editor' : '.btn.new-project', 'new project');
   await page.waitForSelector('.home', { state: 'detached', timeout: 10000 }).catch(() => undefined);
   await showing('editor', 'new project');
 
@@ -295,7 +297,7 @@ try {
   const ways = [
     ['the Back button', () => click('.guide .home-top .btn', 'guide back')],
     ['Esc', () => page.keyboard.press('Escape')],
-    ['Alt+←', () => page.keyboard.press('Alt+ArrowLeft')],
+    ...(guideOnly ? [] : [['Alt+←', () => page.keyboard.press('Alt+ArrowLeft')]]),
     ['the mouse Back button', mouseBack],
   ];
   for (const [how, back] of ways) {
@@ -310,7 +312,7 @@ try {
   await mouseBack();
   await showing('editor', 'mouse Back button in the editor');
 
-  await floatingEditor('code editor');
+  if (!guideOnly) await floatingEditor('code editor');
 
 
   // Add to canvas from a part page.
@@ -320,7 +322,7 @@ try {
   await showing('editor', 'after Add to canvas');
 
   // Interface size (the desktop app zooms its WebView): parts still take clicks where they are drawn.
-  if (exe) {
+  if (exe && !guideOnly) {
     const dpr0 = await page.evaluate(() => devicePixelRatio);
     await page.locator('.workspace').click({ position: { x: 30, y: 30 } });
     await page.keyboard.press('Control+Alt+Equal');
@@ -352,7 +354,7 @@ try {
   await browseParts('arabic guide');
   await click('.guide .home-top .btn', 'guide back');
   await showing('editor', 'arabic: back from the guide');
-  await floatingEditor('arabic code editor');
+  if (!guideOnly) await floatingEditor('arabic code editor');
 } catch (e) {
   check('steps ran to the end', false, e.message.split('\n')[0]);
   await showing('editor', 'after the failure').catch(() => undefined);
