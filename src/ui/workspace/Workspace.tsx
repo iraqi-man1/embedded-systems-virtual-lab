@@ -20,7 +20,7 @@ import { formatShortDate } from '../../i18n';
 import { useT } from '../../i18n/react';
 import { ComponentView } from './ComponentView';
 import { WireLayer, type Overlay } from './WireLayer';
-import { hitPin, insertionPreview, marqueeSelection, nearestSegment, pinIndex, pinPosition, pointAlong, polylineLength, wirePolyline, type IndexedPin } from './geometry';
+import { hitPin, insertionPreview, uncoveredPin, marqueeSelection, nearestSegment, pinIndex, pinPosition, pointAlong, polylineLength, wirePolyline, type IndexedPin } from './geometry';
 import { addComponentAt, addNote, editTextNote, fitView, withCarried, zoomBy, zoomToSelection } from './actions';
 import { FrameLayer, NoteLayer } from './AnnotationLayer';
 import { assignProbe, probeMarkers } from '../instruments/probes';
@@ -260,12 +260,12 @@ export function Workspace() {
     }
     const world = toWorld(e.clientX, e.clientY);
     const zoom = ed.viewport.zoom;
-    const hit = hitPin(index, world, Math.max(4.5, 7 / zoom));
     const target = e.target as Element;
     const wireEl = target.closest('[data-wire]');
     const handleAttr = target.getAttribute('data-handle');
     const compEl = target.closest('[data-comp]');
     const compId = compEl?.getAttribute('data-comp') ?? null;
+    const hit = uncoveredPin(hitPin(index, world, Math.max(4.5, 7 / zoom)), compId);
 
     // Drawing notes: a click places a text note, a drag draws an arrow or a frame.
     if (ed.tool === 'text' || ed.tool === 'arrow' || ed.tool === 'rect') {
@@ -457,7 +457,8 @@ export function Workspace() {
     const d = drag.current;
     let onPin = false;
     if (!d || d.kind === 'pin' || d.kind === 'wire-end') {
-      const h = hitPin(index, world, Math.max(4.5, 7 / ed.viewport.zoom));
+      const over = d ? null : ((e.target as Element | null)?.closest?.('[data-comp]')?.getAttribute('data-comp') ?? null);
+      const h = uncoveredPin(hitPin(index, world, Math.max(4.5, 7 / ed.viewport.zoom)), over);
       if (h !== hover) setHover(h);
       onPin = !!h;
     }

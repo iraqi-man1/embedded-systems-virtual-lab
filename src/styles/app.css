@@ -523,6 +523,7 @@ kbd { direction: ltr; unicode-bidi: plaintext; font-family: var(--font-mono); fo
 /* ------------------------------------------------------ right-to-left (Arabic) */
 /* Text that must read left to right inside right-to-left text: paths, values, code. */
 .ltr { direction: ltr; unicode-bidi: isolate; }
+.nobr { white-space: nowrap; }
 [dir='rtl'] .dir-icon { transform: scaleX(-1); }
 /* The canvas keeps the circuit's geometry; its overlays still read in the interface language. */
 [dir='rtl'] .workspace .canvas-hint, [dir='rtl'] .workspace .sim-banner { direction: rtl; }
