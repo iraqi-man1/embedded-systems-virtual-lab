@@ -162,6 +162,24 @@ export const storage = {
     });
   },
 
+  /** Lets the user pick files of any kind (a Wokwi project's zip, its diagram and code), read as bytes; empty if cancelled. */
+  async openFiles(filter: { name: string; extensions: string[] }): Promise<{ name: string; bytes: Uint8Array }[]> {
+    if (isTauri) {
+      const { open } = await import('@tauri-apps/plugin-dialog');
+      const picked = await open({ multiple: true, directory: false, filters: [filter] });
+      const paths = !picked ? [] : Array.isArray(picked) ? picked : [picked];
+      return Promise.all(paths.map(async (path) => ({ name: path.split(/[\\/]/).pop()!, bytes: new Uint8Array(await invoke<ArrayBuffer>('read_binary_file', { path })) })));
+    }
+    return new Promise((resolve) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.multiple = true;
+      input.accept = filter.extensions.map((e) => `.${e}`).join(',');
+      input.onchange = async () => resolve(await Promise.all([...(input.files ?? [])].map(async (f) => ({ name: f.name, bytes: new Uint8Array(await f.arrayBuffer()) }))));
+      input.click();
+    });
+  },
+
   /** Saves a binary export (PNG image) where the user chooses. Returns the path, or null if cancelled. */
   async exportBinary(bytes: Uint8Array, fileName: string, filter: { name: string; extensions: string[] }, mime: string): Promise<string | null> {
     if (isTauri) {

@@ -1,5 +1,6 @@
 /** Application commands shared by menus, toolbar and keyboard shortcuts. */
 import { exportCode, importCode } from '../app/codeFiles';
+import { copyWokwiDiagram, exportWokwi, importWokwi } from '../app/wokwi';
 import { openDocument, saveDocument } from '../app/fileOps';
 import { newFromTemplate } from '../examples';
 import { t, type MessageKey } from '../i18n';
@@ -137,6 +138,18 @@ export const commands: Record<string, Command> = {
   importCode: cmd('importCode', 'Import Code…', 'Add .ino, .h, .cpp or .py files to the project; a sketch or main.py replaces the main file.', {
     icon: 'file-up',
     run: () => void importCode(),
+  }),
+  importWokwi: cmd('importWokwi', 'Open Wokwi Project…', 'Open a project from wokwi.com: its downloaded zip, or its diagram.json with the code files. You can also drop them on the window.', {
+    icon: 'file-up',
+    run: () => void importWokwi(),
+  }),
+  exportWokwi: cmd('exportWokwi', 'Save for Wokwi…', 'Save the project as a Wokwi project (diagram.json, the code and libraries.txt) to run it on wokwi.com.', {
+    icon: 'file-down',
+    run: () => void exportWokwi(),
+  }),
+  copyWokwi: cmd('copyWokwi', 'Copy diagram.json for Wokwi', 'Copy the circuit as Wokwi’s diagram.json, to paste into a project on wokwi.com.', {
+    icon: 'copy',
+    run: () => void copyWokwiDiagram(),
   }),
   save: cmd('save', 'Save', 'Save the project (circuit, code and instrument setup).', { icon: 'save', shortcut: 'Ctrl+S', run: () => void saveDocument() }),
   saveAs: cmd('saveAs', 'Save As…', 'Save the project under a new name or folder.', { shortcut: 'Ctrl+Shift+S', run: () => void saveDocument(true) }),

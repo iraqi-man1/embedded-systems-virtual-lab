@@ -29,6 +29,16 @@ export function fileNameProblem(language: FirmwareLanguage, name: string): 'patt
   return re.test(name) ? null : 'pattern';
 }
 
+/** An Arduino sketch with nothing in it yet. */
+export const EMPTY_SKETCH = `void setup() {
+  // Runs once when the board starts.
+}
+
+void loop() {
+  // Runs over and over again.
+}
+`;
+
 /** Starting point of a Pico program: blinks the on-board LED and prints a greeting. */
 export const DEFAULT_MAIN_PY = `# main.py runs when the board starts (MicroPython).
 from machine import Pin

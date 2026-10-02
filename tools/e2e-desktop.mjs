@@ -1,9 +1,10 @@
 // Drives the desktop application through the flows that once left the window
 // empty: the parts guide and every way back from it (its Back button, Esc,
-// Alt+←, the mouse's Back button), the start screen, New project and the
-// floating code editor, in English and Arabic. After each step the window
-// must show the expected page (checked in the page and on a screenshot), and
-// at the end no problem may be recorded in Help › Report a Problem.
+// Alt+←, the mouse's Back button), the start screen, New project, the
+// floating code editor and a dropped Wokwi project, in English and Arabic.
+// After each step the window must show the expected page (checked in the page
+// and on a screenshot), and at the end no problem may be recorded in
+// Help › Report a Problem.
 // Screenshots go to .toolchain/e2e/.
 //
 //   node tools/e2e-desktop.mjs --exe src-tauri/target/release/evlab.exe   (Windows: the real app and its WebView2)
@@ -14,6 +15,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
+import { deflateRawSync } from 'node:zlib';
 
 const require = createRequire(import.meta.url);
 let chromium;
@@ -275,6 +277,96 @@ async function floatingEditor(step) {
   await showing('editor', `${step}: docked`);
 }
 
+/** A zip archive of deflated files, as Wokwi's project download. */
+function zip(files) {
+  const chunks = [];
+  const central = [];
+  let offset = 0;
+  for (const f of files) {
+    const raw = Buffer.from(f.text);
+    const data = deflateRawSync(raw);
+    const name = Buffer.from(f.name);
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(8, 8);
+    local.writeUInt32LE(data.length, 18);
+    local.writeUInt32LE(raw.length, 22);
+    local.writeUInt16LE(name.length, 26);
+    const dir = Buffer.alloc(46);
+    dir.writeUInt32LE(0x02014b50, 0);
+    dir.writeUInt16LE(8, 10);
+    dir.writeUInt32LE(data.length, 20);
+    dir.writeUInt32LE(raw.length, 24);
+    dir.writeUInt16LE(name.length, 28);
+    dir.writeUInt32LE(offset, 42);
+    chunks.push(local, name, data);
+    central.push(dir, name);
+    offset += 30 + name.length + data.length;
+  }
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(files.length, 8);
+  end.writeUInt16LE(files.length, 10);
+  end.writeUInt32LE(central.reduce((n, c) => n + c.length, 0), 12);
+  end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...chunks, ...central, end]);
+}
+
+/** A Wokwi project (its zip) dropped on the window opens: parts in breadboard holes, wires and the code. */
+async function wokwiProject(step) {
+  const diagram = {
+    version: 1,
+    author: 'e2e',
+    editor: 'wokwi',
+    parts: [
+      { type: 'wokwi-breadboard-half', id: 'bb1', top: -70, left: -10, attrs: {} },
+      { type: 'wokwi-arduino-uno', id: 'uno', top: 160, left: 0, attrs: {} },
+      { type: 'wokwi-led', id: 'led1', top: -45, left: 90, attrs: { color: 'yellow' } },
+      { type: 'wokwi-resistor', id: 'r1', top: 10, left: 105, rotate: 90, attrs: { value: '220' } },
+    ],
+    connections: [
+      ['led1:A', 'bb1:12t.c', '', ['$bb']],
+      ['led1:C', 'bb1:11t.c', '', ['$bb']],
+      ['r1:1', 'bb1:12t.e', '', ['$bb']],
+      ['r1:2', 'bb1:12b.i', '', ['$bb']],
+      ['bb1:11t.a', 'uno:GND.1', 'black', ['v-10', 'h-40', '*', 'v-20']],
+      ['bb1:12b.j', 'uno:13', 'green', ['v20']],
+    ],
+  };
+  const bytes = zip([
+    { name: 'diagram.json', text: JSON.stringify(diagram) },
+    { name: 'sketch.ino', text: 'void setup() {\n  pinMode(13, OUTPUT);\n}\n\nvoid loop() {\n  digitalWrite(13, !digitalRead(13));\n  delay(300);\n}\n' },
+  ]);
+  if (exe) {
+    // File › Wokwi › Open Wokwi Project… reads the chosen files through the application.
+    const file = join(out, 'wokwi-project.zip');
+    writeFileSync(file, bytes);
+    const read = await within(
+      page.evaluate(async (path) => {
+        const b = new Uint8Array(await window.__TAURI_INTERNALS__.invoke('read_binary_file', { path }));
+        return [b.length, b[0], b[1], b[b.length - 22]];
+      }, file),
+      10000,
+      'reading the zip',
+    ).catch((e) => [e.message]);
+    check(`${step}: the application reads a zip`, read[0] === bytes.length && read[1] === 0x50 && read[2] === 0x4b && read[3] === 0x50, JSON.stringify(read));
+  }
+  await page.evaluate((b64) => {
+    const dt = new DataTransfer();
+    dt.items.add(new File([Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))], 'wokwi-project.zip', { type: 'application/zip' }));
+    window.dispatchEvent(new DragEvent('dragover', { dataTransfer: dt, bubbles: true, cancelable: true }));
+    window.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+  }, bytes.toString('base64'));
+  const opened = await page
+    .waitForFunction(() => document.querySelectorAll('.workspace .comp').length === 4 && /wokwi-project/.test(document.querySelector('.menu-title')?.textContent ?? ''), null, { timeout: 8000 })
+    .then(
+      () => true,
+      () => false,
+    );
+  check(`${step}: the dropped project opens with its parts`, opened, `${await page.locator('.workspace .comp').count()} parts, title ${await page.locator('.menu-title').textContent()}`);
+  await showing('editor', `${step}: opened`);
+}
+
 // ------------------------------------------------------------------ steps
 try {
   await page.waitForSelector('.home', { timeout: 30000 });
@@ -326,6 +418,7 @@ try {
   await showing('editor', 'mouse Back button in the editor');
 
   if (!guideOnly) await floatingEditor('code editor');
+  if (!guideOnly) await wokwiProject('wokwi project');
 
 
   // Add to canvas from a part page.

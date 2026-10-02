@@ -59,6 +59,17 @@ export function ThemeItems() {
   );
 }
 
+/** File › Wokwi: projects of wokwi.com in and out. */
+function WokwiItems() {
+  return (
+    <>
+      <CommandEntry id="importWokwi" />
+      <CommandEntry id="exportWokwi" />
+      <CommandEntry id="copyWokwi" />
+    </>
+  );
+}
+
 function RecentItems() {
   const t = useT();
   const recent = useEditor((s) => s.recentProjects);
@@ -75,7 +86,7 @@ function RecentItems() {
 }
 
 const MENUS: { name: MessageKey; items: Entry[] }[] = [
-  { name: 'File', items: ['home', '-', 'new', 'open', { sub: 'Open Recent', icon: 'history', render: () => <RecentItems /> }, '-', 'save', 'saveAs', 'history', '-', 'exportImage', 'copyImage', '-', 'exportCode', 'importCode', '-', 'examples', '-', 'settings'] },
+  { name: 'File', items: ['home', '-', 'new', 'open', { sub: 'Open Recent', icon: 'history', render: () => <RecentItems /> }, '-', 'save', 'saveAs', 'history', '-', 'exportImage', 'copyImage', '-', 'exportCode', 'importCode', { sub: 'Wokwi', icon: 'package', render: () => <WokwiItems /> }, '-', 'examples', '-', 'settings'] },
   { name: 'Edit', items: ['undo', 'redo', '-', 'cut', 'copy', 'paste', 'duplicate', 'delete', '-', 'selectAll', 'find', '-', 'rotate', 'rotateCcw', 'flip', 'lock', '-', 'quickAdd', 'palette'] },
   {
     name: 'Arrange',
