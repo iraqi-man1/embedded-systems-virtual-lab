@@ -84,3 +84,13 @@ describe('toolchain libraries', () => {
     for (const lib of new Set(Object.values(LIBRARY_MAP).flat())) expect(curated, lib).toContain(`"${lib}"`);
   });
 });
+
+describe('release', () => {
+  it('package.json, tauri.conf.json and Cargo.toml carry the same version', async () => {
+    const { readFileSync } = await import('node:fs');
+    const read = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
+    const npm = JSON.parse(read('package.json')).version;
+    expect(JSON.parse(read('src-tauri/tauri.conf.json')).version).toBe(npm);
+    expect(read('src-tauri/Cargo.toml')).toMatch(new RegExp(`^version = "${npm.replace(/\./g, '\\.')}"`, 'm'));
+  });
+});

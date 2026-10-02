@@ -4,6 +4,7 @@ import { isTauri, toolchain } from '../../platform';
 import { useEditor } from '../../state/editor';
 import { refreshToolchain, useSim } from '../../state/sim';
 import { registry } from '../../app/registry';
+import { APP_VERSION } from '../../app/version';
 import { commands } from '../commands';
 import { ModalFrame } from '../common/Dialog';
 import { Icon } from '../common/Icon';
@@ -206,7 +207,7 @@ function AboutDialog() {
   const all = registry.all();
   return (
     <Modal title="Embedded Systems Virtual Lab" small footer={<button className="btn" onClick={commands.shortcuts.run}>Shortcuts</button>}>
-      <p style={{ marginTop: 0 }}>Version 0.1.0 — an offline desktop laboratory for designing, programming and simulating embedded systems.</p>
+      <p style={{ marginTop: 0 }}>Version {APP_VERSION} — an offline desktop laboratory for designing, programming and simulating embedded systems.</p>
       <p>
         Component library: {all.length} parts ({all.filter((d) => d.simulation.support === 'full').length} fully simulated,{' '}
         {all.filter((d) => d.simulation.support === 'partial').length} partially, {all.filter((d) => d.simulation.support === 'visual-only').length}{' '}

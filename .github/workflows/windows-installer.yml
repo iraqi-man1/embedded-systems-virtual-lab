@@ -1,0 +1,102 @@
+# Builds the Windows installers (NSIS .exe and .msi) on every pull request and
+# push to main. On main, the first build of a new version (the "version" in
+# src-tauri/tauri.conf.json, also in package.json and Cargo.toml) publishes a
+# GitHub release v<version> with both installers attached. Every build also
+# keeps the installers as a workflow artifact for testing.
+name: Windows installer
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-installer-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Windows installer
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - run: npm ci
+
+      - name: Release tag for this build
+        id: release
+        shell: bash
+        run: |
+          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          # Publish only from main, and only once per version.
+          if [ "$GITHUB_REF" = "refs/heads/main" ] && [ "$GITHUB_EVENT_NAME" != "pull_request" ] \
+            && ! git ls-remote --exit-code --tags origin "refs/tags/v$version" > /dev/null; then
+            echo "tag=v$version" >> "$GITHUB_OUTPUT"
+            echo "Publishing release v$version"
+          else
+            echo "Build only (no release)"
+          fi
+
+      - name: Build installers
+        run: npm run tauri build
+
+      - name: Name the installers and write the release notes
+        shell: bash
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          mkdir installers
+          cp src-tauri/target/release/bundle/nsis/*.exe "installers/EmbeddedSystemsVirtualLab_${VERSION}_x64-setup.exe"
+          cp src-tauri/target/release/bundle/msi/*.msi "installers/EmbeddedSystemsVirtualLab_${VERSION}_x64_en-US.msi"
+          (cd installers && sha256sum *) > checksums.txt
+          cat checksums.txt
+          {
+            echo "## Download"
+            echo
+            echo "| File | Use |"
+            echo "|---|---|"
+            echo "| **EmbeddedSystemsVirtualLab_${VERSION}_x64-setup.exe** | Recommended installer (per-user, no admin rights needed) |"
+            echo "| EmbeddedSystemsVirtualLab_${VERSION}_x64_en-US.msi | MSI package for managed/IT deployments |"
+            echo
+            cat .github/release-notes.md
+            echo
+            echo "## SHA-256"
+            echo
+            echo '```'
+            cat checksums.txt
+            echo '```'
+          } > release-notes.md
+
+      - name: Keep the installers as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installers-${{ steps.release.outputs.version }}
+          path: installers/*
+          if-no-files-found: error
+
+      - name: Publish the release
+        if: steps.release.outputs.tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Embedded Systems Virtual Lab ${{ steps.release.outputs.version }}
+          body_path: release-notes.md
+          files: installers/*
+          make_latest: true

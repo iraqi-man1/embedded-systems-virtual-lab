@@ -6,6 +6,7 @@
  */
 import type { CircuitDocument } from '../model/circuit';
 import type { PinRef } from '../model/circuit';
+import { version } from '../../../package.json';
 
 export const PROJECT_FORMAT = 'evlab-project';
 export const PROJECT_VERSION = 1;
@@ -68,7 +69,7 @@ export function newProject(name = 'Untitled'): Project {
   return {
     format: PROJECT_FORMAT,
     version: PROJECT_VERSION,
-    meta: { name, description: '', author: '', created: now, modified: now, appVersion: '0.1.0' },
+    meta: { name, description: '', author: '', created: now, modified: now, appVersion: version },
     circuit: { components: [], wires: [] },
     firmware: { language: 'arduino', files: [{ name: 'sketch.ino', content: DEFAULT_SKETCH }], target: null },
     simulation: { speed: 1, realtime: true },
