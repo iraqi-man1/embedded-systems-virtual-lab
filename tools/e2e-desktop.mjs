@@ -312,11 +312,35 @@ try {
 
   await floatingEditor('code editor');
 
+
   // Add to canvas from a part page.
   await page.keyboard.press('F1');
   await browseParts('add to canvas');
   await click('.guide-head-row .btn.primary', 'add to canvas');
   await showing('editor', 'after Add to canvas');
+
+  // Interface size (the desktop app zooms its WebView): parts still take clicks where they are drawn.
+  if (exe) {
+    const dpr0 = await page.evaluate(() => devicePixelRatio);
+    await page.locator('.workspace').click({ position: { x: 30, y: 30 } });
+    await page.keyboard.press('Control+Alt+Equal');
+    await page.keyboard.press('Control+Alt+Equal');
+    await sleep(500);
+    const dpr1 = await page.evaluate(() => devicePixelRatio);
+    check('Ctrl+Alt+= makes the interface larger', dpr1 > dpr0 * 1.2, `device pixel ratio ${dpr0} → ${dpr1}`);
+    const part = page.locator('.workspace .comp').first();
+    const pb = await part.boundingBox();
+    if (pb) {
+      await page.mouse.click(pb.x + pb.width / 2, pb.y + pb.height / 2);
+      await sleep(200);
+      check('a part takes a click where it is drawn at 125 %', (await part.getAttribute('class'))?.includes('selected'), await part.getAttribute('class'));
+    }
+    await showing('editor', 'interface at 125 %');
+    await page.locator('.workspace').click({ position: { x: 30, y: 30 } });
+    await page.keyboard.press('Control+Alt+Digit0');
+    await sleep(400);
+    check('Ctrl+Alt+0 puts the interface back to 100 %', Math.abs((await page.evaluate(() => devicePixelRatio)) - dpr0) < 0.01);
+  }
 
   // Arabic, right to left: the same round trip.
   // View › Interface language (the toolbar may have moved it to its overflow menu).

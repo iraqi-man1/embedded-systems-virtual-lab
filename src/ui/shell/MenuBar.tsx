@@ -9,6 +9,7 @@ import { Tip } from '../common/Tooltip';
 import { setZoom } from '../workspace/actions';
 import { setTheme } from '../commands';
 import { THEMES, themeInfo } from '../themes';
+import { setUiScale, stepUiScale, UI_SCALES } from '../uiScale';
 import { AlignItems, SpeedItems, WireColorItems } from './Toolbar';
 
 type Entry = string | '-' | { sub: MessageKey; icon?: string; render: () => React.ReactNode };
@@ -23,6 +24,22 @@ export function ZoomItems() {
       {ZOOMS.map((z) => (
         <MenuCheckItem key={z} label={<span className="ltr">{z * 100}%</span>} checked={Math.abs(zoom - z) < 1e-3} onSelect={() => setZoom(z)} />
       ))}
+    </>
+  );
+}
+
+/** View › Interface Size. */
+export function UiScaleItems() {
+  const t = useT();
+  const scale = useEditor((s) => s.uiScale);
+  return (
+    <>
+      {UI_SCALES.map((z) => (
+        <MenuCheckItem key={z} label={<span className="ltr">{Math.round(z * 100)}%</span>} checked={Math.abs(scale - z) < 1e-3} onSelect={() => setUiScale(z)} />
+      ))}
+      <MenuSeparator />
+      <MenuItem label={t('Larger Interface')} shortcut="Ctrl+Alt+=" onSelect={() => stepUiScale(1)} />
+      <MenuItem label={t('Smaller Interface')} shortcut="Ctrl+Alt+−" onSelect={() => stepUiScale(-1)} />
     </>
   );
 }
@@ -71,7 +88,7 @@ const MENUS: { name: MessageKey; items: Entry[] }[] = [
   },
   {
     name: 'View',
-    items: ['zoomIn', 'zoomOut', 'zoomReset', 'fit', 'zoomSelection', { sub: 'Zoom', render: () => <ZoomItems /> }, 'minimap', '-', 'grid', 'snap', 'logicLevels', 'voltages', '-', 'toggleLibrary', 'toggleInspector', 'toggleCode', 'floatCode', 'toggleDock', 'focusCanvas', '-', 'sound', { sub: 'Theme', icon: 'palette', render: () => <ThemeItems /> }, 'theme', 'language'],
+    items: ['zoomIn', 'zoomOut', 'zoomReset', 'fit', 'zoomSelection', { sub: 'Zoom', render: () => <ZoomItems /> }, 'minimap', '-', 'grid', 'snap', 'logicLevels', 'voltages', '-', 'toggleLibrary', 'toggleInspector', 'toggleCode', 'floatCode', 'toggleDock', 'focusCanvas', '-', 'sound', { sub: 'Theme', icon: 'palette', render: () => <ThemeItems /> }, 'theme', { sub: 'Interface Size', icon: 'scale', render: () => <UiScaleItems /> }, 'language'],
   },
   {
     name: 'Simulation',

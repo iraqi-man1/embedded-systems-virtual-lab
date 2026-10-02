@@ -18,8 +18,10 @@ import { App } from './ui/App';
 import { ErrorBoundary } from './ui/common/ErrorBoundary';
 import { pinWindowScroll } from './ui/common/scroll';
 import { applyTheme } from './ui/themes';
+import { applyUiScale } from './ui/uiScale';
 
 applyTheme(useEditor.getState().appliedTheme);
+void applyUiScale(useEditor.getState().uiScale);
 
 // Problems are recorded for Help › Report a Problem; the user hears about them (at most every half minute).
 let lastNotice = 0;

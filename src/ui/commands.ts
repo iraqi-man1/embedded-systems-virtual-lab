@@ -38,6 +38,7 @@ import {
 } from './workspace/actions';
 import { closeGuide, openGuideForContext } from './guide/open';
 import { toggleCodeFloat } from './editor/codeDock';
+import { setUiScale, stepUiScale } from './uiScale';
 import { openQuickEdit } from './workspace/QuickEdit';
 import { copyCircuitImage } from './export/copy';
 
@@ -178,6 +179,9 @@ export const commands: Record<string, Command> = {
   zoomIn: cmd('zoomIn', 'Zoom In', null, { icon: 'zoom-in', shortcut: '+', run: () => zoomBy(1.2) }),
   zoomOut: cmd('zoomOut', 'Zoom Out', null, { icon: 'zoom-out', shortcut: '−', run: () => zoomBy(1 / 1.2) }),
   zoomReset: cmd('zoomReset', 'Actual Size (100%)', null, { shortcut: '0', run: () => setZoom(1) }),
+  uiLarger: cmd('uiLarger', 'Larger Interface', 'Make menus, panels, text and the code editor larger (for a projector or a large screen).', { shortcut: 'Ctrl+Alt+=', run: () => stepUiScale(1) }),
+  uiSmaller: cmd('uiSmaller', 'Smaller Interface', 'Make the whole interface smaller (for a small laptop screen).', { shortcut: 'Ctrl+Alt+−', run: () => stepUiScale(-1) }),
+  uiReset: cmd('uiReset', 'Interface at 100%', null, { shortcut: 'Ctrl+Alt+0', run: () => setUiScale(1) }),
   fit: cmd('fit', 'Fit to Window', 'Zoom so the whole circuit fits in the canvas.', { icon: 'fit', shortcut: 'F', run: () => fitView() }),
   zoomSelection: cmd('zoomSelection', 'Zoom to Selection', null, { icon: 'zoom-in', shortcut: 'Shift+F', run: zoomToSelection }),
   toolText: cmd('toolText', 'Text Note', 'Click the canvas to write a note (Arabic or English).', { icon: 'type', shortcut: 'T', run: () => pickTool('text') }),
@@ -310,10 +314,16 @@ export function installShortcuts(): () => void {
     if (k === 'F6') return run('pause');
     if (k === 'F10') return run('step');
     if (k === 'F11') return run('stepInstr');
-    // Browser shortcuts that would reload, navigate away, print or open browser UI
-    // over the application (the packaged app also disables them in WebView2).
+    // Interface size (outside text fields: Ctrl+Alt is AltGr on some keyboards).
+    if (ctrl && e.altKey && !isTyping(e)) {
+      if (e.code === 'Equal' || e.code === 'NumpadAdd') return run('uiLarger');
+      if (e.code === 'Minus' || e.code === 'NumpadSubtract') return run('uiSmaller');
+      if (e.code === 'Digit0' || e.code === 'Numpad0') return run('uiReset');
+    }
     // Ctrl+L locks parts (outside text fields, where it keeps its own meaning).
     if (ctrl && !e.shiftKey && k.toLowerCase() === 'l' && !isTyping(e) && !inMenu(e)) return run('lock');
+    // Browser shortcuts that would reload, navigate away, print or open browser UI
+    // over the application (the packaged app also disables them in WebView2).
     if (isBrowserShortcut(e)) return e.preventDefault();
     if (isTyping(e) || inMenu(e)) return;
     if (ctrl && !e.shiftKey && k.toLowerCase() === 'z') return run('undo');

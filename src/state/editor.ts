@@ -38,6 +38,8 @@ interface Prefs {
   /** Last light and dark themes chosen (the quick light/dark toggle switches between them). */
   themeLight: ThemeId;
   themeDark: ThemeId;
+  /** Size of the whole interface (0.8–1.5). */
+  uiScale: number;
   /** Code editor font size (px) and soft wrapping of long lines. */
   editorFontSize: number;
   editorWordWrap: boolean;
@@ -102,6 +104,7 @@ export function defaultPrefs(): Prefs {
     theme: 'system',
     themeLight: 'light',
     themeDark: 'dark',
+    uiScale: 1,
     editorFontSize: 13,
     editorWordWrap: false,
     favorites: ['evlab.arduino-uno', 'evlab.breadboard-half', 'evlab.resistor', 'evlab.led', 'evlab.pushbutton', 'evlab.potentiometer'],

@@ -6,7 +6,9 @@ import { useState, type ReactNode } from 'react';
 import { WIRE_COLORS } from '../../core/model/circuit';
 import { LANGUAGES, tr, type MessageKey } from '../../i18n';
 import { useT } from '../../i18n/react';
+import { isTauri } from '../../platform';
 import { useEditor } from '../../state/editor';
+import { setUiScale, UI_SCALES } from '../uiScale';
 import { setTheme } from '../commands';
 import { confirmDialog } from '../common/Dialog';
 import { ModalFrame } from '../common/Dialog';
@@ -112,6 +114,15 @@ export function SettingsDialog() {
   } else if (tab === 'appearance') {
     body = (
       <>
+        <Row label={t('Interface size')} description={t('Larger for a projector or a large screen, smaller for a small laptop screen. Ctrl+Alt+= and Ctrl+Alt+− change it anywhere.')}>
+          <Segmented
+            value={String(s.uiScale)}
+            label={t('Interface size')}
+            options={UI_SCALES.map((z) => ({ value: String(z), label: `${Math.round(z * 100)}%` }))}
+            onChange={(v) => setUiScale(Number(v))}
+          />
+        </Row>
+        {!isTauri && <div className="set-note">{t('In a browser, use the browser’s own zoom (Ctrl and + or −) instead.')}</div>}
         <div className="set-note">{t('The theme colours the whole application, the canvas and the code editor. Parts keep their real colours.')}</div>
         <ThemeGallery />
       </>
