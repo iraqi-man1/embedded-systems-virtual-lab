@@ -36,6 +36,7 @@ import { SimControlsLayer } from './SimControls';
 import { useWireToolbarVisible, WireToolbar } from './WireToolbar';
 import { ContextMenuGate, type HeldMenu } from './contextMenuGate';
 import { PartHoverCard, usePartHover } from './PartHoverCard';
+import { openQuickEdit, QuickEdit } from './QuickEdit';
 import { Minimap } from './Minimap';
 
 type Drag =
@@ -712,8 +713,12 @@ export function Workspace() {
       useProject.getState().edit((d) => {
         d.wires.find((x) => x.id === wireId)!.points.splice(insertAt, 0, snapPt(world));
       });
-    } else if (target.closest('[data-comp]')) {
-      useEditor.getState().setPrefs({ showInspector: true });
+    } else if (target.closest('[data-comp]') || under.closest('[data-comp]')) {
+      // A part: its main value, right there (parts clicked while simulating keep their clicks).
+      const id = (target.closest('[data-comp]') ?? under.closest('[data-comp]'))!.getAttribute('data-comp')!;
+      const inst = circuit.components.find((c) => c.id === id);
+      const interactive = simulating && !!(inst && lookup(inst.type)?.interaction);
+      if (interactive || !openQuickEdit(id, e.clientX, e.clientY)) useEditor.getState().setPrefs({ showInspector: true });
     } else if (!target.closest('button, .simctl-chip, .simctl-key, .canvas-hint') && !useEditor.getState().wiring) {
       // Double-click on empty canvas: add a part right here.
       useEditor.getState().set({ palette: { mode: 'add', at: world } });
@@ -1160,6 +1165,7 @@ export function Workspace() {
       {tip}
       {wireBar}
       {hoverCard}
+      <QuickEdit />
     </>
   );
 }

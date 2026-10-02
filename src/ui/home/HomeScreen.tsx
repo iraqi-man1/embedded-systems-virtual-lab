@@ -241,6 +241,7 @@ function LearnTab() {
     [t('Rotate / delete the selection'), 'R / Del'],
     [t('Run / stop the simulation'), 'F5 / Shift+F5'],
     [t('Learn about a part'), t('Rest the mouse on it, or press F1')],
+    [t('Change a part’s value'), t('Double-click it')],
     [t('Find any command'), 'Ctrl+Shift+P'],
   ];
   return (

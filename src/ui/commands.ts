@@ -36,6 +36,7 @@ import {
 } from './workspace/actions';
 import { closeGuide, openGuideForContext } from './guide/open';
 import { toggleCodeFloat } from './editor/codeDock';
+import { openQuickEdit } from './workspace/QuickEdit';
 import { copyCircuitImage } from './export/copy';
 
 export interface Command {
@@ -308,6 +309,14 @@ export function installShortcuts(): () => void {
     if (ctrl) return;
     const editor = ed();
     switch (k) {
+      case 'Enter': {
+        // The selected part's main value, in the quick editor under it.
+        if (editor.selectedComponents.length !== 1 || editor.selectedWires.length || editor.selectedAnnotations.length) return;
+        const el = document.querySelector(`.workspace [data-comp="${CSS.escape(editor.selectedComponents[0])}"]`);
+        const r = el?.getBoundingClientRect();
+        if (r && openQuickEdit(editor.selectedComponents[0], r.left + r.width / 2, r.bottom)) e.preventDefault();
+        return;
+      }
       case 'Delete':
       case 'Backspace':
         return run('delete');

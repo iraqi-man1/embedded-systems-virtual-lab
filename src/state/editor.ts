@@ -182,6 +182,8 @@ interface EditorState extends Prefs {
   dragType: string | null;
   /** The floating code editor is being dragged over its place: letting go docks it. */
   codeDocking: boolean;
+  /** Quick value editor open on a part, at a point of the window. */
+  quickEdit: { id: string; x: number; y: number } | null;
   /** Line to reveal in the code editor (set by the Problems panel). */
   revealLine: { file: string; line: number; nonce: number } | null;
 
@@ -226,6 +228,7 @@ export const useEditor = create<EditorState>((set, get) => ({
   toasts: [],
   dragType: null,
   codeDocking: false,
+  quickEdit: null,
   palette: null,
   revealLine: null,
 

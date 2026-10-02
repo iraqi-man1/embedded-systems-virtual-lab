@@ -151,6 +151,8 @@ function ShortcutsDialog() {
     [t('Scroll sideways'), t('Shift + mouse wheel')],
     [t('Zoom on a touchpad'), t('Pinch, or Ctrl + scroll')],
     [t('Part information'), t('Rest the mouse on a part · F1')],
+    [t('Change a part’s value'), t('Double-click it, or select it and press Enter')],
+    [t('Move the code editor anywhere'), t('Drag its tab bar · double-click puts it back')],
     [t('Start a wire'), t('Click a pin (or drag from it)')],
     [t('Add a bend while wiring'), t('Click empty canvas')],
     [t('Cancel wire / probe / selection'), t('Esc or right-click')],
