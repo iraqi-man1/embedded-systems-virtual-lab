@@ -12,6 +12,7 @@ import * as RD from '@radix-ui/react-dialog';
 import { create } from 'zustand';
 import { t } from '../../i18n';
 import { useT } from '../../i18n/react';
+import { ErrorBoundary } from './ErrorBoundary';
 import { Icon } from './Icon';
 
 export interface DialogButton {
@@ -212,7 +213,17 @@ function QueuedDialog({ req }: { req: DialogRequest }) {
 
 export function DialogHost() {
   const req = useDialogQueue((s) => s.queue[0]);
-  return req ? <QueuedDialog key={req.id} req={req} /> : null;
+  if (!req) return null;
+  // A question that cannot be drawn is answered with its cancel button, so the next one can show.
+  const cancel = () => {
+    useDialogQueue.setState((s) => ({ queue: s.queue.filter((q) => q !== req) }));
+    req.resolve({ button: req.cancelId });
+  };
+  return (
+    <ErrorBoundary area="Dialog" variant="silent" resetKey={req.id} onError={cancel}>
+      <QueuedDialog key={req.id} req={req} />
+    </ErrorBoundary>
+  );
 }
 
 /** True while an in-app dialog is waiting for an answer. */

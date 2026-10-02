@@ -1,5 +1,7 @@
 * { box-sizing: border-box; }
 html, body, #root { margin: 0; height: 100%; overflow: hidden; }
+/* The window frame never scrolls, only the panels in it: clip (unlike hidden) cannot be scrolled even by a script. */
+body, #root, .app { overflow: clip; }
 body {
   font-family: var(--font-ui);
   font-size: var(--fs-sm);
@@ -614,3 +616,25 @@ kbd { direction: ltr; unicode-bidi: plaintext; font-family: var(--font-mono); fo
 .export-checks label { display: flex; align-items: center; gap: 8px; font-size: var(--fs-sm); cursor: pointer; }
 .export-checks label.disabled { opacity: 0.5; cursor: default; }
 @media (max-width: 860px) { .export { grid-template-columns: 1fr; } }
+
+/* ------------------------------------------------------- error boundaries */
+.crash { display: flex; flex: 1; min-width: 0; min-height: 0; align-items: center; justify-content: center; padding: 16px; overflow: auto; background: var(--bg-panel); color: var(--text); }
+.crash-card { display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 460px; text-align: center; }
+.crash-card > svg { color: var(--warn); }
+.crash-card h2 { margin: 0; font-size: var(--fs-md); }
+.crash-card p { margin: 0 0 4px; color: var(--text-2); line-height: 1.5; }
+.crash-card details { width: 100%; text-align: start; color: var(--text-2); }
+.crash-card pre { max-height: 140px; overflow: auto; margin: 6px 0 0; padding: 8px; border-radius: var(--radius); background: var(--bg-panel-2); font: 11px/1.4 var(--font-mono); white-space: pre-wrap; user-select: text; }
+.crash-card .btn-row { justify-content: center; }
+.dock > .crash, .left-top > .crash, .left-bottom > .crash { height: 100%; }
+.crash-page, .crash-app { position: fixed; inset: 0; z-index: var(--z-page); background: var(--bg-app); }
+.crash-bar { flex: none; justify-content: flex-start; gap: 8px; padding: 3px 10px; font-size: var(--fs-xs); background: color-mix(in srgb, var(--warn) 12%, var(--bg-header)); border-bottom: 1px solid var(--border); }
+.crash-bar > svg { color: var(--warn); }
+.crash-bar .btn { height: 22px; }
+/* Help › Report a Problem */
+.error-list { list-style: none; margin: 10px 0 0; padding: 0; max-height: 320px; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+.error-list li { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.error-list li:last-child { border-bottom: 0; }
+.error-head { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 3px; font-size: var(--fs-xs); color: var(--text-3); }
+.error-area { font-weight: 600; color: var(--text-2); }
+.error-msg { font: 11.5px/1.4 var(--font-mono); white-space: pre-wrap; word-break: break-word; user-select: text; }

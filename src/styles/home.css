@@ -24,6 +24,10 @@
 .home-side { position: sticky; top: 14px; align-self: start; display: flex; flex-direction: column; gap: 10px; }
 .btn.big { height: 38px; justify-content: flex-start; gap: 9px; padding: 0 14px; font-size: var(--fs-md); }
 .btn.big svg { width: 16px; height: 16px; }
+/* New project: what it starts from, under the label. */
+.btn.big.new-project { height: auto; min-height: 44px; padding-block: 5px; }
+.new-project-text { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; line-height: 1.25; }
+.new-project-text .sub { max-width: 100%; overflow: hidden; text-overflow: ellipsis; font-size: var(--fs-xs); font-weight: 400; opacity: 0.85; }
 .side-card { display: block; width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-panel); color: var(--text); text-align: start; }
 .side-card-head { display: flex; align-items: center; gap: 6px; font-weight: 600; }
 .side-card p { margin: 6px 0 8px; color: var(--text-2); font-size: var(--fs-xs); line-height: 1.45; }
@@ -50,6 +54,9 @@
 .card-grid .empty-note { grid-column: 1 / -1; }
 .ex-card, .tpl-card, .proj-open { display: flex; flex-direction: column; width: 100%; padding: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-panel-2); color: var(--text); text-align: start; cursor: pointer; transition: border-color 120ms, box-shadow 120ms, transform 120ms; }
 .ex-card:hover, .tpl-card:hover, .proj-open:hover { border-color: var(--accent); box-shadow: var(--shadow); transform: translateY(-1px); }
+/* The template New project, Enter and Create start from. */
+.tpl-card.current { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.tpl-badge { position: absolute; inset-block-start: 8px; inset-inline-start: 8px; padding: 1px 8px; border-radius: 999px; background: var(--accent); color: var(--accent-text); font-size: var(--fs-xs); font-weight: 600; }
 .card-canvas { position: relative; display: block; aspect-ratio: 16 / 10; overflow: hidden; border-bottom: 1px solid var(--border); background-color: var(--bg-canvas); background-image: radial-gradient(var(--grid-dot) 1px, transparent 1.2px); background-size: 9.6px 9.6px; }
 .card-canvas.small { width: 76px; height: 50px; flex: none; aspect-ratio: auto; border: 1px solid var(--border); border-radius: 6px; }
 .card-canvas > svg, .cpv > svg { position: absolute; inset: 0; margin: auto; color: var(--text-3); }

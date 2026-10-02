@@ -1,5 +1,15 @@
 import {
   Activity,
+  Braces,
+  Bug,
+  FileDown,
+  FileUp,
+  GripHorizontal,
+  Lock,
+  LockOpen,
+  PanelRightClose,
+  PictureInPicture2,
+  Scaling,
   AlignCenterHorizontal,
   AlignCenterVertical,
   AlignEndHorizontal,
@@ -213,10 +223,22 @@ const ICONS: Record<string, LucideIcon> = {
   'disc': Disc3,
   footprints: Footprints,
   wind: Wind,
+  bug: Bug,
+  lock: Lock,
+  unlock: LockOpen,
+  /** Detach a docked panel into a floating window. */
+  float: PictureInPicture2,
+  /** Put a floating panel back in its place. */
+  dock: PanelRightClose,
+  grip: GripHorizontal,
+  snippet: Braces,
+  'file-down': FileDown,
+  'file-up': FileUp,
+  scale: Scaling,
 };
 
 /** Icons that point along the reading direction: mirrored in right-to-left layouts. */
-const DIRECTIONAL = new Set(['chevron-right', 'chevron-left', 'chevrons-right']);
+const DIRECTIONAL = new Set(['chevron-right', 'chevron-left', 'chevrons-right', 'dock']);
 
 export function Icon({ name, size, className, fill }: { name: string; size?: number; className?: string; fill?: string }) {
   const C = ICONS[name] ?? Box;

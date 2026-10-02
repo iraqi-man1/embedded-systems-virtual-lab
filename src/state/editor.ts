@@ -8,6 +8,7 @@ export type Tool = 'select' | 'probe-logic' | 'probe-scope' | 'probe-meter-red' 
 /** Drawing a text note, an arrow or a frame on the canvas. */
 export type NoteTool = 'text' | 'arrow' | 'rect';
 export type DockTab = 'serial' | 'plotter' | 'scope' | 'logic' | 'meter' | 'mcu' | 'problems' | 'output';
+export type HomeTab = 'recent' | 'new' | 'examples' | 'learn';
 export type Theme = ThemePref;
 
 export interface Toast {
@@ -74,6 +75,8 @@ interface Prefs {
   rightDragPan: boolean;
   /** Open on the start screen (recent projects, templates, examples). */
   showStartScreen: boolean;
+  /** Template that New Project starts from: the one used last ('' until one is chosen: the empty project). */
+  newTemplate: string;
   /** Resting the mouse on a part shows what it is and what it is for. */
   hoverCards: boolean;
   /** Overview of the whole circuit in the corner of the canvas (key M). */
@@ -117,6 +120,7 @@ export function defaultPrefs(): Prefs {
     librarySimOnly: false,
     rightDragPan: true,
     showStartScreen: true,
+    newTemplate: '',
     hoverCards: true,
     showMinimap: true,
     wheelAction: 'zoom',
@@ -143,6 +147,8 @@ interface EditorState extends Prefs {
   appliedTheme: ThemeId;
   /** Full-window page shown over the editor (null = the editor). */
   page: null | 'home' | 'guide';
+  /** Tab of the start screen (kept while the guide or the editor is shown; null: chosen on opening). */
+  homeTab: HomeTab | null;
   /** Part shown in the parts guide (null: the overview). */
   guideType: string | null;
   /** Where the guide's Back button goes. */
@@ -162,7 +168,7 @@ interface EditorState extends Prefs {
   dockTab: DockTab;
   clipboard: CircuitDocument | null;
   contextMenu: ContextMenuState | null;
-  dialog: null | 'examples' | 'toolchain' | 'shortcuts' | 'about' | 'project' | 'settings' | 'export';
+  dialog: null | 'examples' | 'toolchain' | 'shortcuts' | 'about' | 'project' | 'settings' | 'export' | 'report';
   toasts: Toast[];
   /** Open command palette: run commands, or add a part (optionally at a canvas point). */
   palette: null | { mode: 'commands' | 'add' | 'find'; at?: { x: number; y: number } };
@@ -193,6 +199,7 @@ export const useEditor = create<EditorState>((set, get) => ({
   ...initialPrefs,
   appliedTheme: resolveTheme(initialPrefs.theme, systemPrefersDark()),
   page: initialPrefs.showStartScreen ? 'home' : null,
+  homeTab: null,
   guideType: null,
   guideReturn: null,
   selectedComponents: [],

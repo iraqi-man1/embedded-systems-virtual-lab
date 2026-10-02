@@ -1,5 +1,6 @@
 /** Application commands shared by menus, toolbar and keyboard shortcuts. */
-import { newDocument, openDocument, saveDocument } from '../app/fileOps';
+import { openDocument, saveDocument } from '../app/fileOps';
+import { newFromTemplate } from '../examples';
 import { t, type MessageKey } from '../i18n';
 import { themeInfo, type ThemePref } from './themes';
 import { useEditor, type NoteTool } from '../state/editor';
@@ -121,7 +122,7 @@ const partSelected = () => ed().selectedComponents.length > 0;
 
 export const commands: Record<string, Command> = {
   home: cmd('home', 'Start Screen', 'Recent projects, templates, examples and getting started.', { icon: 'home', run: () => ed().set({ page: 'home', wiring: null }) }),
-  new: cmd('new', 'New Project', 'Start an empty project (asks to save the current one).', { icon: 'new', shortcut: 'Ctrl+N', run: newDocument }),
+  new: cmd('new', 'New Project', 'Start a new project from the template you used last (at first, an empty project). Asks to save the current one.', { icon: 'new', shortcut: 'Ctrl+N', run: () => void newFromTemplate() }),
   open: cmd('open', 'Open Project…', 'Open a .evlab project file.', { icon: 'open', shortcut: 'Ctrl+O', run: () => void openDocument() }),
   save: cmd('save', 'Save', 'Save the project (circuit, code and instrument setup).', { icon: 'save', shortcut: 'Ctrl+S', run: () => void saveDocument() }),
   saveAs: cmd('saveAs', 'Save As…', 'Save the project under a new name or folder.', { shortcut: 'Ctrl+Shift+S', run: () => void saveDocument(true) }),
@@ -217,6 +218,7 @@ export const commands: Record<string, Command> = {
   quickAdd: cmd('quickAdd', 'Add a Part…', 'Type a part name and add it to the canvas.', { icon: 'plus', shortcut: 'Ctrl+K', run: () => ed().set({ palette: { mode: 'add' } }) }),
   guide: cmd('guide', 'Parts Guide', 'What each part is, what it is for and how to connect it.', { icon: 'book', shortcut: 'F1', run: () => openGuideForContext() }),
   shortcuts: cmd('shortcuts', 'Keyboard Shortcuts', 'Every mouse gesture and keyboard shortcut.', { icon: 'keyboard', shortcut: '?', run: () => ed().set({ dialog: 'shortcuts' }) }),
+  report: cmd('report', 'Report a Problem…', 'The problems the lab recorded, with the details to copy into a report for your teacher or the developers.', { icon: 'bug', run: () => ed().set({ dialog: 'report' }) }),
   about: cmd('about', 'About', null, { icon: 'info', run: () => ed().set({ dialog: 'about' }) }),
 };
 

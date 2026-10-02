@@ -1,4 +1,4 @@
-import { newProject, parseProject, PROJECT_EXTENSION, serializeProject, type Project } from '../core/project/schema';
+import { parseProject, PROJECT_EXTENSION, serializeProject, type Project } from '../core/project/schema';
 import { t } from '../i18n';
 import { isTauri, storage } from '../platform';
 import { useEditor } from '../state/editor';
@@ -31,11 +31,6 @@ export function showProject(project: Project, path: string | null) {
   useProject.getState().load(project, path);
   useEditor.getState().set({ viewport: project.view, selectedComponents: [], selectedWires: [], wiring: null, page: null });
   void clearAutosave();
-}
-
-export async function newDocument() {
-  if (!(await confirmDiscard())) return;
-  showProject(newProject(t('Untitled')), null);
 }
 
 /** File name without folders and extension. */

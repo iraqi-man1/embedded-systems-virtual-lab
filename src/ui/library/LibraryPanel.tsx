@@ -10,6 +10,7 @@ import { partName, partWhat, pick } from '../guide/guideModel';
 import { openGuide } from '../guide/open';
 import { Prose } from '../guide/Prose';
 import { Icon } from '../common/Icon';
+import { revealInList } from '../common/scroll';
 import { Tip } from '../common/Tooltip';
 
 const SUPPORT_LABEL: Record<ComponentDefinition['simulation']['support'], MessageKey> = { full: 'Simulated', partial: 'Partial', 'visual-only': 'Visual only' };
@@ -98,7 +99,7 @@ const Item = memo(function Item({ def, fav, active }: ItemProps) {
   const t = useT();
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (active) ref.current?.scrollIntoView({ block: 'nearest' });
+    if (active) revealInList(ref.current);
   }, [active]);
   return (
     <Tip content={<InfoCard def={def} />} card side="right" align="start" delay={500} direct>
