@@ -50,10 +50,10 @@ export function ThemeItems() {
   const pref = useEditor((s) => s.theme);
   return (
     <>
-      <MenuCheckItem label={t('Follow system (light/dark)')} checked={pref === 'system'} onSelect={() => setTheme('system')} />
+      <MenuCheckItem id="theme-system" label={t('Follow system (light/dark)')} checked={pref === 'system'} onSelect={() => setTheme('system')} />
       <MenuSeparator />
       {THEMES.map((th) => (
-        <MenuCheckItem key={th.id} label={t(th.label)} checked={pref === th.id} onSelect={() => setTheme(th.id)} />
+        <MenuCheckItem key={th.id} id={`theme-${th.id}`} label={t(th.label)} checked={pref === th.id} onSelect={() => setTheme(th.id)} />
       ))}
     </>
   );
@@ -129,8 +129,8 @@ function CommandEntry({ id }: { id: string }) {
   // Toggles reflect the current preferences.
   useEditor((s) => [s.showGrid, s.showMinimap, s.snap, s.appliedTheme, s.sound, s.showLibrary, s.showInspector, s.showCode, s.codeFloating, s.showDock, s.showLogicLevels, s.showVoltages].join());
   const disabled = !!c.enabled && !c.enabled();
-  if (TOGGLES[id]) return <MenuCheckItem label={c.label} checked={TOGGLES[id]()} shortcut={c.shortcut} disabled={disabled} onSelect={c.run} />;
-  return <MenuItem label={c.label} icon={c.icon} shortcut={c.shortcut} disabled={disabled} onSelect={c.run} />;
+  if (TOGGLES[id]) return <MenuCheckItem id={id} label={c.label} checked={TOGGLES[id]()} shortcut={c.shortcut} disabled={disabled} onSelect={c.run} />;
+  return <MenuItem id={id} label={c.label} icon={c.icon} shortcut={c.shortcut} disabled={disabled} onSelect={c.run} />;
 }
 
 export function MenuBar() {
@@ -157,7 +157,7 @@ export function MenuBar() {
               ) : typeof it === 'string' ? (
                 <CommandEntry key={it} id={it} />
               ) : (
-                <SubMenu key={it.sub} label={t(it.sub)} icon={it.icon}>
+                <SubMenu key={it.sub} id={it.sub} label={t(it.sub)} icon={it.icon}>
                   {it.render()}
                 </SubMenu>
               ),

@@ -182,6 +182,7 @@ function QueuedDialog({ req }: { req: DialogRequest }) {
           className={`btn${b.variant === 'primary' ? ' primary' : b.variant === 'danger' ? ' danger' : ''}`}
           disabled={!!req.input && b.id !== req.cancelId && !!error}
           onClick={() => finish(b.id)}
+          data-id={b.id}
         >
           {b.label}
         </button>
