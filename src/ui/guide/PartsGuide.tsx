@@ -80,7 +80,10 @@ function useCategories(query: string, simOnly: boolean) {
 function Sidebar({ cats, current }: { cats: ReturnType<typeof useCategories>; current: string | null }) {
   const t = useT();
   const active = useRef<HTMLButtonElement>(null);
-  useEffect(() => revealInList(active.current), [current]);
+  // A braced body: an effect's return value is its cleanup, and scroll methods may return promises.
+  useEffect(() => {
+    revealInList(active.current);
+  }, [current]);
   return (
     <nav className="guide-nav" aria-label={t('Parts')}>
       <button className={`guide-nav-item overview${current ? '' : ' on'}`} onClick={() => showPart(null)}>
