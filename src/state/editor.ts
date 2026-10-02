@@ -70,6 +70,8 @@ interface Prefs {
   librarySimOnly: boolean;
   /** Dragging with the right mouse button pans the canvas (a click still opens the menu). */
   rightDragPan: boolean;
+  /** Open on the start screen (recent projects, templates, examples). */
+  showStartScreen: boolean;
 }
 
 const PREFS_KEY = 'evlab.prefs.v1';
@@ -106,6 +108,7 @@ export function defaultPrefs(): Prefs {
     libraryCollapsed: ['Communication', 'Integrated Circuits', 'Actuators', 'Sensors'],
     librarySimOnly: false,
     rightDragPan: true,
+    showStartScreen: true,
   };
 }
 
@@ -127,6 +130,8 @@ function loadPrefs(): Prefs {
 interface EditorState extends Prefs {
   /** Theme currently shown (resolves 'system'). */
   appliedTheme: ThemeId;
+  /** Full-window page shown over the editor (null = the editor). */
+  page: null | 'home';
   selectedComponents: string[];
   selectedWires: string[];
   viewport: { x: number; y: number; zoom: number };
@@ -168,6 +173,7 @@ const initialPrefs = loadPrefs();
 export const useEditor = create<EditorState>((set, get) => ({
   ...initialPrefs,
   appliedTheme: resolveTheme(initialPrefs.theme, systemPrefersDark()),
+  page: initialPrefs.showStartScreen ? 'home' : null,
   selectedComponents: [],
   selectedWires: [],
   viewport: { x: 80, y: 60, zoom: 1 },

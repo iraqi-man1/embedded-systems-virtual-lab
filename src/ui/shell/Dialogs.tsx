@@ -1,6 +1,4 @@
 import { useEffect, useState } from 'react';
-import { EXAMPLES, loadExample } from '../../examples';
-import { exampleSummary, exampleTitle, tr } from '../../i18n';
 import { rich, useT } from '../../i18n/react';
 import { isTauri, toolchain } from '../../platform';
 import { useEditor } from '../../state/editor';
@@ -10,78 +8,25 @@ import { APP_VERSION } from '../../app/version';
 import { commands } from '../commands';
 import { ModalFrame } from '../common/Dialog';
 import { Icon } from '../common/Icon';
+import { ExampleGallery } from '../home/ExampleGallery';
 import { SettingsDialog } from './SettingsDialog';
 
-function Modal({ title, small, children, footer }: { title: string; small?: boolean; children: React.ReactNode; footer?: React.ReactNode }) {
+function Modal({ title, small, wide, children, footer }: { title: string; small?: boolean; wide?: boolean; children: React.ReactNode; footer?: React.ReactNode }) {
   return (
-    <ModalFrame title={title} small={small} footer={footer} onClose={() => useEditor.getState().set({ dialog: null })}>
+    <ModalFrame title={title} small={small} wide={wide} footer={footer} onClose={() => useEditor.getState().set({ dialog: null })}>
       {children}
     </ModalFrame>
   );
 }
 
-/** Tags shared by several examples, most common first (the filter chips). */
-const EXAMPLE_TAGS = (() => {
-  const count = new Map<string, number>();
-  for (const ex of EXAMPLES) for (const t of ex.tags) count.set(t, (count.get(t) ?? 0) + 1);
-  return [...count].filter(([, n]) => n > 1).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([t]) => t);
-})();
-
 function ExamplesDialog() {
   const t = useT();
-  const [query, setQuery] = useState('');
-  const [tag, setTag] = useState<string | null>(null);
-  const q = query.trim().toLowerCase();
-  const shown = EXAMPLES.filter(
-    (ex) =>
-      (!tag || ex.tags.includes(tag)) &&
-      (!q || [ex.title, ex.summary, exampleTitle(ex), exampleSummary(ex), ...ex.tags, ...ex.tags.map((x) => tr(x))].some((s) => s.toLowerCase().includes(q))),
-  );
   return (
-    <Modal title={t('Examples & Templates')}>
+    <Modal title={t('Examples & Templates')} wide>
       <p style={{ marginTop: 0, color: 'var(--text-2)' }}>
         {t('Each example opens a complete project — circuit and firmware.')} {rich(t('Press {key} to compile and simulate.'), { key: <kbd>F5</kbd> })}
       </p>
-      <div className="examples-filter">
-        <div className="search-box">
-          <Icon name="search" />
-          <input autoFocus placeholder={t('Search examples (e.g. sensor, I2C, PWM)')} value={query} onChange={(e) => setQuery(e.target.value)} aria-label={t('Search examples')} />
-        </div>
-        <span className="count">{t('{n} of {total}', { n: shown.length, total: EXAMPLES.length })}</span>
-      </div>
-      <div className="chips examples-tags">
-        <button className={`chip${tag === null ? ' active' : ''}`} aria-pressed={tag === null} onClick={() => setTag(null)}>
-          {t('All')}
-        </button>
-        {EXAMPLE_TAGS.map((x) => (
-          <button key={x} className={`chip${tag === x ? ' active' : ''}`} aria-pressed={tag === x} onClick={() => setTag(tag === x ? null : x)}>
-            {tr(x)}
-          </button>
-        ))}
-      </div>
-      <div className="examples">
-        {shown.map((ex) => (
-          <div
-            key={ex.id}
-            className="example"
-            role="button"
-            tabIndex={0}
-            onClick={() => loadExample(ex.id)}
-            onKeyDown={(e) => e.key === 'Enter' && loadExample(ex.id)}
-          >
-            <h4>{exampleTitle(ex)}</h4>
-            <p>{exampleSummary(ex)}</p>
-            <div className="tags">
-              {ex.tags.map((x) => (
-                <span key={x} className={`chip${tag === x ? ' active' : ''}`}>
-                  {tr(x)}
-                </span>
-              ))}
-            </div>
-          </div>
-        ))}
-        {!shown.length && <div className="empty-note">{t('No example matches. Try another word or tag.')}</div>}
-      </div>
+      <ExampleGallery autoFocus />
     </Modal>
   );
 }

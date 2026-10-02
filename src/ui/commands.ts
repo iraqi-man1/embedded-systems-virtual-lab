@@ -96,6 +96,7 @@ function cmd(id: string, label: MessageKey, description: MessageKey | null, rest
 const oneSelected = () => ed().selectedComponents.length > 0;
 
 export const commands: Record<string, Command> = {
+  home: cmd('home', 'Start Screen', 'Recent projects, templates, examples and getting started.', { icon: 'home', run: () => ed().set({ page: 'home', wiring: null }) }),
   new: cmd('new', 'New Project', 'Start an empty project (asks to save the current one).', { icon: 'new', shortcut: 'Ctrl+N', run: newDocument }),
   open: cmd('open', 'Open Project…', 'Open a .evlab project file.', { icon: 'open', shortcut: 'Ctrl+O', run: () => void openDocument() }),
   save: cmd('save', 'Save', 'Save the project (circuit, code and instrument setup).', { icon: 'save', shortcut: 'Ctrl+S', run: () => void saveDocument() }),
@@ -211,6 +212,19 @@ export function installShortcuts(): () => void {
       if (!c.enabled || c.enabled()) c.run();
       e.preventDefault();
     };
+    // A full-window page (start screen) covers the editor: only its own keys apply.
+    if (ed().page) {
+      if (ctrl && k.toLowerCase() === 'o') return run('open');
+      if (ctrl && k.toLowerCase() === 'n') return run('new');
+      if (ctrl && k === ',') return run('settings');
+      if (ctrl && e.shiftKey && k.toLowerCase() === 'p') return run('palette');
+      if (isBrowserShortcut(e) || k === 'F5') return e.preventDefault();
+      if (k === 'Escape' && !ed().dialog && !ed().palette && !inMenu(e)) {
+        ed().set({ page: null });
+        return e.preventDefault();
+      }
+      return;
+    }
     // Work everywhere (including the code editor).
     if (ctrl && k.toLowerCase() === 's') return run(e.shiftKey ? 'saveAs' : 'save');
     if (ctrl && k.toLowerCase() === 'o') return run('open');

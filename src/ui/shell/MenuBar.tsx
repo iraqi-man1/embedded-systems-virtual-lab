@@ -28,7 +28,7 @@ export function ZoomItems() {
 }
 
 /** View › Theme: every theme, plus following the system setting. */
-function ThemeItems() {
+export function ThemeItems() {
   const t = useT();
   const pref = useEditor((s) => s.theme);
   return (
@@ -58,7 +58,7 @@ function RecentItems() {
 }
 
 const MENUS: { name: MessageKey; items: Entry[] }[] = [
-  { name: 'File', items: ['new', 'open', { sub: 'Open Recent', icon: 'history', render: () => <RecentItems /> }, '-', 'save', 'saveAs', '-', 'examples', '-', 'settings'] },
+  { name: 'File', items: ['home', '-', 'new', 'open', { sub: 'Open Recent', icon: 'history', render: () => <RecentItems /> }, '-', 'save', 'saveAs', '-', 'examples', '-', 'settings'] },
   { name: 'Edit', items: ['undo', 'redo', '-', 'cut', 'copy', 'paste', 'duplicate', 'delete', '-', 'selectAll', '-', 'rotate', 'rotateCcw', 'flip', '-', 'quickAdd', 'palette'] },
   {
     name: 'Arrange',

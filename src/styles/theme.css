@@ -14,6 +14,7 @@
   --z-sim-controls: 20;
   --z-canvas-toolbar: 30;
   --z-panel: 40;
+  --z-page: 500;
   --z-dropdown: 1000;
   --z-context: 1100;
   --z-tooltip: 1200;
@@ -60,6 +61,10 @@
 /* Arabic: slightly larger text (Arabic letters are smaller at the same size). */
 :root[dir='rtl'] {
   --font-ui: 'Segoe UI', Tahoma, 'Noto Sans Arabic', 'Noto Naskh Arabic', system-ui, sans-serif;
+  /* Key caps and small labels that mix Latin keys with Arabic words: Latin stays
+     monospaced, Arabic falls back to a proportional face (monospaced Arabic
+     breaks the joined letters apart). */
+  --font-mono-mixed: 'Cascadia Mono', Consolas, 'Liberation Mono', 'Segoe UI', Tahoma, 'Noto Sans Arabic', sans-serif;
   --fs-xs: 11.5px;
   --fs-sm: 12.5px;
   --fs-md: 13.5px;

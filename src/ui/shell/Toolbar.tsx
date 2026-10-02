@@ -209,6 +209,7 @@ export function Toolbar() {
     <div className="toolbar" ref={barRef} role="toolbar" aria-label="Main toolbar">
       {shown('file') && (
         <div className="group" data-group="file">
+          <Btn id="home" />
           <Btn id="new" />
           <Btn id="open" />
           <Btn id="save" />
@@ -301,7 +302,7 @@ export function Toolbar() {
           <MenuButton icon="chevrons-right" title={t('More tools')}>
             {hidden.includes('file') && (
               <>
-                {['new', 'open', 'save', 'examples'].map((id) => (
+                {['home', 'new', 'open', 'save', 'examples'].map((id) => (
                   <CmdItem key={id} id={id} />
                 ))}
                 <MenuSeparator />

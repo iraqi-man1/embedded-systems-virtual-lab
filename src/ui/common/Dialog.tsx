@@ -106,6 +106,7 @@ export async function promptText(opts: {
 export function ModalFrame({
   title,
   small,
+  wide,
   onClose,
   children,
   footer,
@@ -113,6 +114,8 @@ export function ModalFrame({
 }: {
   title: string;
   small?: boolean;
+  /** Wider frame for galleries. */
+  wide?: boolean;
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
@@ -125,7 +128,7 @@ export function ModalFrame({
       <RD.Portal>
         <RD.Overlay className="modal-back" />
         <RD.Content
-          className={`modal${small ? ' small' : ''}`}
+          className={`modal${small ? ' small' : ''}${wide ? ' wide' : ''}`}
           aria-describedby={undefined}
           onOpenAutoFocus={(e) => {
             if (initialFocus?.current) {

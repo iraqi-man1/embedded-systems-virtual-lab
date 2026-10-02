@@ -114,7 +114,7 @@ export async function offerRestore(): Promise<void> {
     useProject.getState().load(project, meta.sourcePath ?? null);
     // Restored work is unsaved until the user saves it.
     useProject.setState({ dirty: true });
-    useEditor.getState().set({ viewport: project.view, selectedComponents: [], selectedWires: [] });
+    useEditor.getState().set({ viewport: project.view, selectedComponents: [], selectedWires: [], page: null });
     useEditor.getState().notify(t('Unsaved work restored. Save it to keep it.'), 'success');
   } catch (e) {
     useEditor.getState().notify(t('The autosaved copy could not be read: {error}', { error: (e as Error).message }), 'error');

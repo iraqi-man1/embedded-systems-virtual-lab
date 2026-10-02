@@ -17,6 +17,7 @@ import { MenuBar } from './shell/MenuBar';
 import { StatusBar } from './shell/StatusBar';
 import { Toolbar } from './shell/Toolbar';
 import { Workspace } from './workspace/Workspace';
+import { HomeScreen } from './home/HomeScreen';
 import { applyTheme, resolveTheme, systemPrefersDark } from './themes';
 
 type SizeKey = 'libraryWidth' | 'inspectorHeight' | 'codeWidth' | 'dockHeight';
@@ -114,6 +115,7 @@ export function App() {
   }, []);
 
   const hide = (p: Partial<Record<'showLibrary' | 'showInspector' | 'showCode' | 'showDock', boolean>>) => () => useEditor.getState().setPrefs(p);
+  const page = useEditor((s) => s.page);
 
   return (
     <TooltipProvider>
@@ -165,6 +167,7 @@ export function App() {
           </div>
         </div>
         <StatusBar />
+        {page === 'home' && <HomeScreen />}
         <Dialogs />
         <DialogHost />
         <CommandPalette />

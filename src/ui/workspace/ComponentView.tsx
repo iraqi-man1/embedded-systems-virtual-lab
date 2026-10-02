@@ -24,7 +24,7 @@ function applyBindings(el: AnyElement, inst: ComponentInstance, def: ComponentDe
   }
 }
 
-function WokwiElement({ inst, def, tag }: { inst: ComponentInstance; def: ComponentDefinition; tag: string }) {
+function WokwiElement({ inst, def, tag, preview }: { inst: ComponentInstance; def: ComponentDefinition; tag: string; preview?: boolean }) {
   const ref = useRef<AnyElement>(null);
 
   useEffect(() => {
@@ -33,7 +33,7 @@ function WokwiElement({ inst, def, tag }: { inst: ComponentInstance; def: Compon
 
   useEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    if (!el || preview) return;
     const originals = new Map<string, unknown>();
     return visualBus.register(inst.id, (state) => {
       if (!state) {
@@ -58,7 +58,7 @@ function WokwiElement({ inst, def, tag }: { inst: ComponentInstance; def: Compon
     });
     // Re-register only when the component identity changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inst.id, def]);
+  }, [inst.id, def, preview]);
 
   return createElement(tag, { ref });
 }
@@ -115,6 +115,8 @@ interface Props {
   inert?: boolean;
   /** Worst diagnostic on this part (outlined on the canvas). */
   problem?: 'error' | 'warning';
+  /** Static picture (start screen, guide): not driven by the simulation. */
+  preview?: boolean;
 }
 
 /** `$rotate` in the visual state turns the part's body (e.g. a tilt switch being tilted). */
@@ -133,18 +135,18 @@ function useBodyRotation(id: string, active: boolean) {
   return ref;
 }
 
-export const ComponentView = memo(function ComponentView({ inst, def, selected, inert, problem }: Props) {
+export const ComponentView = memo(function ComponentView({ inst, def, selected, inert, problem, preview }: Props) {
   const { width, height } = def.size;
   const transform = `rotate(${inst.rotation}deg)${inst.flip ? ' scaleX(-1)' : ''}`;
-  const bodyRef = useBodyRotation(inst.id, !!def.simulation.model);
+  const bodyRef = useBodyRotation(inst.id, !!def.simulation.model && !preview);
   let body;
-  if (def.visual.kind === 'wokwi') body = <WokwiElement inst={inst} def={def} tag={def.visual.tag} />;
+  if (def.visual.kind === 'wokwi') body = <WokwiElement inst={inst} def={def} tag={def.visual.tag} preview={preview} />;
   else if (def.visual.kind === 'svg') body = <SvgVisual svg={def.visual.svg} />;
   else body = renderBuiltin(def.visual.renderer, inst, def);
   return (
     <div
       className={`comp${selected ? ' selected' : ''}${inert ? ' inert' : ''}${problem ? ` problem-${problem}` : ''}`}
-      data-comp={inst.id}
+      data-comp={preview ? undefined : inst.id}
       style={{ left: inst.x, top: inst.y, width, height, transform }}
     >
       <div className="body" ref={bodyRef}>

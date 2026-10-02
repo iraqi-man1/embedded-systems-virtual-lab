@@ -117,6 +117,9 @@ export function SettingsDialog() {
         <Row label={t('Language')} description={t('Language of menus, panels and messages. Arabic uses a right-to-left layout.')}>
           <Segmented value={s.language} label={t('Language')} options={LANGUAGES.map((l) => ({ value: l.id, label: l.native }))} onChange={(language) => set({ language })} />
         </Row>
+        <Row label={t('Start screen at launch')} description={t('Open on the start screen with recent projects, templates and examples.')}>
+          <Switch checked={s.showStartScreen} label={t('Start screen at launch')} onChange={(showStartScreen) => set({ showStartScreen })} />
+        </Row>
         <Row label={t('Sound')} description={t('Play the tones of buzzers and speakers while simulating.')}>
           <Switch checked={s.sound} label={t('Sound')} onChange={(sound) => set({ sound })} />
         </Row>

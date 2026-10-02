@@ -397,6 +397,7 @@ input[type='checkbox'] { accent-color: var(--accent); }
 .kbd-table { width: 100%; border-collapse: collapse; }
 .kbd-table td { padding: 4px 6px; border-bottom: 1px solid var(--border); }
 kbd { direction: ltr; unicode-bidi: plaintext; font-family: var(--font-mono); font-size: 11px; padding: 1px 5px; border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 4px; background: var(--bg-panel-2); }
+:root[dir='rtl'] kbd { font-family: var(--font-mono-mixed); }
 .log-box { font-family: var(--font-mono); font-size: 11px; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px; height: 220px; overflow: auto; white-space: pre-wrap; user-select: text; direction: ltr; text-align: left; }
 
 /* ------------------------------------------------------ command palette */

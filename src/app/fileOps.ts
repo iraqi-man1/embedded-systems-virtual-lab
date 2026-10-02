@@ -29,7 +29,7 @@ function resetForNewDocument() {
 export function showProject(project: Project, path: string | null) {
   resetForNewDocument();
   useProject.getState().load(project, path);
-  useEditor.getState().set({ viewport: project.view, selectedComponents: [], selectedWires: [], wiring: null });
+  useEditor.getState().set({ viewport: project.view, selectedComponents: [], selectedWires: [], wiring: null, page: null });
   void clearAutosave();
 }
 
