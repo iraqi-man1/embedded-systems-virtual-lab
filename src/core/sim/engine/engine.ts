@@ -40,7 +40,11 @@ export class SimulationEngine {
   private settings: SimSettings;
   private models = new Map<string, SimModel>();
   private contexts = new Map<string, { setup: SimComponentSetup }>();
-  private mcus: { id: string; mcu: McuEmulator }[] = [];
+  /**
+   * Programmable parts. `offset` is the simulation time at which the MCU's
+   * cycle counter was 0, so MCUs added (or reset) mid-run share one time base.
+   */
+  private mcus: { id: string; mcu: McuEmulator; offset: number }[] = [];
   private stamps = new StampCollector();
   private solution: SolveResult | null = null;
   private dirty = new Set<number>();
@@ -48,7 +52,6 @@ export class SimulationEngine {
   private resolveRequested = false;
   private lastSolveTime = 0;
   private virtualTime = 0;
-  private timeOffset = 0;
   private events: TimedEvent[] = [];
   /** End of the slice the MCUs are currently executing (simulation seconds). */
   private segEnd = Infinity;
@@ -78,19 +81,24 @@ export class SimulationEngine {
   }
 
   // ---------------------------------------------------------------- time
+  /** Simulation time: the first MCU's clock is the master; a virtual clock otherwise. Never decreases. */
   now(): number {
     if (this.mcus.length) {
-      const m = this.mcus[0].mcu;
-      return this.timeOffset + m.cycles / m.clockHz;
+      const { mcu, offset } = this.mcus[0];
+      return offset + mcu.cycles / mcu.clockHz;
     }
     return this.virtualTime;
+  }
+
+  private cyclesAt(entry: { mcu: McuEmulator; offset: number }, t: number) {
+    return Math.ceil((t - entry.offset) * entry.mcu.clockHz);
   }
 
   // ------------------------------------------------------------ lifecycle
   private buildModels() {
     this.engineDiagnostics = [];
     for (const comp of this.setup.components) this.createModel(comp);
-    this.refreshMcuList();
+    this.refreshMcuList(0);
   }
 
   private createModel(comp: SimComponentSetup) {
@@ -121,9 +129,23 @@ export class SimulationEngine {
     }
   }
 
-  private refreshMcuList() {
+  /**
+   * Rebuilds the MCU list after models changed, at simulation time `t`. MCUs
+   * that already ran keep their offset; new ones start their clock at `t`.
+   * Without an MCU the virtual clock continues from `t`.
+   */
+  private refreshMcuList(t: number) {
+    const previous = new Map(this.mcus.map((e) => [e.mcu, e.offset]));
     this.mcus = [];
-    for (const [id, m] of this.models) if (m.mcu) this.mcus.push({ id, mcu: m.mcu });
+    for (const [id, m] of this.models) {
+      if (!m.mcu) continue;
+      this.mcus.push({ id, mcu: m.mcu, offset: previous.get(m.mcu) ?? t - m.mcu.cycles / m.mcu.clockHz });
+    }
+    // A different MCU may now be the master clock; lock-stepped MCUs can lag by an
+    // instruction, so align it to never step back.
+    const master = this.mcus[0];
+    if (master) master.offset += Math.max(0, t - this.now());
+    this.virtualTime = t;
   }
 
   private makeContext(holder: { setup: SimComponentSetup }): ModelContext {
@@ -164,7 +186,6 @@ export class SimulationEngine {
     if (this.state !== 'stopped') return;
     this.disposeModels();
     this.virtualTime = 0;
-    this.timeOffset = 0;
     this.lastSolveTime = 0;
     this.events = [];
     this.solution = null;
@@ -204,10 +225,7 @@ export class SimulationEngine {
     // Keep the time base monotonic across MCU resets.
     const t = this.now();
     for (const m of this.models.values()) m.reset?.();
-    if (this.mcus.length) {
-      const m = this.mcus[0].mcu;
-      this.timeOffset = t - m.cycles / m.clockHz;
-    }
+    for (const e of this.mcus) e.offset = t - e.mcu.cycles / e.mcu.clockHz;
     this.dirty.add(-1);
     this.solveNow();
     this.emitFrame();
@@ -232,12 +250,17 @@ export class SimulationEngine {
     this.settings = s;
   }
 
-  /** Re-wires the running circuit, preserving model state (incl. MCU state). */
-  updateCircuit(setup: SimSetup) {
+  /**
+   * Re-wires the running circuit, preserving model state (incl. MCU state).
+   * Components in `restart` start over (a board flashed with a new build).
+   */
+  updateCircuit(setup: SimSetup, restart: string[] = []) {
     const oldSetup = this.setup;
     this.setup = setup;
     this.probes = setup.probes;
     if (this.state === 'stopped') return;
+    // Capture the time before the MCU list (and with it the master clock) changes.
+    const t = this.now();
     const nextIds = new Set(setup.components.map((c) => c.id));
     for (const [id, model] of this.models) {
       if (!nextIds.has(id)) {
@@ -249,7 +272,7 @@ export class SimulationEngine {
     for (const comp of setup.components) {
       const holder = this.contexts.get(comp.id);
       const old = oldSetup.components.find((c) => c.id === comp.id);
-      if (holder && old && old.model === comp.model && old.type === comp.type && old.firmware === comp.firmware) {
+      if (holder && old && old.model === comp.model && old.type === comp.type && old.firmware === comp.firmware && !restart.includes(comp.id)) {
         holder.setup = comp;
       } else {
         this.models.get(comp.id)?.dispose?.();
@@ -257,7 +280,7 @@ export class SimulationEngine {
         this.createModel(comp);
       }
     }
-    this.refreshMcuList();
+    this.refreshMcuList(t);
     this.solution = null;
     this.dirty.add(-1);
     this.solveNow();
@@ -316,7 +339,7 @@ export class SimulationEngine {
     // stop the MCUs at the event time so it fires exactly when due.
     if (ev.t < this.segEnd) {
       this.segEnd = ev.t;
-      for (const { mcu } of this.mcus) mcu.limitTo(Math.ceil((ev.t - this.timeOffset) * mcu.clockHz));
+      for (const e of this.mcus) e.mcu.limitTo(this.cyclesAt(e, ev.t));
     }
   }
 
@@ -423,7 +446,7 @@ export class SimulationEngine {
       if (this.mcus.length > 1) segEnd = Math.min(segEnd, this.now() + 1e-4);
       if (this.mcus.length) {
         this.segEnd = segEnd;
-        for (const { mcu } of this.mcus) mcu.runUntil(Math.ceil((this.segEnd - this.timeOffset) * mcu.clockHz));
+        for (const e of this.mcus) e.mcu.runUntil(this.cyclesAt(e, this.segEnd));
         this.segEnd = Infinity;
       } else {
         this.virtualTime = segEnd;
@@ -480,7 +503,7 @@ export class SimulationEngine {
     const mcus: McuStatus[] = this.mcus.map(({ id, mcu }) => {
       const pins: Record<string, string> = {};
       for (const p of mcu.pins) pins[p] = mcu.pinDrive(p);
-      return { componentId: id, cycles: mcu.cycles, pc: mcu.pc, pins, serialBaud: mcu.serialBaud };
+      return { componentId: id, cycles: mcu.cycles, pc: mcu.pc, pins, serialBaud: mcu.serialBaud, debug: this.models.get(id)?.mcuDebug?.() };
     });
     const sol = this.solution;
     const voltages = sol ? Array.from(sol.voltages) : [];

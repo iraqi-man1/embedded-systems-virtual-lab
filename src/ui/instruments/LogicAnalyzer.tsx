@@ -1,10 +1,12 @@
 import { useRef, useState } from 'react';
+import { storage } from '../../platform';
 import { captures } from '../../state/captures';
 import { useEditor } from '../../state/editor';
 import { useProject } from '../../state/project';
 import { useSim } from '../../state/sim';
 import { decodeUart, indexAtOrAfter, toVcd } from '../../core/instruments/decoders';
 import { Icon } from '../common/Icon';
+import { Tip } from '../common/Tooltip';
 import { cssVar, formatTime, TIME_DIVS, useCanvas } from './useCanvas';
 import { removeChannel } from './probes';
 
@@ -116,10 +118,10 @@ export function LogicAnalyzer() {
         .map((c) => ({ name: c.label, capture: captures.probes.get(`logic:${c.id}`) }))
         .filter((c): c is { name: string; capture: NonNullable<typeof c.capture> } => !!c.capture),
     );
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([vcd], { type: 'text/plain' }));
-    a.download = 'capture.vcd';
-    a.click();
+    void storage
+      .exportText(vcd, 'capture.vcd', { name: 'Value Change Dump', extensions: ['vcd'] })
+      .then((path) => path && useEditor.getState().notify(`Saved ${path.split(/[\\/]/).pop()}`, 'success'))
+      .catch((e) => useEditor.getState().notify(`Could not save the capture: ${(e as Error).message ?? e}`, 'error'));
   };
 
   const timeAt = (clientX: number, el: HTMLElement) => {
@@ -132,10 +134,12 @@ export function LogicAnalyzer() {
   return (
     <div className="dock-body">
       <div className="inst-bar">
-        <button className="tb-btn" onClick={() => useEditor.getState().set({ tool: 'probe-logic' })} title="Click pins on the canvas to add channels">
-          <Icon name="probe" />
-          <span className="label">Add probe</span>
-        </button>
+        <Tip content="Then click pins on the canvas to add channels" direct>
+          <button className="tb-btn" onClick={() => useEditor.getState().set({ tool: 'probe-logic' })}>
+            <Icon name="probe" />
+            <span className="label">Add probe</span>
+          </button>
+        </Tip>
         <label>
           Time
           <select className="tb-select" value={timeDiv} onChange={(e) => setTimeDiv(Number(e.target.value))}>
@@ -157,10 +161,12 @@ export function LogicAnalyzer() {
           />{' '}
           Follow live
         </label>
-        <button className="tb-btn" onClick={exportVcd} disabled={!channels.length} title="Export a Value Change Dump (open with PulseView/GTKWave)">
-          <Icon name="save" />
-          <span className="label">Export VCD</span>
-        </button>
+        <Tip content="Export a Value Change Dump (open with PulseView or GTKWave)">
+          <button className="tb-btn" onClick={exportVcd} disabled={!channels.length}>
+            <Icon name="save" />
+            <span className="label">Export VCD</span>
+          </button>
+        </Tip>
         <span className="grow" />
         <span style={{ color: 'var(--text-3)', fontSize: 11 }}>
           {simState === 'stopped' ? 'Start the simulation to capture. ' : ''}Drag to pan · wheel to zoom when not following
@@ -176,14 +182,14 @@ export function LogicAnalyzer() {
           {channels.map((c) => (
             <div key={c.id} className="chan" style={{ height: ROW, borderBottom: '1px solid var(--border)' }}>
               <span className="probe-dot" style={{ background: c.color }} />
-              <span className="nm" title={c.label}>
-                {c.label}
-              </span>
+              <Tip content={c.label} direct>
+                <span className="nm">{c.label}</span>
+              </Tip>
               <select
                 className="tb-select"
                 style={{ width: 62, height: 22, fontSize: 10.5 }}
                 value={decoders[c.id] ?? 0}
-                title="Protocol decoder"
+                aria-label="Protocol decoder"
                 onChange={(e) => setDecoders({ ...decoders, [c.id]: Number(e.target.value) })}
               >
                 <option value={0}>raw</option>
@@ -193,9 +199,11 @@ export function LogicAnalyzer() {
                   </option>
                 ))}
               </select>
-              <button className="icon-btn" title="Remove" onClick={() => removeChannel('logic', c.id)}>
-                <Icon name="x" size={12} />
-              </button>
+              <Tip content="Remove channel" direct>
+                <button className="icon-btn" aria-label="Remove channel" onClick={() => removeChannel('logic', c.id)}>
+                  <Icon name="x" size={12} />
+                </button>
+              </Tip>
             </div>
           ))}
         </div>

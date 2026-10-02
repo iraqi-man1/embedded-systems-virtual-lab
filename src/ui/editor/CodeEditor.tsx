@@ -3,8 +3,53 @@ import { monaco } from './monacoSetup';
 import { lookup } from '../../app/registry';
 import { useEditor } from '../../state/editor';
 import { useProject } from '../../state/project';
-import { compileFirmware, findTargetBoard, useSim } from '../../state/sim';
+import { compileFirmware, findTargetBoard, useBuildState, useSim } from '../../state/sim';
+import { confirmDialog } from '../common/Dialog';
 import { Icon } from '../common/Icon';
+import { Tip } from '../common/Tooltip';
+
+/** Why a file name can't be used, or null when it can. */
+function fileNameError(name: string, others: string[]): string | null {
+  if (!/^[A-Za-z0-9_-]+\.(h|hpp|c|cpp)$/.test(name)) return 'Use letters, digits, - or _ and end in .h, .hpp, .c or .cpp';
+  if (others.includes(name)) return 'A file with this name already exists';
+  return null;
+}
+
+/** Inline name field for a new or renamed file: Enter applies, Esc cancels. */
+function FileNameInput({ initial, others, onDone }: { initial: string; others: string[]; onDone: (name: string | null) => void }) {
+  const [value, setValue] = useState(initial);
+  const error = fileNameError(value.trim(), others);
+  const done = useRef(false);
+  const finish = (name: string | null) => {
+    if (done.current) return;
+    done.current = true;
+    onDone(name);
+  };
+  return (
+    <Tip content={error ?? 'Enter to apply · Esc to cancel'} direct>
+      <div className={`code-tab editing${error ? ' invalid' : ''}`}>
+        <Icon name="code" size={13} />
+        <input
+          className="tab-input"
+          value={value}
+          autoFocus
+          spellCheck={false}
+          aria-label="File name"
+          aria-invalid={!!error}
+          size={Math.max(8, value.length + 1)}
+          onFocus={(e) => e.currentTarget.setSelectionRange(0, value.lastIndexOf('.') > 0 ? value.lastIndexOf('.') : value.length)}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key === 'Enter' && !error) finish(value.trim());
+            else if (e.key === 'Escape') finish(null);
+          }}
+          onBlur={() => finish(error ? null : value.trim())}
+        />
+      </div>
+    </Tip>
+  );
+}
 
 const uriFor = (name: string) => monaco.Uri.parse(`file:///sketch/${name}`);
 const languageFor = (name: string) => (/\.(c)$/.test(name) ? 'c' : 'cpp');
@@ -21,6 +66,7 @@ export function CodeEditor() {
   const revealLine = useEditor((s) => s.revealLine);
   const compile = useSim((s) => s.compile);
   const simState = useSim((s) => s.state);
+  const buildState = useBuildState();
   const [active, setActive] = useState('sketch.ino');
   const circuit = useProject((s) => s.project.circuit);
   const target = findTargetBoard(useProject.getState().project);
@@ -39,6 +85,8 @@ export function CodeEditor() {
       renderWhitespace: 'selection',
       smoothScrolling: true,
       fixedOverflowWidgets: true,
+      // Project files dropped on the editor open the project (window handler).
+      dropIntoEditor: { enabled: false },
       theme: useEditor.getState().theme === 'dark' ? 'evlab-dark' : 'evlab-light',
     });
     editorRef.current = ed;
@@ -113,65 +161,98 @@ export function CodeEditor() {
     }, 0);
   }, [revealLine, files]);
 
-  const addFile = () => {
-    const name = prompt('New file name (e.g. helpers.h, utils.cpp):', 'helpers.h');
+  // Inline file naming: `null` = adding a new file, a name = renaming it.
+  const [naming, setNaming] = useState<{ from: string | null } | null>(null);
+  const names = files.map((f) => f.name);
+  const finishNaming = (name: string | null) => {
+    const from = naming?.from ?? null;
+    setNaming(null);
     if (!name) return;
-    if (!/^[A-Za-z0-9_-]+\.(h|hpp|c|cpp)$/.test(name)) {
-      useEditor.getState().notify('Use a simple name ending in .h, .hpp, .c or .cpp', 'warning');
-      return;
-    }
-    useProject.getState().addFile(name);
+    if (from) useProject.getState().renameFile(from, name);
+    else useProject.getState().addFile(name);
     setActive(name);
+  };
+  const newFileName = () => {
+    for (let i = 1; ; i++) {
+      const n = i === 1 ? 'helpers.h' : `helpers${i}.h`;
+      if (!names.includes(n)) return n;
+    }
   };
 
   const boards = circuit.components.filter((c) => lookup(c.type)?.mcu);
   const statusText =
     compile.status === 'compiling'
       ? 'Compiling…'
-      : compile.status === 'success'
-        ? `Built · flash ${compile.flashBytes ?? '?'} B · RAM ${compile.ramBytes ?? '?'} B`
-        : compile.status === 'error'
-          ? 'Build failed — see Problems'
-          : targetDef
-            ? `${targetDef.mcu?.chip ?? ''} · PlatformIO ${targetDef.mcu?.toolchain.board ?? ''}`
-            : 'No programmable board in the circuit';
+      : buildState === 'modified'
+        ? simState !== 'stopped'
+          ? 'The board runs the previous build'
+          : 'Code changed since the last build — Ctrl+B to compile'
+        : compile.status === 'success'
+          ? `Built · flash ${compile.flashBytes ?? '?'} B · RAM ${compile.ramBytes ?? '?'} B`
+          : compile.status === 'error'
+            ? 'Build failed — see Problems'
+            : targetDef
+              ? `${targetDef.mcu?.chip ?? ''} · PlatformIO ${targetDef.mcu?.toolchain.board ?? ''}`
+              : 'No programmable board in the circuit';
 
   return (
     <div className="panel code-panel" style={{ flex: 1 }}>
       <div className="code-tabs">
-        {files.map((f) => (
-          <div key={f.name} className={`code-tab${f.name === active ? ' active' : ''}`} onClick={() => setActive(f.name)}>
-            <Icon name="code" size={13} />
-            {f.name}
-            {f.name !== 'sketch.ino' && (
-              <span
-                className="x"
-                title="Remove file"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (confirm(`Remove ${f.name}?`)) useProject.getState().removeFile(f.name);
-                }}
+        {files.map((f) =>
+          naming?.from === f.name ? (
+            <FileNameInput key={f.name} initial={f.name} others={names.filter((n) => n !== f.name)} onDone={finishNaming} />
+          ) : (
+            <Tip
+              key={f.name}
+              direct
+              content={`${f.name === 'sketch.ino' ? 'Main sketch' : 'Double-click to rename'}${compile.built && compile.built[f.name] !== f.content ? ' · changed since the last build' : ''}`}
+            >
+              <div
+                className={`code-tab${f.name === active ? ' active' : ''}`}
+                onClick={() => setActive(f.name)}
+                onDoubleClick={() => f.name !== 'sketch.ino' && setNaming({ from: f.name })}
               >
-                <Icon name="x" size={12} />
-              </span>
-            )}
-          </div>
-        ))}
-        <button className="icon-btn" style={{ alignSelf: 'center', marginLeft: 4 }} title="Add file" onClick={addFile}>
-          <Icon name="plus" />
-        </button>
+                <Icon name="code" size={13} />
+                {f.name}
+                {compile.built && compile.built[f.name] !== f.content && <span className="mod-dot" aria-label="Changed since the last build" />}
+                {f.name !== 'sketch.ino' && (
+                  <span
+                    className="x"
+                    role="button"
+                    aria-label={`Remove ${f.name}`}
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (await confirmDialog({ title: `Remove ${f.name}?`, message: 'The file and its contents are removed from the project.', confirmLabel: 'Remove', danger: true }))
+                        useProject.getState().removeFile(f.name);
+                    }}
+                  >
+                    <Icon name="x" size={12} />
+                  </span>
+                )}
+              </div>
+            </Tip>
+          ),
+        )}
+        {naming && naming.from === null && <FileNameInput initial={newFileName()} others={names} onDone={finishNaming} />}
+        <Tip content="Add a source file (.h, .c, .cpp)" direct>
+          <button className="icon-btn" style={{ alignSelf: 'center', marginLeft: 4 }} aria-label="Add file" onClick={() => setNaming({ from: null })} disabled={!!naming}>
+            <Icon name="plus" />
+          </button>
+        </Tip>
       </div>
       <div className="code-toolbar">
-        <button className="tb-btn" onClick={() => void compileFirmware()} disabled={compile.status === 'compiling'} title="Compile (Ctrl+B)">
-          <Icon name="build" />
-          <span className="label">Compile</span>
-        </button>
+        <Tip content={simState !== 'stopped' ? 'Compile and flash the running board' : 'Compile the firmware'} shortcut="Ctrl+B">
+          <button className="tb-btn" onClick={() => void compileFirmware()} disabled={compile.status === 'compiling'}>
+            <Icon name="build" />
+            <span className="label">Compile</span>
+          </button>
+        </Tip>
         {boards.length > 1 && (
           <select
             className="tb-select"
             value={target?.id ?? ''}
             onChange={(e) => useProject.getState().updateProject((p) => void (p.firmware.target = e.target.value))}
-            title="Board that runs this firmware"
+            aria-label="Board that runs this firmware"
           >
             {boards.map((b) => (
               <option key={b.id} value={b.id}>
@@ -180,10 +261,17 @@ export function CodeEditor() {
             ))}
           </select>
         )}
-        <span className="info" title={statusText}>
-          {simState !== 'stopped' && compile.status !== 'compiling' ? 'Edits apply after Stop + Run · ' : ''}
-          {statusText}
-        </span>
+        {simState !== 'stopped' && buildState === 'modified' && (
+          <Tip content="Compile and flash the running board; the rest of the circuit keeps running" shortcut="Ctrl+B">
+            <button className="tb-btn accent" onClick={() => void compileFirmware()}>
+              <Icon name="reset" />
+              <span className="label">Rebuild &amp; restart board</span>
+            </button>
+          </Tip>
+        )}
+        <Tip content={statusText} direct>
+          <span className="info">{statusText}</span>
+        </Tip>
       </div>
       <div ref={host} className="editor-host" />
     </div>

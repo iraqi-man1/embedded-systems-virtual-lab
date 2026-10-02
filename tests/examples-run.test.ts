@@ -52,6 +52,9 @@ const EXPECT: Record<string, { seconds: number; serial?: RegExp; visual?: (v: Re
   buzzer: { seconds: 0.3, visual: (v) => Object.values(v).some((s) => s.hasSignal === true && Math.abs((s.frequency as number) - 262) < 3) },
   relay: { seconds: 0.3, serial: /Relay ON/, visual: (v) => Object.values(v).some((s) => s.value === true) },
   'half-adder': { seconds: 0.05 },
+  'keypad-lock': { seconds: 0.2, serial: /Locked\. Enter the code/ },
+  'encoder-ring': { seconds: 0.2, serial: /position:0/, visual: (v) => Object.values(v).some((s) => Array.isArray(s.$pixels) && (s.$pixels as { r: number }[]).some((p) => p.r > 0.1)) },
+  'spirit-level': { seconds: 0.6, serial: /pitch:-?0\.0 roll:-?0\.0/, visual: (v) => Object.values(v).some((s) => s.$imageData instanceof Uint8ClampedArray && s.$imageData.some((x) => x > 0)) },
 };
 
 describe.skipIf(process.env.EVLAB_E2E !== '1')('examples end-to-end (compile + simulate)', () => {

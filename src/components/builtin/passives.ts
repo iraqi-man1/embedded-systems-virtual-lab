@@ -132,6 +132,7 @@ export const potentiometer: ComponentDefinition = {
   ],
   simulation: { support: 'full', model: 'potentiometer', notes: 'Linear taper; two resistors around the wiper.' },
   interaction: { kind: 'slider', input: 'position', property: 'position' },
+  indicators: [{ kind: 'readout', value: 'value', scale: 100, unit: '%', digits: 3 }],
   docs: {
     summary: 'Rotary potentiometer. Connect the ends to 5 V and GND and read the wiper with analogRead().',
     notes: 'During simulation, drag the knob or use the mouse wheel over it. The Inspector also shows a slider.',
@@ -182,6 +183,8 @@ export const photoresistor: ComponentDefinition = {
     { key: 'gamma', label: 'Gamma', type: 'number', default: 0.7, min: 0.3, max: 1.2, step: 0.05 },
   ],
   simulation: { support: 'full', model: 'photoresistor', notes: 'R = R10·(lux/10)^−γ (GL55xx-style). Response time not modelled.' },
+  controls: [{ kind: 'slider', prop: 'lux', icon: 'sun', log: true }],
+  indicators: [{ kind: 'glow', value: 'prop:lux', at: { x: ldr.size.width / 2, y: ldr.size.height * 0.3 }, radius: 26, color: '#ffd54f', max: 100000, log: true }],
   docs: { summary: 'Light-dependent resistor. Use in a voltage divider and read it with analogRead().' },
 };
 
@@ -202,6 +205,7 @@ export const ntc: ComponentDefinition = {
     { key: 'beta', label: 'Beta', type: 'number', default: 3950, min: 1000, max: 6000, step: 10 },
   ],
   simulation: { support: 'full', model: 'ntc', notes: 'β-model; self-heating not modelled.' },
+  controls: [{ kind: 'slider', prop: 'temperature', icon: 'thermometer' }],
   docs: { summary: 'Negative-temperature-coefficient thermistor, 10 kΩ at 25 °C.' },
 };
 
@@ -273,6 +277,7 @@ function diodePart(type: string, name: string, label: string, body: string, summ
     pins: v.pins,
     properties: [],
     simulation: { support: 'full', model: 'diode', notes: 'Piecewise-linear diode (forward voltage + series resistance); reverse recovery not modelled.' },
+    indicators: [{ kind: 'readout', value: '_conducting', map: { true: 'conducting', false: 'off' }, anchor: 'top' }],
     docs: { summary },
     ...extra,
   };
@@ -316,6 +321,7 @@ function bjt(type: string, name: string, label: string, polarity: 'npn' | 'pnp',
       model: 'bjt',
       notes: 'Piecewise-linear BJT (cut-off / active with β / saturation at 0.2 V). No Early effect, capacitances or temperature.',
     },
+    indicators: [{ kind: 'readout', value: '_mode', map: { cutoff: 'off', active: 'active', saturation: 'ON (saturated)' }, anchor: 'top' }],
     docs: { summary },
   };
 }
@@ -346,6 +352,7 @@ function mosfet(type: string, name: string, label: string, channel: 'n' | 'p', p
       model: 'mosfet',
       notes: 'Switch model: Rds(on) above Vgs(th) (scaled through a 1 V transition band), off below. No linear-region gain, gate charge or body diode.',
     },
+    indicators: [{ kind: 'readout', value: '_mode', map: { off: 'off', linear: 'partly on', on: 'ON' }, anchor: 'top' }],
     docs: { summary },
   };
 }

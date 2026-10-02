@@ -88,8 +88,8 @@ void loop() {
   {
     id: 'button',
     title: 'Push Button',
-    summary: 'Read a push button with the internal pull-up resistor and light an LED while it is pressed. Prints events to the Serial Monitor.',
-    tags: ['beginner', 'digital input', 'INPUT_PULLUP', 'serial'],
+    summary: 'Read a push button with the internal pull-up resistor and light an LED while it is pressed. Click the button on the canvas while simulating; events print to the Serial Monitor.',
+    tags: ['beginner', 'digital input', 'INPUT_PULLUP', 'serial', 'interactive'],
     build: (r) => {
       const { b, uno, bb } = base(r);
       const { outCol } = ledOnBoard(b, bb, 10, 'green');
@@ -137,8 +137,8 @@ void loop() {
   {
     id: 'potentiometer',
     title: 'Potentiometer Dimmer',
-    summary: 'analogRead() a potentiometer on A0 and dim an LED with analogWrite() PWM. Values stream to the Serial Monitor and Plotter.',
-    tags: ['beginner', 'analog input', 'ADC', 'PWM', 'serial plotter'],
+    summary: 'analogRead() a potentiometer on A0 and dim an LED with analogWrite() PWM. Turn the knob (drag or scroll) while simulating; values stream to the Serial Monitor and Plotter.',
+    tags: ['beginner', 'analog input', 'ADC', 'PWM', 'serial plotter', 'interactive'],
     build: (r) => {
       const { b, uno, bb } = base(r);
       const { outCol } = ledOnBoard(b, bb, 14, 'yellow');
@@ -407,8 +407,8 @@ void loop() {
   {
     id: 'light-meter',
     title: 'Light Meter (LDR)',
-    summary: 'A photoresistor in a voltage divider is read on A0. The LED turns on when it gets dark. Change the light level in the Inspector.',
-    tags: ['sensor', 'analog input', 'voltage divider'],
+    summary: 'A photoresistor in a voltage divider is read on A0. The LED turns on when it gets dark. Drag the light slider next to the sensor while simulating.',
+    tags: ['sensor', 'analog input', 'voltage divider', 'interactive'],
     build: (r) => {
       const b = new CircuitBuilder(r);
       const uno = b.add('evlab.arduino-uno', 0, 0);
@@ -460,8 +460,8 @@ void loop() {
   {
     id: 'thermometer',
     title: 'NTC Thermometer',
-    summary: 'Measure temperature with a 10 kΩ NTC thermistor and the Steinhart–Hart (β) equation. Change the temperature in the Inspector.',
-    tags: ['sensor', 'temperature', 'math', 'serial plotter'],
+    summary: 'Measure temperature with a 10 kΩ NTC thermistor and the Steinhart–Hart (β) equation. Drag the temperature slider next to the thermistor while simulating.',
+    tags: ['sensor', 'temperature', 'math', 'serial plotter', 'interactive'],
     build: (r) => {
       const b = new CircuitBuilder(r);
       const uno = b.add('evlab.arduino-uno', 0, 0);

@@ -61,6 +61,8 @@ export const battery9V: ComponentDefinition = {
     { key: 'maxCurrent', label: 'Max current', type: 'number', default: 0.5, unit: 'A', min: 0.01, step: 0.05 },
   ],
   simulation: { support: 'full', model: 'dc-source', notes: 'Ideal DC source with internal resistance; no discharge model.' },
+  controls: [{ kind: 'slider', prop: 'voltage', icon: 'zap' }],
+  indicators: [{ kind: 'readout', value: '_amps', engineering: true, unit: 'A', label: 'I' }],
   docs: { summary: 'Floating DC voltage source. Its − terminal is not ground unless you wire it to GND.' },
 };
 

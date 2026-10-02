@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import type { CircuitDocument, PinRef, Point } from '../core/model/circuit';
 
 export type Tool = 'select' | 'probe-logic' | 'probe-scope' | 'probe-meter-red' | 'probe-meter-black';
-export type DockTab = 'serial' | 'plotter' | 'scope' | 'logic' | 'meter' | 'problems' | 'output';
+export type DockTab = 'serial' | 'plotter' | 'scope' | 'logic' | 'meter' | 'mcu' | 'problems' | 'output';
 export type Theme = 'light' | 'dark';
 
 export interface Toast {
@@ -12,20 +12,29 @@ export interface Toast {
   message: string;
 }
 
-export interface ContextMenuState {
-  x: number;
-  y: number;
-  target: { kind: 'component'; id: string } | { kind: 'wire'; id: string } | { kind: 'canvas'; world: { x: number; y: number } };
+/** What the canvas context menu was opened on (the menu positions itself at the pointer). */
+export type ContextMenuState = { kind: 'component'; id: string } | { kind: 'wire'; id: string } | { kind: 'canvas'; world: { x: number; y: number } };
+
+/** A project file opened or saved recently (File › Open Recent). */
+export interface RecentProject {
+  path: string;
+  name: string;
+  /** ISO timestamp of the last open/save. */
+  at: string;
 }
+
+const MAX_RECENT_PROJECTS = 10;
 
 interface Prefs {
   theme: Theme;
   favorites: string[];
   recent: string[];
+  recentProjects: RecentProject[];
   showGrid: boolean;
   snap: boolean;
   libraryWidth: number;
-  inspectorWidth: number;
+  /** Height of the Properties panel under the component library. */
+  inspectorHeight: number;
   codeWidth: number;
   dockHeight: number;
   showLibrary: boolean;
@@ -34,6 +43,20 @@ interface Prefs {
   showDock: boolean;
   wireColor: string;
   sound: boolean;
+  /** Coloured dots on IC/MCU pins while simulating (high/low/floating). */
+  showLogicLevels: boolean;
+  /** Voltage badges on wires while simulating. */
+  showVoltages: boolean;
+  /** Serial monitor: clear the output when a simulation starts. */
+  serialClearOnRun: boolean;
+  /** Serial monitor: prefix lines with the simulation time. */
+  serialTimestamps: boolean;
+  /** Serial monitor: text or hex dump. */
+  serialView: 'text' | 'hex';
+  /** Collapsed library categories ('__fav', '__recent' for the pinned sections). */
+  libraryCollapsed: string[];
+  /** Library shows simulated parts only. */
+  librarySimOnly: boolean;
 }
 
 const PREFS_KEY = 'evlab.prefs.v1';
@@ -44,11 +67,12 @@ function loadPrefs(): Prefs {
     theme: dark ? 'dark' : 'light',
     favorites: ['evlab.arduino-uno', 'evlab.breadboard-half', 'evlab.resistor', 'evlab.led', 'evlab.pushbutton', 'evlab.potentiometer'],
     recent: [],
+    recentProjects: [],
     showGrid: true,
     snap: true,
-    libraryWidth: 270,
-    inspectorWidth: 300,
-    codeWidth: 520,
+    libraryWidth: 280,
+    inspectorHeight: 340,
+    codeWidth: 460,
     dockHeight: 240,
     showLibrary: true,
     showInspector: true,
@@ -56,6 +80,13 @@ function loadPrefs(): Prefs {
     showDock: true,
     wireColor: '#2ecc71',
     sound: true,
+    showLogicLevels: false,
+    showVoltages: false,
+    serialClearOnRun: true,
+    serialTimestamps: false,
+    serialView: 'text',
+    libraryCollapsed: ['Communication', 'Integrated Circuits', 'Actuators', 'Sensors'],
+    librarySimOnly: false,
   };
   try {
     const raw = localStorage.getItem(PREFS_KEY);
@@ -79,6 +110,10 @@ interface EditorState extends Prefs {
   contextMenu: ContextMenuState | null;
   dialog: null | 'examples' | 'toolchain' | 'shortcuts' | 'about' | 'project';
   toasts: Toast[];
+  /** Open command palette: run commands, or add a part (optionally at a canvas point). */
+  palette: null | { mode: 'commands' | 'add'; at?: { x: number; y: number } };
+  /** Component type being dragged from the library (drop preview). */
+  dragType: string | null;
   /** Line to reveal in the code editor (set by the Problems panel). */
   revealLine: { file: string; line: number; nonce: number } | null;
 
@@ -88,6 +123,8 @@ interface EditorState extends Prefs {
   clearSelection(): void;
   toggleFavorite(type: string): void;
   pushRecent(type: string): void;
+  rememberProject(path: string, name: string): void;
+  forgetProject(path?: string): void;
   notify(message: string, kind?: Toast['kind']): void;
   dismissToast(id: number): void;
 }
@@ -108,6 +145,8 @@ export const useEditor = create<EditorState>((set, get) => ({
   contextMenu: null,
   dialog: null,
   toasts: [],
+  dragType: null,
+  palette: null,
   revealLine: null,
 
   set: (partial) => set(partial),
@@ -118,10 +157,11 @@ export const useEditor = create<EditorState>((set, get) => ({
       theme: s.theme,
       favorites: s.favorites,
       recent: s.recent,
+      recentProjects: s.recentProjects,
       showGrid: s.showGrid,
       snap: s.snap,
       libraryWidth: s.libraryWidth,
-      inspectorWidth: s.inspectorWidth,
+      inspectorHeight: s.inspectorHeight,
       codeWidth: s.codeWidth,
       dockHeight: s.dockHeight,
       showLibrary: s.showLibrary,
@@ -130,6 +170,13 @@ export const useEditor = create<EditorState>((set, get) => ({
       showDock: s.showDock,
       wireColor: s.wireColor,
       sound: s.sound,
+      showLogicLevels: s.showLogicLevels,
+      showVoltages: s.showVoltages,
+      serialClearOnRun: s.serialClearOnRun,
+      serialTimestamps: s.serialTimestamps,
+      serialView: s.serialView,
+      libraryCollapsed: s.libraryCollapsed,
+      librarySimOnly: s.librarySimOnly,
     };
     try {
       localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
@@ -149,6 +196,13 @@ export const useEditor = create<EditorState>((set, get) => ({
   },
   pushRecent(type) {
     get().setPrefs({ recent: [type, ...get().recent.filter((t) => t !== type)].slice(0, 12) });
+  },
+  rememberProject(path, name) {
+    const entry = { path, name, at: new Date().toISOString() };
+    get().setPrefs({ recentProjects: [entry, ...get().recentProjects.filter((r) => r.path !== path)].slice(0, MAX_RECENT_PROJECTS) });
+  },
+  forgetProject(path) {
+    get().setPrefs({ recentProjects: path ? get().recentProjects.filter((r) => r.path !== path) : [] });
   },
   notify(message, kind = 'info') {
     const id = ++toastSeq;

@@ -3,10 +3,12 @@
  * shortcuts. They operate on the project/editor stores.
  */
 import { nanoid } from 'nanoid';
-import type { CircuitDocument, ComponentInstance, Rotation, Wire } from '../../core/model/circuit';
+import { WIRE_COLORS, type CircuitDocument, type ComponentInstance, type Rotation, type Wire } from '../../core/model/circuit';
 import { GRID } from '../../core/model/component';
 import { componentBounds, snapComponentPosition } from '../../core/circuit/geometry';
+import { carriedComponents } from '../../core/circuit/netlist';
 import { lookup, registry } from '../../app/registry';
+import { getNetlist } from '../../state/derived';
 import { useEditor } from '../../state/editor';
 import { createInstance, nextLabel, useProject } from '../../state/project';
 import { autoRoute, selectionBounds } from './geometry';
@@ -150,8 +152,17 @@ function pasteDocument(doc: CircuitDocument, at?: { x: number; y: number }) {
   );
 }
 
+/**
+ * The selected components plus everything plugged into them: moving a
+ * breadboard (or any part with sockets) carries the parts inserted into it,
+ * transitively, so they stay connected.
+ */
+export function withCarried(ids: Iterable<string>): Set<string> {
+  return carriedComponents(getNetlist(proj().project.circuit), ids);
+}
+
 export function nudgeSelection(dx: number, dy: number) {
-  const ids = new Set(ed().selectedComponents);
+  const ids = withCarried(ed().selectedComponents);
   if (!ids.size) return;
   proj().edit((c) => {
     for (const inst of c.components) if (ids.has(inst.id)) {
@@ -201,21 +212,83 @@ export function alignSelection(mode: Align) {
       moves.set(inst.id, { dx, dy });
     }
   }
+  // Effective (snapped) moves, then parts plugged into moved boards follow their board.
+  const effective = new Map<string, { dx: number; dy: number }>();
+  for (const inst of c.components) {
+    const m = moves.get(inst.id);
+    if (!m) continue;
+    const p = snapComponentPosition(inst, lookup(inst.type)!, inst.x + m.dx, inst.y + m.dy);
+    effective.set(inst.id, { dx: p.x - inst.x, dy: p.y - inst.y });
+  }
+  for (const id of carriedComponents(getNetlist(c), effective.keys())) {
+    if (effective.has(id)) continue;
+    // Plugged-in parts follow the board they sit in.
+    const board = getNetlist(c).insertions.find((i) => i.pin.componentId === id && effective.has(i.socket.componentId));
+    if (board) effective.set(id, effective.get(board.socket.componentId)!);
+  }
   proj().edit((doc) => {
     for (const inst of doc.components) {
-      const m = moves.get(inst.id);
+      const m = effective.get(inst.id);
       if (!m) continue;
-      const def = lookup(inst.type)!;
-      Object.assign(inst, snapComponentPosition(inst as ComponentInstance, def, inst.x + m.dx, inst.y + m.dy));
+      inst.x += m.dx;
+      inst.y += m.dy;
+    }
+    for (const w of doc.wires) {
+      const a = effective.get(w.from.componentId);
+      const b = effective.get(w.to.componentId);
+      if (a && b && a.dx === b.dx && a.dy === b.dy) for (const p of w.points) {
+        p.x += a.dx;
+        p.y += a.dy;
+      }
     }
   });
 }
 
+/** Recolours existing wires (one undo step). The default for new wires is unchanged. */
 export function setWireColor(ids: string[], color: string) {
+  const set = new Set(ids);
   proj().edit((c) => {
-    for (const w of c.wires) if (ids.includes(w.id)) w.color = color;
+    for (const w of c.wires) if (set.has(w.id)) w.color = color;
   });
-  ed().setPrefs({ wireColor: color });
+}
+
+/** Wires electrically connected to `wireId` (same net, including through breadboard strips). */
+export function netWireIds(wireId: string): string[] {
+  const circuit = proj().project.circuit;
+  const w = circuit.wires.find((x) => x.id === wireId);
+  if (!w) return [];
+  const netlist = getNetlist(circuit);
+  const net = netlist.netOf(w.from);
+  if (net === undefined) return [wireId];
+  return circuit.wires.filter((x) => netlist.netOf(x.from) === net || netlist.netOf(x.to) === net).map((x) => x.id);
+}
+
+/** Recolours every wire of the net the given wire belongs to (e.g. all GND wires black). */
+export function setNetWireColor(wireId: string, color: string) {
+  const ids = netWireIds(wireId);
+  setWireColor(ids, color);
+  if (ids.length > 1) ed().notify(`Recoloured ${ids.length} wires on this net.`, 'info');
+}
+
+/**
+ * Keyboard colour picking: applies to the selected wires, or to the wire being
+ * drawn (and later new wires) when nothing is selected.
+ */
+export function pickWireColor(index: number) {
+  const c = WIRE_COLORS[index];
+  if (!c) return;
+  const { selectedWires, wiring } = ed();
+  if (selectedWires.length && !wiring) setWireColor(selectedWires, c.value);
+  else ed().setPrefs({ wireColor: c.value });
+}
+
+/** Cycles the colour of the selected wires (or the default for new wires) through the palette. */
+export function cycleWireColor() {
+  const { selectedWires, wiring, wireColor } = ed();
+  const wires = proj().project.circuit.wires;
+  const current = selectedWires.length && !wiring ? (wires.find((w) => w.id === selectedWires[0])?.color ?? wireColor) : wireColor;
+  const i = WIRE_COLORS.findIndex((c) => c.value === current);
+  pickWireColor((i + 1) % WIRE_COLORS.length);
 }
 
 export function clearWirePoints(ids: string[]) {
@@ -252,19 +325,28 @@ export function bringToFront(id: string, front = true) {
 }
 
 export function fitView() {
+  zoomToComponents(proj().project.circuit.components.map((x) => x.id));
+}
+
+/** Zooms to the selection (Shift+F), or to the whole circuit when nothing is selected. */
+export function zoomToSelection() {
+  const sel = ed().selectedComponents;
+  if (sel.length) zoomToComponents(sel, 1.6);
+  else fitView();
+}
+
+/** Centres the given parts in the canvas at the largest zoom (≤ maxZoom) that shows them all. */
+export function zoomToComponents(ids: string[], maxZoom = 1.6) {
   const c = proj().project.circuit;
   const el = document.querySelector('.workspace') as HTMLElement | null;
   if (!el) return;
-  const b = selectionBounds(
-    c,
-    c.components.map((x) => x.id),
-  );
+  const b = selectionBounds(c, ids, true);
   if (!b) {
     ed().set({ viewport: { x: 80, y: 60, zoom: 1 } });
     return;
   }
   const pad = 60;
-  const zoom = Math.max(0.15, Math.min(1.6, Math.min((el.clientWidth - pad * 2) / b.width, (el.clientHeight - pad * 2) / b.height)));
+  const zoom = Math.max(0.15, Math.min(maxZoom, Math.min((el.clientWidth - pad * 2) / b.width, (el.clientHeight - pad * 2) / b.height)));
   ed().set({
     viewport: {
       zoom,
@@ -274,11 +356,16 @@ export function fitView() {
   });
 }
 
-export function zoomBy(factor: number) {
+/** Sets the zoom level, keeping the centre of the canvas in place. */
+export function setZoom(level: number) {
   const el = document.querySelector('.workspace') as HTMLElement | null;
   const { viewport } = ed();
   const cx = (el?.clientWidth ?? 800) / 2;
   const cy = (el?.clientHeight ?? 600) / 2;
-  const zoom = Math.max(0.1, Math.min(6, viewport.zoom * factor));
+  const zoom = Math.max(0.1, Math.min(6, level));
   ed().set({ viewport: { zoom, x: cx - (cx - viewport.x) * (zoom / viewport.zoom), y: cy - (cy - viewport.y) * (zoom / viewport.zoom) } });
+}
+
+export function zoomBy(factor: number) {
+  setZoom(ed().viewport.zoom * factor);
 }

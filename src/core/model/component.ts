@@ -118,6 +118,186 @@ export interface InteractionDefinition {
   property?: string;
 }
 
+/** Point in component-local pixels (unrotated), like pin coordinates. */
+export interface LocalPoint {
+  x: number;
+  y: number;
+}
+
+export type LocalDirection = 'up' | 'down' | 'left' | 'right';
+
+/**
+ * On-canvas controls shown while simulating (and, for property controls,
+ * when stopped on the selected part to set initial conditions). They are
+ * pure data so JSON packages can declare them too. Controls either edit a
+ * live property (`prop`, one undo step per gesture) or send a model input.
+ */
+export type SimControl =
+  | {
+      /** Compact slider chip under the part. Bounds/unit default to the property definition. */
+      kind: 'slider';
+      prop: string;
+      label?: string;
+      /** Icon name (sun, thermometer, droplets, flame, volume, zap, gauge, …). */
+      icon?: string;
+      min?: number;
+      max?: number;
+      step?: number;
+      unit?: string;
+      /** Logarithmic scale (illuminance, frequency). */
+      log?: boolean;
+    }
+  | {
+      /** Enum property as a compact selector chip (e.g. waveform). */
+      kind: 'select';
+      prop: string;
+      label?: string;
+      icon?: string;
+    }
+  | {
+      /** Draggable object in front of a distance sensor; distance in `unit` is written to `prop`. */
+      kind: 'range-target';
+      prop: string;
+      min: number;
+      max: number;
+      unit: string;
+      /** Centre of the sensor face. */
+      origin: LocalPoint;
+      direction: LocalDirection;
+      /** Canvas pixels per unit (at 100 % zoom). */
+      scale: number;
+      /** Visual-state counter incremented per measurement (draws an echo ripple). */
+      pingKey?: string;
+      label?: string;
+    }
+  | {
+      /** Clickable regions on the part (keypad keys, DIP levers, reset button…). */
+      kind: 'keys';
+      keys: {
+        id: string;
+        label?: string;
+        x: number;
+        y: number;
+        w: number;
+        h: number;
+        round?: boolean;
+        /** Momentary: input sent with true on press, false on release (default `key:<id>`). */
+        input?: string;
+        /** Toggle: boolean property flipped on click (takes precedence over `input`). */
+        prop?: string;
+      }[];
+      /** Visual-state key listing pressed key ids (highlight). */
+      pressedKey?: string;
+    }
+  | {
+      /**
+       * 2-D drag of a spring-loaded thumbstick. While held it sends inputs named
+       * `xProp`/`yProp` (0..1, 0.5 = centre), then `release`; the model returns to
+       * the resting position given by those properties.
+       */
+      kind: 'stick';
+      xProp: string;
+      yProp: string;
+      center: LocalPoint;
+      radius: number;
+      /** Left on the canvas = larger value (HORZ on most modules). */
+      invertX?: boolean;
+      /** Up on the canvas = larger value (VERT on most modules). */
+      invertY?: boolean;
+      /** Click without dragging presses the stick (momentary input). */
+      pressInput?: string;
+    }
+  | {
+      /** Drag to rotate (or mouse wheel) with detents; sends `input` = +1 / −1 per detent. */
+      kind: 'rotary';
+      input: string;
+      center: LocalPoint;
+      radius: number;
+      /** Detents per revolution (KY-040: 20). */
+      detents: number;
+      /** Click without rotating presses the shaft (momentary input). */
+      pressInput?: string;
+    }
+  | {
+      /** Pitch/roll pad chip (IMUs); degrees written to the properties. */
+      kind: 'tilt';
+      pitchProp: string;
+      rollProp: string;
+      range: number;
+      label?: string;
+    }
+  | {
+      /** Chip button sending a model input: momentary (held) or a single trigger. */
+      kind: 'action';
+      input: string;
+      label: string;
+      icon?: string;
+      mode?: 'momentary' | 'trigger';
+    };
+
+/**
+ * Visual feedback drawn over a part while simulating. `value` names a key of
+ * the model's visual state, or `prop:<key>` for an instance property.
+ */
+export type IndicatorDefinition =
+  | {
+      /** Small value badge next to the part. */
+      kind: 'readout';
+      value: string;
+      label?: string;
+      unit?: string;
+      /** Multiplier applied before formatting (e.g. 100 for percent). */
+      scale?: number;
+      digits?: number;
+      /** Engineering notation (1.2k, 3.3m). */
+      engineering?: boolean;
+      /** Maps discrete values to text, e.g. { true: 'ON', false: 'OFF' }. */
+      map?: Record<string, string>;
+      anchor?: 'top' | 'bottom' | 'left' | 'right';
+    }
+  | {
+      /** Coloured glow; intensity = value / max (clamped), optionally logarithmic. */
+      kind: 'glow';
+      value: string;
+      at: LocalPoint;
+      radius: number;
+      color: string;
+      max?: number;
+      log?: boolean;
+    }
+  | {
+      /** Animated waves (sound, IR, RF) while value is truthy / > 0. */
+      kind: 'waves';
+      value: string;
+      at: LocalPoint;
+      direction: LocalDirection;
+      color: string;
+    }
+  | {
+      /** Detection cone that lights up while value is truthy. */
+      kind: 'cone';
+      value: string;
+      origin: LocalPoint;
+      direction: LocalDirection;
+      length: number;
+      spread: number;
+      color: string;
+    }
+  | {
+      /** Brief flash whenever value changes (a counter: reads, pings, frames). */
+      kind: 'pulse';
+      value: string;
+      at: LocalPoint;
+      color: string;
+    }
+  | {
+      /** Rotor glyph turned by `value` degrees (motors drawn without their own animation). */
+      kind: 'rotor';
+      value: string;
+      at: LocalPoint;
+      radius: number;
+    };
+
 /** Boards with a programmable MCU declare how their pins map onto the core. */
 export interface McuDefinition {
   /** Emulator family registered in the engine, e.g. "avr". */
@@ -188,6 +368,10 @@ export interface ComponentDefinition {
     notes?: string;
   };
   interaction?: InteractionDefinition;
+  /** On-canvas simulation controls (sliders, keys, sticks, distance targets…). */
+  controls?: SimControl[];
+  /** Visual feedback while simulating (readouts, glows, waves…). */
+  indicators?: IndicatorDefinition[];
   mcu?: McuDefinition;
   docs: ComponentDocs;
   /** Package that contributed this definition (filled by the registry). */

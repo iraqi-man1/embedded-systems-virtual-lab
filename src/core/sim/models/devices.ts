@@ -72,6 +72,8 @@ class UltrasonicModel implements SimModel {
   private trigRise = -1;
   private echo = false;
   private busy = false;
+  /** Measurements started (drawn as an echo ripple). */
+  private pings = 0;
   private powered = false;
   private gnd = -1;
   private vcc = 5;
@@ -95,6 +97,7 @@ class UltrasonicModel implements SimModel {
     if (e.rising) this.trigRise = t;
     if (e.falling && this.trigRise >= 0 && t - this.trigRise >= 8e-6 && !this.busy) {
       this.busy = true;
+      this.pings++;
       const cm = Math.max(2, Math.min(400, numProp(this.ctx, 'distance', 100)));
       const width = numProp(this.ctx, 'distance', 100) > 400 ? 0.038 : (cm * 2) / 34300;
       // 8 cycles of 40 kHz burst (~200 µs) + transducer latency before ECHO rises.
@@ -112,6 +115,9 @@ class UltrasonicModel implements SimModel {
     this.ctx.solveNow([this.ctx.net('ECHO')]);
   }
   setProp() {}
+  visualState() {
+    return { _pings: this.pings };
+  }
   diagnostics(): Diagnostic[] {
     return this.powered ? [] : [diag(this.ctx, 'unpowered', 'warning', 'VCC/GND are not powered (needs 5 V).')];
   }
@@ -128,6 +134,8 @@ class DhtModel implements SimModel {
   private gnd = -1;
   private lastRead = -10;
   private tooFast = false;
+  /** Completed host start signals (drawn as a "reading" blink). */
+  private reads = 0;
   constructor(readonly ctx: ModelContext) {}
   private get dataPin() {
     return String(this.ctx.setup.params.data ?? 'SDA');
@@ -158,6 +166,7 @@ class DhtModel implements SimModel {
   }
   private respond() {
     this.busy = true;
+    this.reads++;
     const now = this.ctx.now();
     this.tooFast = now - this.lastRead < (this.dht11 ? 1 : 2);
     this.lastRead = now;
@@ -200,6 +209,9 @@ class DhtModel implements SimModel {
       });
     };
     next();
+  }
+  visualState() {
+    return { _reads: this.reads };
   }
   diagnostics(): Diagnostic[] {
     const out: Diagnostic[] = [];
@@ -664,7 +676,7 @@ class RelayModel implements SimModel {
     }
   }
   visualState() {
-    return { energized: this.energized };
+    return { energized: this.energized, _energized: this.energized };
   }
 }
 registerModel('relay', (ctx) => new RelayModel(ctx));
@@ -692,6 +704,9 @@ class RelayModuleModel implements SimModel {
       this.ctx.solveNow(['COM', 'NO', 'NC'].map((p) => this.ctx.net(p)));
     }
   }
+  visualState() {
+    return { _energized: this.on };
+  }
 }
 registerModel('relay-module', (ctx) => new RelayModuleModel(ctx));
 
@@ -718,7 +733,12 @@ registerModel('switch-array', (ctx) => new SwitchArrayModel(ctx));
 // =============================================================== joystick
 class JoystickModel implements SimModel {
   private pressed = false;
+  /** Position while the stick is held on the canvas; it springs back to the properties on release. */
+  private held: { x?: number; y?: number } = {};
   constructor(readonly ctx: ModelContext) {}
+  private pos(key: 'x' | 'y') {
+    return Math.max(0, Math.min(1, this.held[key] ?? numProp(this.ctx, key, 0.5)));
+  }
   stamp(s: StampCollector) {
     const vcc = this.ctx.net('VCC');
     const gnd = this.ctx.net('GND');
@@ -727,7 +747,7 @@ class JoystickModel implements SimModel {
       ['HORZ', 'x'],
       ['VERT', 'y'],
     ] as const) {
-      const p = Math.max(0, Math.min(1, numProp(this.ctx, key, 0.5)));
+      const p = this.pos(key);
       const w = this.ctx.net(pin);
       s.resistor(gnd, w, Math.max(1, r * p));
       s.resistor(w, vcc, Math.max(1, r * (1 - p)));
@@ -738,13 +758,19 @@ class JoystickModel implements SimModel {
     if (key === 'pressed') {
       this.pressed = !!value;
       this.ctx.solveNow([this.ctx.net('SEL')]);
+    } else if (key === 'x' || key === 'y') {
+      this.held[key] = Number(value);
+      this.ctx.solveNow([this.ctx.net(key === 'x' ? 'HORZ' : 'VERT')]);
+    } else if (key === 'release') {
+      this.held = {};
+      this.ctx.solveNow([this.ctx.net('HORZ'), this.ctx.net('VERT')]);
     }
   }
   setProp() {
     this.ctx.solveNow(['HORZ', 'VERT', 'SEL'].map((p) => this.ctx.net(p)));
   }
   visualState() {
-    return { xValue: numProp(this.ctx, 'x', 0.5) * 2 - 1, yValue: numProp(this.ctx, 'y', 0.5) * 2 - 1, pressed: this.pressed || !!this.ctx.setup.props.pressed };
+    return { xValue: this.pos('x') * 2 - 1, yValue: this.pos('y') * 2 - 1, pressed: this.pressed || !!this.ctx.setup.props.pressed };
   }
 }
 registerModel('joystick', (ctx) => new JoystickModel(ctx));
@@ -789,6 +815,11 @@ class EventSensorModel implements SimModel {
   setProp() {
     this.ctx.solveNow([this.ctx.net(this.out)]);
   }
+  visualState() {
+    const active = this.active();
+    const tilt = Number(this.ctx.setup.params.tiltAngle ?? 0);
+    return tilt ? { _active: active, $rotate: active ? tilt : 0 } : { _active: active };
+  }
 }
 registerModel('event-sensor', (ctx) => new EventSensorModel(ctx));
 
@@ -798,6 +829,8 @@ class AnalogModuleModel implements SimModel {
   private powered = false;
   private vcc = 5;
   private gnd = -1;
+  /** Short burst above the set level (a clap at a sound sensor). */
+  private burstUntil = -1;
   constructor(readonly ctx: ModelContext) {}
   private p() {
     return this.ctx.setup.params as { ao: string; do?: string; sensor: 'ldr' | 'ntc' | 'level'; vcc?: string; gnd?: string };
@@ -815,6 +848,7 @@ class AnalogModuleModel implements SimModel {
       const r = 10_000 * Math.exp(3950 * (1 / t - 1 / 298.15));
       return 10_000 / (r + 10_000);
     }
+    if (this.ctx.now() < this.burstUntil) return 0.95;
     return Math.max(0, Math.min(1, numProp(this.ctx, 'level', 0.2)));
   }
   stamp(s: StampCollector) {
@@ -839,6 +873,16 @@ class AnalogModuleModel implements SimModel {
   }
   setProp() {
     this.ctx.solveNow([this.ctx.net(this.p().ao), this.ctx.net(this.p().do ?? '')]);
+  }
+  onInput(key: string, value: PropValue) {
+    if (key !== 'burst' || !value || this.p().sensor !== 'level') return;
+    // ~150 ms loud event (clap, flame flicker): AO jumps, DO trips, then the level returns.
+    this.burstUntil = this.ctx.now() + 0.15;
+    this.setProp();
+    this.ctx.schedule(0.15 + 1e-6, () => this.setProp());
+  }
+  visualState() {
+    return { _level: this.ratio(), _triggered: !this.doHigh };
   }
 }
 registerModel('analog-module', (ctx) => new AnalogModuleModel(ctx));

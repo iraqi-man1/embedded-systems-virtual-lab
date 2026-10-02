@@ -1,8 +1,12 @@
 import { useErc } from '../../state/derived';
 import { useEditor, type DockTab } from '../../state/editor';
+import { useProject } from '../../state/project';
 import { useSim } from '../../state/sim';
+import { zoomToComponents } from '../workspace/actions';
 import { Icon } from '../common/Icon';
+import { Tip } from '../common/Tooltip';
 import { LogicAnalyzer } from './LogicAnalyzer';
+import { McuPanel } from './McuPanel';
 import { Multimeter } from './Multimeter';
 import { Oscilloscope } from './Oscilloscope';
 import { SerialMonitor } from './SerialMonitor';
@@ -15,6 +19,16 @@ function useProblems() {
   return { erc, sim, compile };
 }
 
+/** Selects the parts a problem refers to and brings them into view. */
+function revealComponents(ids?: string[]) {
+  if (!ids?.length) return;
+  const existing = new Set(useProject.getState().project.circuit.components.map((c) => c.id));
+  const sel = ids.filter((id) => existing.has(id));
+  if (!sel.length) return;
+  useEditor.getState().select(sel);
+  zoomToComponents(sel, 1.4);
+}
+
 function ProblemsPanel() {
   const { erc, sim, compile } = useProblems();
   const items = [
@@ -25,8 +39,8 @@ function ProblemsPanel() {
       source: 'compiler',
       onClick: () => useEditor.getState().set({ revealLine: { file: d.file, line: d.line, nonce: Math.random() }, showCode: true }),
     })),
-    ...sim.map((d) => ({ severity: d.severity, message: d.message, where: '', source: 'simulation', onClick: () => d.componentIds && useEditor.getState().select(d.componentIds.slice(0, 1)) })),
-    ...erc.map((d) => ({ severity: d.severity, message: d.message, where: '', source: 'circuit check', onClick: () => d.componentIds && useEditor.getState().select(d.componentIds.slice(0, 1)) })),
+    ...sim.map((d) => ({ severity: d.severity, message: d.message, where: '', source: 'simulation', onClick: () => revealComponents(d.componentIds) })),
+    ...erc.map((d) => ({ severity: d.severity, message: d.message, where: '', source: 'circuit check', onClick: () => revealComponents(d.componentIds) })),
   ];
   const rank = { error: 0, warning: 1, info: 2, note: 2 } as Record<string, number>;
   items.sort((a, b) => rank[a.severity] - rank[b.severity]);
@@ -88,6 +102,7 @@ const TABS: { id: DockTab; label: string; icon: string }[] = [
   { id: 'scope', label: 'Oscilloscope', icon: 'waves' },
   { id: 'logic', label: 'Logic Analyzer', icon: 'activity' },
   { id: 'meter', label: 'Multimeter', icon: 'gauge' },
+  { id: 'mcu', label: 'MCU', icon: 'cpu' },
   { id: 'problems', label: 'Problems', icon: 'warning' },
   { id: 'output', label: 'Build Output', icon: 'build' },
 ];
@@ -110,15 +125,18 @@ export function BottomDock() {
           </button>
         ))}
         <span className="spacer" />
-        <button className="icon-btn" style={{ alignSelf: 'center', marginRight: 6 }} title="Hide panel" onClick={() => useEditor.getState().setPrefs({ showDock: false })}>
-          <Icon name="panel-bottom" />
-        </button>
+        <Tip content="Hide the instruments panel" side="top" align="end" direct>
+          <button className="icon-btn" style={{ alignSelf: 'center', marginRight: 6 }} aria-label="Hide panel" onClick={() => useEditor.getState().setPrefs({ showDock: false })}>
+            <Icon name="panel-bottom" />
+          </button>
+        </Tip>
       </div>
       {tab === 'serial' && <SerialMonitor />}
       {tab === 'plotter' && <SerialPlotter />}
       {tab === 'scope' && <Oscilloscope />}
       {tab === 'logic' && <LogicAnalyzer />}
       {tab === 'meter' && <Multimeter />}
+      {tab === 'mcu' && <McuPanel />}
       {tab === 'problems' && <ProblemsPanel />}
       {tab === 'output' && <BuildOutput />}
     </div>

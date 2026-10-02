@@ -33,7 +33,7 @@ import {
 } from 'avr8js';
 import type { McuDefinition } from '../../../model/component';
 import { loadIntelHex } from '../ihex';
-import type { FirmwareImage, I2CDevice, McuEmulator, PinDrive, SPIDevice } from '../mcu';
+import type { FirmwareImage, I2CDevice, McuEmulator, McuRegisters, PinDrive, SPIDevice } from '../mcu';
 
 interface PinBinding {
   port: AVRIOPort;
@@ -243,5 +243,10 @@ export class AvrEmulator implements McuEmulator {
 
   schedule(cycles: number, cb: () => void) {
     this.cpu.addClockEvent(cb, Math.max(1, Math.round(cycles)));
+  }
+
+  registers(): McuRegisters {
+    const { data } = this.cpu;
+    return { r: Array.from(data.subarray(0, 32)), sp: this.cpu.SP, sreg: this.cpu.SREG, ramEnd: data.length - 1 };
   }
 }

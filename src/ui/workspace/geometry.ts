@@ -1,7 +1,7 @@
 import type { CircuitDocument, ComponentInstance, PinRef, Point, Wire } from '../../core/model/circuit';
 import type { ComponentDefinition, PinDefinition } from '../../core/model/component';
 import { GRID } from '../../core/model/component';
-import { componentBounds, pinWorld, type Rect } from '../../core/circuit/geometry';
+import { componentBounds, localToWorld, pinWorld, rectsIntersect, type Rect } from '../../core/circuit/geometry';
 import { lookup } from '../../app/registry';
 
 export interface IndexedPin {
@@ -95,6 +95,25 @@ export function orthogonalPath(anchors: Point[]): Point[] {
   return out;
 }
 
+export function polylineLength(pts: Point[]): number {
+  let len = 0;
+  for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+  return len;
+}
+
+/** Point at distance `d` along a polyline. */
+export function pointAlong(pts: Point[], d: number): Point {
+  for (let i = 1; i < pts.length; i++) {
+    const seg = Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+    if (d <= seg && seg > 0) {
+      const k = d / seg;
+      return { x: pts[i - 1].x + (pts[i].x - pts[i - 1].x) * k, y: pts[i - 1].y + (pts[i].y - pts[i - 1].y) * k };
+    }
+    d -= seg;
+  }
+  return pts[pts.length - 1];
+}
+
 export function wirePolyline(circuit: CircuitDocument, w: Wire): Point[] | null {
   const a = pinPosition(circuit, w.from);
   const b = pinPosition(circuit, w.to);
@@ -124,13 +143,30 @@ export function nearestSegment(pts: Point[], p: Point): number {
   return best;
 }
 
-export function selectionBounds(circuit: CircuitDocument, ids: string[]): Rect | null {
+/** Grows a part's bounds by on-canvas controls drawn outside it (distance-sensor obstacles). */
+function withControlExtents(inst: ComponentInstance, def: ComponentDefinition, b: Rect): Rect {
+  let r = b;
+  for (const c of def.controls ?? []) {
+    if (c.kind !== 'range-target') continue;
+    const d = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[c.direction];
+    const far = localToWorld(inst, def, { x: c.origin.x + d[0] * (170 * c.scale + 20), y: c.origin.y + d[1] * (170 * c.scale + 20) });
+    const x1 = Math.min(r.x, far.x - 35);
+    const y1 = Math.min(r.y, far.y - 35);
+    const x2 = Math.max(r.x + r.width, far.x + 35);
+    const y2 = Math.max(r.y + r.height, far.y + 35);
+    r = { x: x1, y: y1, width: x2 - x1, height: y2 - y1 };
+  }
+  return r;
+}
+
+/** Bounds of the given parts; `withControls` adds controls drawn outside them (for fitting the view). */
+export function selectionBounds(circuit: CircuitDocument, ids: string[], withControls = false): Rect | null {
   let r: Rect | null = null;
   for (const inst of circuit.components) {
     if (!ids.includes(inst.id)) continue;
     const def = lookup(inst.type);
     if (!def) continue;
-    const b = componentBounds(inst, def);
+    const b = withControls ? withControlExtents(inst, def, componentBounds(inst, def)) : componentBounds(inst, def);
     if (!r) r = { ...b };
     else {
       const x2 = Math.max(r.x + r.width, b.x + b.width);
@@ -218,4 +254,100 @@ export function autoRoute(circuit: CircuitDocument, w: Wire): Point[] | null {
     }
   }
   return null;
+}
+
+// ------------------------------------------------------------------ marquee
+function segmentHitsRect(a: Point, b: Point, r: Rect): boolean {
+  const inside = (p: Point) => p.x >= r.x && p.x <= r.x + r.width && p.y >= r.y && p.y <= r.y + r.height;
+  if (inside(a) || inside(b)) return true;
+  // Wire segments are axis-aligned or short diagonals: test against the rectangle edges.
+  const edges: [Point, Point][] = [
+    [{ x: r.x, y: r.y }, { x: r.x + r.width, y: r.y }],
+    [{ x: r.x + r.width, y: r.y }, { x: r.x + r.width, y: r.y + r.height }],
+    [{ x: r.x + r.width, y: r.y + r.height }, { x: r.x, y: r.y + r.height }],
+    [{ x: r.x, y: r.y + r.height }, { x: r.x, y: r.y }],
+  ];
+  const cross = (p: Point, q: Point, s: Point) => (q.x - p.x) * (s.y - p.y) - (q.y - p.y) * (s.x - p.x);
+  return edges.some(([c, d]) => cross(a, b, c) * cross(a, b, d) <= 0 && cross(c, d, a) * cross(c, d, b) <= 0);
+}
+
+/**
+ * Box selection, CAD convention: dragging left→right ("window") selects what
+ * lies completely inside the box; right→left ("crossing") selects everything
+ * the box touches.
+ */
+export function marqueeSelection(circuit: CircuitDocument, rect: Rect, crossing: boolean): { components: string[]; wires: string[] } {
+  const contains = (b: Rect) => b.x >= rect.x && b.y >= rect.y && b.x + b.width <= rect.x + rect.width && b.y + b.height <= rect.y + rect.height;
+  const components = circuit.components
+    .filter((c) => {
+      const def = lookup(c.type);
+      if (!def) return false;
+      const b = componentBounds(c, def);
+      return crossing ? rectsIntersect(b, rect) : contains(b);
+    })
+    .map((c) => c.id);
+  const wires = circuit.wires
+    .filter((w) => {
+      const pts = wirePolyline(circuit, w);
+      if (!pts) return false;
+      if (!crossing) return pts.every((p) => contains({ x: p.x, y: p.y, width: 0, height: 0 }));
+      for (let i = 0; i + 1 < pts.length; i++) if (segmentHitsRect(pts[i], pts[i + 1], rect)) return true;
+      return false;
+    })
+    .map((w) => w.id);
+  return { components, wires };
+}
+
+// -------------------------------------------------------- insertion preview
+/**
+ * Breadboard holes (socket pins) that legs at `points` would plug into, and
+ * the other holes of the same strips. Sockets of `exclude`d parts (the ones
+ * being moved) are ignored.
+ */
+export function insertionPreview(
+  circuit: CircuitDocument,
+  netlist: { netOf(ref: PinRef): number | undefined; nets: { pins: PinRef[] }[] },
+  points: Point[],
+  exclude: Set<string>,
+  tolerance = 3.6,
+): { holes: Point[]; strips: Point[] } {
+  const index = pinIndex(circuit);
+  const holes: Point[] = [];
+  const holeKeys = new Set<string>();
+  const nets = new Set<number>();
+  for (const p of points) {
+    const cx = Math.floor(p.x / CELL);
+    const cy = Math.floor(p.y / CELL);
+    let best: IndexedPin | null = null;
+    let bestD = tolerance;
+    for (let ix = cx - 1; ix <= cx + 1; ix++) {
+      for (let iy = cy - 1; iy <= cy + 1; iy++) {
+        for (const ip of index.cells.get(`${ix},${iy}`) ?? []) {
+          if (ip.pin.kind !== 'socket' || exclude.has(ip.ref.componentId)) continue;
+          const d = Math.hypot(ip.x - p.x, ip.y - p.y);
+          if (d <= bestD) {
+            bestD = d;
+            best = ip;
+          }
+        }
+      }
+    }
+    if (!best) continue;
+    const key = `${best.ref.componentId}:${best.ref.pinId}`;
+    if (holeKeys.has(key)) continue;
+    holeKeys.add(key);
+    holes.push({ x: best.x, y: best.y });
+    const n = netlist.netOf(best.ref);
+    if (n !== undefined) nets.add(n);
+  }
+  const strips: Point[] = [];
+  for (const n of nets) {
+    for (const ref of netlist.nets[n]?.pins ?? []) {
+      const key = `${ref.componentId}:${ref.pinId}`;
+      if (holeKeys.has(key) || exclude.has(ref.componentId)) continue;
+      const ip = index.byKey.get(key);
+      if (ip && ip.pin.kind === 'socket') strips.push({ x: ip.x, y: ip.y });
+    }
+  }
+  return { holes, strips };
 }

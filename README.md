@@ -12,7 +12,7 @@ Built with Tauri 2, React, TypeScript, avr8js, Wokwi Elements, Monaco Editor and
 
 ![I²C LCD example running: firmware drives an LCD over the emulated TWI bus while a potentiometer is read on A0](docs/images/screenshot-dark.png)
 
-| Light theme — traffic light running on a breadboard | 20 ready-to-run example projects |
+| Light theme — traffic light running on a breadboard | 23 ready-to-run example projects |
 |---|---|
 | ![Traffic light example in the light theme](docs/images/screenshot-light.png) | ![Examples and templates gallery](docs/images/screenshot-examples.png) |
 
@@ -22,23 +22,34 @@ Built with Tauri 2, React, TypeScript, avr8js, Wokwi Elements, Monaco Editor and
   multi-select, align/distribute, undo/redo, copy/paste, context menus, keyboard shortcuts,
   grid snapping, orthogonal wires with editable bends, junctions, net labels, wire colours and
   labels, A* auto-routing.
+- **Fast to drive from the keyboard**: command palette (Ctrl+Shift+P), quick add a part
+  (Ctrl+K or double-click the canvas), recent projects, `.evlab` file association and drag and
+  drop, live build state in the status bar.
 - **Breadboards that understand connectivity**: legs dropped on holes connect automatically;
   hover a hole to see every connected hole highlighted.
-- **Component library**: 140 parts across 12 categories; 60 have simulation models (48 full,
-  12 partial). Every part
-  shows whether it is *fully simulated*, *partially simulated* or *visual-only*.
+- **Component library**: 140 parts across 12 categories; 76 have simulation models (54 full,
+  22 partial), including NeoPixels, an SSD1306 OLED, MPU-6050, DS1307, IR remote/receiver,
+  keypad, rotary encoder, DC and stepper motors with L298N/A4988 drivers. Every part shows
+  whether it is *fully simulated*, *partially simulated* or *visual-only*.
+- **Interactive simulation**: drag the obstacle in front of an ultrasonic sensor, tilt an IMU,
+  move a joystick, turn an encoder, press keypad and IR-remote keys, set temperature/light/gas
+  with on-canvas sliders; parts show live feedback (beams, waves, glows, readouts).
 - **Real firmware**: Monaco editor with Arduino completions and hover docs, multi-file sketches,
   automatic library resolution, PlatformIO compilation, compiler errors as editor markers.
 - **Simulation**: run, pause, step (1 ms / instruction), reset, stop, 0.01×–4× or max speed;
   live interaction with buttons, knobs, switches and sensors.
-- **Instruments**: serial monitor (bidirectional), serial plotter, oscilloscope with trigger
-  and measurements, 8-channel logic analyzer with UART decoding and VCD export, multimeter
-  (V / Ω / A), signal generator.
+- **Instruments**: serial monitor (bidirectional, timestamps, hex view, save log), serial
+  plotter, oscilloscope with trigger and measurements, 8-channel logic analyzer with UART
+  decoding and VCD export, multimeter (V / Ω / A), signal generator.
+- **Debugging**: MCU panel with pin modes, levels, voltages and PWM duty, PC/SP/SREG, R0–R31 and
+  flash/RAM use; voltage badges on wires (View › Show Voltages, `V`); Ctrl+B while running
+  flashes the new build into the board without stopping the rest of the circuit.
 - **Electrical checks**: shorts, supply conflicts, unconnected required pins, floating inputs,
   undefined logic levels, pin/supply over-current, LED over-current and reverse bias.
-- **Projects**: versioned `.evlab` files; 20 example projects (Blink, button, PWM, traffic
-  light, RGB, UART console, LDR, thermistor, transistor, MOSFET, HC-SR04, DHT22, servo, LCD,
-  I²C LCD, SPI shift register, buzzer, relay, logic half adder…).
+- **Projects**: versioned `.evlab` files with crash-recovery autosave; 23 example projects
+  (Blink, button, PWM, traffic light, RGB, UART console, LDR, thermistor, transistor, MOSFET,
+  HC-SR04, DHT22, servo, LCD, I²C LCD, SPI shift register, buzzer, relay, logic half adder,
+  keypad lock, encoder + NeoPixel ring, MPU-6050 + OLED spirit level…), searchable by tag.
 - **Extensible**: components, behaviour models, MCU emulators and toolchains are registered,
   not hard-coded; JSON component packages load from the user's packages folder.
 
@@ -111,6 +122,7 @@ cargo test --manifest-path src-tauri/Cargo.toml -- --include-ignored
 - [Architecture](docs/02-architecture.md)
 - [Component packages (extending the library)](docs/03-component-packages.md)
 - [Simulation fidelity & limitations](docs/04-simulation-fidelity.md)
+- [UI regression checklist (floating UI, layering)](docs/05-ui-regression-checklist.md)
 - Architecture decisions: [desktop shell](docs/adr/ADR-001-desktop-shell.md),
   [MCU emulation](docs/adr/ADR-002-mcu-emulation.md),
   [real-time solver](docs/adr/ADR-003-realtime-circuit-solver.md),

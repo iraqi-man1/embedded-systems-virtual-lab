@@ -37,6 +37,8 @@ interface ProjectState {
   setFile(name: string, content: string): void;
   addFile(name: string): void;
   removeFile(name: string): void;
+  /** Renames a source file (the main sketch keeps its name). */
+  renameFile(from: string, to: string): void;
 }
 
 export const useProject = create<ProjectState>((set, get) => ({
@@ -121,7 +123,44 @@ export const useProject = create<ProjectState>((set, get) => ({
       p.firmware.files = p.firmware.files.filter((f) => f.name !== name || f.name === 'sketch.ino');
     });
   },
+  renameFile(from, to) {
+    get().updateProject((p) => {
+      if (from === 'sketch.ino' || from === to || p.firmware.files.some((f) => f.name === to)) return;
+      const f = p.firmware.files.find((x) => x.name === from);
+      if (f) f.name = to;
+    });
+  },
 }));
+
+// ------------------------------------------------- coalesced interactions
+let coalesce: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Edit from a continuous interaction without discrete start/end (mouse-wheel
+ * knob turns, keyboard slider steps): edits arriving within `ms` of each other
+ * form one undo step.
+ */
+export function coalescedEdit(fn: (c: Draft<CircuitDocument>) => void, ms = 500) {
+  const p = useProject.getState();
+  if (!coalesce) {
+    if (p.txBase) {
+      // Already inside another gesture (e.g. a drag): it owns the undo step.
+      p.edit(fn);
+      return;
+    }
+    p.begin();
+  } else clearTimeout(coalesce);
+  coalesce = setTimeout(flushCoalesced, ms);
+  p.edit(fn);
+}
+
+/** Closes a pending coalesced undo step now (before undo/redo). */
+export function flushCoalesced() {
+  if (!coalesce) return;
+  clearTimeout(coalesce);
+  coalesce = null;
+  useProject.getState().end();
+}
 
 // ---------------------------------------------------------------- helpers
 

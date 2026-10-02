@@ -53,7 +53,8 @@ export type StepKind = 'instruction' | '1ms' | '10ms' | '100ms';
 /** UI -> worker. */
 export type SimCommand =
   | { type: 'setup'; setup: SimSetup; settings: SimSettings }
-  | { type: 'update-circuit'; setup: SimSetup }
+  /** `restart`: components to recreate even if unchanged (boards flashed with a new build). */
+  | { type: 'update-circuit'; setup: SimSetup; restart?: string[] }
   | { type: 'start' }
   | { type: 'pause' }
   | { type: 'resume' }
@@ -79,6 +80,22 @@ export interface McuStatus {
   /** pinId -> drive state ('low' | 'high' | 'input' | 'input-pullup'). */
   pins: Record<string, string>;
   serialBaud: number;
+  debug?: McuDebug;
+}
+
+/** What the MCU panel shows besides pin drive states. */
+export interface McuDebug {
+  /** R0..R31. */
+  r: number[];
+  sp: number;
+  sreg: number;
+  ramEnd: number;
+  /** Share of the last frame each wired output pin was high (PWM duty, 0..1). */
+  duty: Record<string, number>;
+  /** Level each wired input pin reads. */
+  inputs: Record<string, boolean>;
+  /** Wired input pins with nothing driving them. */
+  floating: string[];
 }
 
 export type SimRunState = 'stopped' | 'running' | 'paused';

@@ -1,22 +1,25 @@
 import { useEffect, useState } from 'react';
+import { installLifecycle } from '../app/lifecycle';
 import { useEditor } from '../state/editor';
-import { useProject } from '../state/project';
 import { refreshToolchain } from '../state/sim';
 import { installShortcuts } from './commands';
 import { CodeEditor } from './editor/CodeEditor';
 import { Inspector } from './inspector/Inspector';
 import { BottomDock } from './instruments/BottomDock';
 import { LibraryPanel } from './library/LibraryPanel';
-import { ContextMenu } from './shell/ContextMenu';
+import { DialogHost } from './common/Dialog';
+import { Tip, TooltipProvider } from './common/Tooltip';
+import { CommandPalette } from './shell/CommandPalette';
 import { Dialogs, Toasts } from './shell/Dialogs';
 import { MenuBar } from './shell/MenuBar';
 import { StatusBar } from './shell/StatusBar';
 import { Toolbar } from './shell/Toolbar';
 import { Workspace } from './workspace/Workspace';
 
-type SizeKey = 'libraryWidth' | 'inspectorWidth' | 'codeWidth' | 'dockHeight';
+type SizeKey = 'libraryWidth' | 'inspectorHeight' | 'codeWidth' | 'dockHeight';
 
-function Splitter({ k, dir, invert, min, max }: { k: SizeKey; dir: 'v' | 'h'; invert?: boolean; min: number; max: number }) {
+/** Drag to resize; double-click collapses the panel it belongs to. */
+function Splitter({ k, dir, invert, min, max, onCollapse }: { k: SizeKey; dir: 'v' | 'h'; invert?: boolean; min: number; max: number; onCollapse: () => void }) {
   const onPointerDown = (e: React.PointerEvent) => {
     e.preventDefault();
     const start = dir === 'v' ? e.clientX : e.clientY;
@@ -34,8 +37,20 @@ function Splitter({ k, dir, invert, min, max }: { k: SizeKey; dir: 'v' | 'h'; in
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
   };
-  return <div className={dir === 'v' ? 'splitter-v' : 'splitter-h'} onPointerDown={onPointerDown} />;
+  return (
+    <Tip content="Drag to resize · double-click to hide" side={dir === 'v' ? 'right' : 'top'} delay={900} direct>
+      <div
+        className={dir === 'v' ? 'splitter-v' : 'splitter-h'}
+        onPointerDown={onPointerDown}
+        onDoubleClick={onCollapse}
+        role="separator"
+        aria-orientation={dir === 'v' ? 'vertical' : 'horizontal'}
+      />
+    </Tip>
+  );
 }
+
+const CHROME_HEIGHT = 28 + 40 + 24; // menu bar + toolbar + status bar
 
 export function App() {
   const theme = useEditor((s) => s.theme);
@@ -44,7 +59,7 @@ export function App() {
   const showCode = useEditor((s) => s.showCode);
   const showDock = useEditor((s) => s.showDock);
   const libraryWidth = useEditor((s) => s.libraryWidth);
-  const inspectorWidth = useEditor((s) => s.inspectorWidth);
+  const inspectorHeight = useEditor((s) => s.inspectorHeight);
   const codeWidth = useEditor((s) => s.codeWidth);
   const dockHeight = useEditor((s) => s.dockHeight);
 
@@ -59,75 +74,81 @@ export function App() {
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
-  const libW = Math.min(libraryWidth, Math.max(200, win.w * 0.2));
-  const inspW = Math.min(inspectorWidth, Math.max(220, win.w * 0.22));
-  const center = win.w - (showLibrary ? libW : 0) - (showInspector ? inspW : 0);
-  const codeW = Math.min(codeWidth, Math.max(280, center * 0.5));
+  const showLeft = showLibrary || showInspector;
+  const leftW = Math.min(libraryWidth, Math.max(220, win.w * 0.25));
+  const center = win.w - (showLeft ? leftW : 0);
+  const codeW = Math.min(codeWidth, Math.max(300, center * 0.5));
   const dockH = Math.min(dockHeight, Math.max(120, win.h * 0.45));
+  const columnH = win.h - CHROME_HEIGHT;
+  const inspH = showLibrary ? Math.max(140, Math.min(inspectorHeight, columnH - 160)) : columnH;
 
   useEffect(() => {
     const off = installShortcuts();
+    const offLifecycle = installLifecycle();
     void refreshToolchain();
-    const beforeUnload = (e: BeforeUnloadEvent) => {
-      if (useProject.getState().dirty) {
-        e.preventDefault();
-        e.returnValue = '';
-      }
-    };
-    window.addEventListener('beforeunload', beforeUnload);
     return () => {
       off();
-      window.removeEventListener('beforeunload', beforeUnload);
+      offLifecycle();
     };
   }, []);
 
+  const hide = (p: Partial<Record<'showLibrary' | 'showInspector' | 'showCode' | 'showDock', boolean>>) => () => useEditor.getState().setPrefs(p);
+
   return (
-    <div className="app">
-      <MenuBar />
-      <Toolbar />
-      <div className="main">
-        {showLibrary && (
-          <>
-            <div style={{ width: libW, flex: 'none', minHeight: 0 }}>
-              <LibraryPanel />
+    <TooltipProvider>
+      <div className="app">
+        <MenuBar />
+        <Toolbar />
+        <div className="main">
+          {showLeft && (
+            <>
+              {/* Components on top, the selection's properties below. */}
+              <div className="left-column" style={{ width: leftW }}>
+                {showLibrary && (
+                  <div className="left-top">
+                    <LibraryPanel />
+                  </div>
+                )}
+                {showLibrary && showInspector && (
+                  <Splitter k="inspectorHeight" dir="h" invert min={140} max={Math.max(160, columnH - 160)} onCollapse={hide({ showInspector: false })} />
+                )}
+                {showInspector && (
+                  <div className="left-bottom" style={{ height: showLibrary ? inspH : undefined, flex: showLibrary ? 'none' : 1 }}>
+                    <Inspector />
+                  </div>
+                )}
+              </div>
+              <Splitter k="libraryWidth" dir="v" min={220} max={520} onCollapse={hide({ showLibrary: false, showInspector: false })} />
+            </>
+          )}
+          <div className="center">
+            <div className="center-top">
+              <Workspace />
+              {showCode && (
+                <>
+                  <Splitter k="codeWidth" dir="v" invert min={300} max={1100} onCollapse={hide({ showCode: false })} />
+                  <div style={{ width: codeW, flex: 'none', display: 'flex', minHeight: 0 }}>
+                    <CodeEditor />
+                  </div>
+                </>
+              )}
             </div>
-            <Splitter k="libraryWidth" dir="v" min={200} max={460} />
-          </>
-        )}
-        <div className="center">
-          <div className="center-top">
-            <Workspace />
-            {showCode && (
+            {showDock && (
               <>
-                <Splitter k="codeWidth" dir="v" invert min={320} max={1100} />
-                <div style={{ width: codeW, flex: 'none', display: 'flex', minHeight: 0 }}>
-                  <CodeEditor />
+                <Splitter k="dockHeight" dir="h" invert min={120} max={700} onCollapse={hide({ showDock: false })} />
+                <div className="dock" style={{ height: dockH }}>
+                  <BottomDock />
                 </div>
               </>
             )}
           </div>
-          {showDock && (
-            <>
-              <Splitter k="dockHeight" dir="h" invert min={120} max={700} />
-              <div className="dock" style={{ height: dockH }}>
-                <BottomDock />
-              </div>
-            </>
-          )}
         </div>
-        {showInspector && (
-          <>
-            <Splitter k="inspectorWidth" dir="v" invert min={240} max={520} />
-            <div style={{ width: inspW, flex: 'none', minHeight: 0 }}>
-              <Inspector />
-            </div>
-          </>
-        )}
+        <StatusBar />
+        <Dialogs />
+        <DialogHost />
+        <CommandPalette />
+        <Toasts />
       </div>
-      <StatusBar />
-      <ContextMenu />
-      <Dialogs />
-      <Toasts />
-    </div>
+    </TooltipProvider>
   );
 }

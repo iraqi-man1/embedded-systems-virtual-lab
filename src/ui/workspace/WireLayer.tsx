@@ -29,6 +29,12 @@ const WireView = memo(function WireView({ circuit, wire, selected, zoom }: WireP
           {wire.label}
         </text>
       )}
+      {selected && (
+        <>
+          <circle className="end-handle" data-wire={wire.id} data-end="from" cx={pts[0].x} cy={pts[0].y} r={4 / zoom} strokeWidth={1.5 / zoom} />
+          <circle className="end-handle" data-wire={wire.id} data-end="to" cx={pts[pts.length - 1].x} cy={pts[pts.length - 1].y} r={4 / zoom} strokeWidth={1.5 / zoom} />
+        </>
+      )}
       {selected &&
         wire.points.map((p, i) => (
           <rect
@@ -50,10 +56,21 @@ const WireView = memo(function WireView({ circuit, wire, selected, zoom }: WireP
 export interface Overlay {
   /** Wire being drawn: anchor points and current cursor. */
   draft: { points: Point[]; cursor: Point; color: string } | null;
-  marquee: { x: number; y: number; w: number; h: number } | null;
+  /** `crossing`: dragged right→left (selects what it touches). */
+  marquee: { x: number; y: number; w: number; h: number; crossing?: boolean } | null;
   hoverPin: Point | null;
   netPins: Point[];
+  /** Nets of the selected wires / the wire being drawn. */
+  stickyNetPins: Point[];
+  /** Breadboard holes the dragged/moved part plugs into (green) and their strips. */
+  insertion: { holes: Point[]; strips: Point[] } | null;
+  /** Wire end being dragged to another pin. */
+  endDrag: { from: Point; to: Point; color: string } | null;
   probes: { x: number; y: number; color: string; label: string }[];
+  /** Logic level of IC/MCU pins while simulating. */
+  levels: { x: number; y: number; level: 'high' | 'low' | 'mid' | 'float' }[];
+  /** Net voltage badges on wires while simulating (View › Show Voltages). */
+  voltages: { x: number; y: number; text: string; float: boolean }[];
 }
 
 interface Props {
@@ -70,9 +87,21 @@ export function WireLayer({ circuit, selectedWires, zoom, overlay }: Props) {
       {circuit.wires.map((w) => (
         <WireView key={w.id} circuit={circuit} wire={w} selected={sel.has(w.id)} zoom={zoom} />
       ))}
+      {overlay.insertion?.strips.map((p, i) => (
+        <circle key={`is${i}`} className="ins-strip" cx={p.x} cy={p.y} r={2.2} />
+      ))}
+      {overlay.insertion?.holes.map((p, i) => (
+        <circle key={`ih${i}`} className="ins-hole" cx={p.x} cy={p.y} r={3.4} />
+      ))}
+      {overlay.stickyNetPins.map((p, i) => (
+        <circle key={`s${i}`} className="net-pin sticky" cx={p.x} cy={p.y} r={2.4} />
+      ))}
       {overlay.netPins.map((p, i) => (
         <circle key={i} className="net-pin" cx={p.x} cy={p.y} r={2.4} />
       ))}
+      {overlay.endDrag && (
+        <path d={polylineToPath([overlay.endDrag.from, overlay.endDrag.to])} stroke={overlay.endDrag.color} strokeWidth={2.4} strokeDasharray="5 3" fill="none" strokeLinecap="round" />
+      )}
       {overlay.draft && (
         <path
           d={polylineToPath(orthogonalPath([...overlay.draft.points, overlay.draft.cursor]))}
@@ -83,6 +112,20 @@ export function WireLayer({ circuit, selectedWires, zoom, overlay }: Props) {
           strokeLinecap="round"
         />
       )}
+      {overlay.levels.map((p, i) => (
+        <circle key={`l${i}`} className={`lvl ${p.level}`} cx={p.x} cy={p.y} r={2.6} />
+      ))}
+      {overlay.voltages.map((b, i) => {
+        const w = b.text.length * 5 + 8;
+        return (
+          <g key={`v${i}`} className={`volt-badge${b.float ? ' float' : ''}`} transform={`translate(${b.x} ${b.y})`}>
+            <rect x={-w / 2} y={-6.5} width={w} height={13} rx={6.5} />
+            <text y={3} textAnchor="middle">
+              {b.text}
+            </text>
+          </g>
+        );
+      })}
       {overlay.hoverPin && <circle className="pin-hover" cx={overlay.hoverPin.x} cy={overlay.hoverPin.y} r={5} strokeWidth={2 / zoom} />}
       {overlay.probes.map((p, i) => (
         <g key={i}>
@@ -93,7 +136,7 @@ export function WireLayer({ circuit, selectedWires, zoom, overlay }: Props) {
         </g>
       ))}
       {overlay.marquee && (
-        <rect className="marquee" x={overlay.marquee.x} y={overlay.marquee.y} width={overlay.marquee.w} height={overlay.marquee.h} strokeWidth={1 / zoom} />
+        <rect className={`marquee${overlay.marquee.crossing ? ' crossing' : ''}`} x={overlay.marquee.x} y={overlay.marquee.y} width={overlay.marquee.w} height={overlay.marquee.h} strokeWidth={1 / zoom} />
       )}
     </svg>
   );

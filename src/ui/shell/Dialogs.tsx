@@ -5,46 +5,77 @@ import { useEditor } from '../../state/editor';
 import { refreshToolchain, useSim } from '../../state/sim';
 import { registry } from '../../app/registry';
 import { commands } from '../commands';
+import { ModalFrame } from '../common/Dialog';
 import { Icon } from '../common/Icon';
 
 function Modal({ title, small, children, footer }: { title: string; small?: boolean; children: React.ReactNode; footer?: React.ReactNode }) {
-  const close = () => useEditor.getState().set({ dialog: null });
   return (
-    <div className="modal-back" onMouseDown={(e) => e.target === e.currentTarget && close()}>
-      <div className={`modal${small ? ' small' : ''}`}>
-        <div className="modal-head">
-          <h2>{title}</h2>
-          <button className="icon-btn" onClick={close}>
-            <Icon name="x" />
-          </button>
-        </div>
-        <div className="modal-body">{children}</div>
-        {footer && <div className="modal-foot">{footer}</div>}
-      </div>
-    </div>
+    <ModalFrame title={title} small={small} footer={footer} onClose={() => useEditor.getState().set({ dialog: null })}>
+      {children}
+    </ModalFrame>
   );
 }
 
+/** Tags shared by several examples, most common first (the filter chips). */
+const EXAMPLE_TAGS = (() => {
+  const count = new Map<string, number>();
+  for (const ex of EXAMPLES) for (const t of ex.tags) count.set(t, (count.get(t) ?? 0) + 1);
+  return [...count].filter(([, n]) => n > 1).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([t]) => t);
+})();
+
 function ExamplesDialog() {
+  const [query, setQuery] = useState('');
+  const [tag, setTag] = useState<string | null>(null);
+  const q = query.trim().toLowerCase();
+  const shown = EXAMPLES.filter(
+    (ex) => (!tag || ex.tags.includes(tag)) && (!q || [ex.title, ex.summary, ...ex.tags].some((t) => t.toLowerCase().includes(q))),
+  );
   return (
     <Modal title="Examples & Templates">
       <p style={{ marginTop: 0, color: 'var(--text-2)' }}>
         Each example opens a complete project — circuit and firmware. Press <kbd>F5</kbd> to compile and simulate.
       </p>
+      <div className="examples-filter">
+        <div className="search-box">
+          <Icon name="search" />
+          <input autoFocus placeholder="Search examples (e.g. sensor, I2C, PWM)" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search examples" />
+        </div>
+        <span className="count">
+          {shown.length} of {EXAMPLES.length}
+        </span>
+      </div>
+      <div className="chips examples-tags">
+        <button className={`chip${tag === null ? ' active' : ''}`} aria-pressed={tag === null} onClick={() => setTag(null)}>
+          All
+        </button>
+        {EXAMPLE_TAGS.map((t) => (
+          <button key={t} className={`chip${tag === t ? ' active' : ''}`} aria-pressed={tag === t} onClick={() => setTag(tag === t ? null : t)}>
+            {t}
+          </button>
+        ))}
+      </div>
       <div className="examples">
-        {EXAMPLES.map((ex) => (
-          <div key={ex.id} className="example" onClick={() => loadExample(ex.id)}>
+        {shown.map((ex) => (
+          <div
+            key={ex.id}
+            className="example"
+            role="button"
+            tabIndex={0}
+            onClick={() => loadExample(ex.id)}
+            onKeyDown={(e) => e.key === 'Enter' && loadExample(ex.id)}
+          >
             <h4>{ex.title}</h4>
             <p>{ex.summary}</p>
             <div className="tags">
               {ex.tags.map((t) => (
-                <span key={t} className="chip">
+                <span key={t} className={`chip${tag === t ? ' active' : ''}`}>
                   {t}
                 </span>
               ))}
             </div>
           </div>
         ))}
+        {!shown.length && <div className="empty-note">No example matches. Try another word or tag.</div>}
       </div>
     </Modal>
   );
@@ -125,7 +156,10 @@ function ShortcutsDialog() {
     ['Stop', 'Shift+F5'],
     ['Reset board', 'Ctrl+F5'],
     ['Step 1 ms / one instruction', 'F10 / F11'],
-    ['Compile', 'Ctrl+B'],
+    ['Compile (while running: flash the board)', 'Ctrl+B'],
+    ['Command palette', 'Ctrl+Shift+P'],
+    ['Add a part', 'Ctrl+K or double-click the canvas'],
+    ['Search the library', '/'],
     ['New / Open / Save', 'Ctrl+N / Ctrl+O / Ctrl+S'],
     ['Undo / Redo', 'Ctrl+Z / Ctrl+Y'],
     ['Copy / Cut / Paste / Duplicate', 'Ctrl+C / X / V / D'],
@@ -134,8 +168,11 @@ function ShortcutsDialog() {
     ['Flip horizontally', 'H'],
     ['Nudge (×5 with Shift)', 'Arrow keys'],
     ['Zoom in / out / 100%', '+ / − / 0'],
-    ['Fit circuit to window', 'F'],
+    ['Fit circuit to window / zoom to selection', 'F / Shift+F'],
+    ['Focus the canvas (hide panels)', 'Ctrl+`'],
     ['Toggle grid', 'G'],
+    ['Show voltages on wires', 'V'],
+    ['Wire colour (selected / new wire)', '1–9, C cycles'],
     ['Pan', 'Middle-drag, or Space + drag'],
     ['Zoom at cursor', 'Mouse wheel'],
     ['Start a wire', 'Click a pin (or drag from it)'],

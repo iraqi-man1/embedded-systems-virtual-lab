@@ -17,21 +17,68 @@ pub struct AppState {
     /// Serialises firmware builds: PlatformIO build directories are shared
     /// per board so incremental builds stay fast.
     pub build_lock: Mutex<()>,
+    /// Project file passed on the command line (file association), until the UI takes it.
+    pub launch_file: Mutex<Option<String>>,
+}
+
+/// Browser shortcuts (F5/Ctrl+R reload, Ctrl+F find, Ctrl+P print, Alt+← back, F12…)
+/// would discard or disturb the user's work in a desktop application; the UI
+/// binds the keys it needs itself. Debug builds keep them for development.
+#[cfg(all(windows, not(debug_assertions)))]
+fn disable_browser_accelerators(window: &tauri::WebviewWindow) {
+    use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Settings3;
+    use windows::core::Interface;
+    let _ = window.with_webview(|webview| unsafe {
+        let Ok(core) = webview.controller().CoreWebView2() else { return };
+        let Ok(settings) = core.Settings() else { return };
+        if let Ok(settings) = settings.cast::<ICoreWebView2Settings3>() {
+            let _ = settings.SetAreBrowserAcceleratorKeysEnabled(false);
+        }
+    });
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let cwd = std::env::current_dir().unwrap_or_default();
+    let launch_file = project_io::project_arg(std::env::args().skip(1), &cwd);
     tauri::Builder::default()
+        // Must be first: a second launch (e.g. double-clicking another project)
+        // hands its arguments to the running window and exits.
+        .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
+            use tauri::{Emitter, Manager};
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+            if let Some(path) = project_io::project_arg(argv.into_iter().skip(1), std::path::Path::new(&cwd)) {
+                let _ = app.emit("open-file", path);
+            }
+        }))
         .plugin(tauri_plugin_dialog::init())
         .manage(AppState {
             build_lock: Mutex::new(()),
+            launch_file: Mutex::new(launch_file),
+        })
+        .setup(|_app| {
+            #[cfg(all(windows, not(debug_assertions)))]
+            {
+                use tauri::Manager;
+                if let Some(window) = _app.get_webview_window("main") {
+                    disable_browser_accelerators(&window);
+                }
+            }
+            Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             toolchain::toolchain_status,
             toolchain::toolchain_install,
             toolchain::compile_firmware,
+            project_io::take_launch_file,
             project_io::read_text_file,
             project_io::write_text_file,
+            project_io::autosave_write,
+            project_io::autosave_read,
+            project_io::autosave_clear,
             packages::list_component_packages,
             packages::app_paths,
         ])

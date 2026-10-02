@@ -34,7 +34,7 @@ class DiodeModel implements SimModel {
   visualState() {
     if (this.window > 0) this.avgI = this.charge / this.window;
     this.charge = this.window = 0;
-    return undefined;
+    return { _conducting: this.avgI > 1e-4 };
   }
   diagnostics(): Diagnostic[] {
     const max = numProp(this.ctx, 'maxCurrent', 1);
@@ -124,7 +124,7 @@ class BjtModel implements SimModel {
     }
   }
   visualState() {
-    return undefined;
+    return { _mode: this.mode };
   }
 }
 registerModel('bjt', (ctx) => new BjtModel(ctx));
@@ -156,6 +156,9 @@ class MosfetModel implements SimModel {
       this.level = next;
       this.ctx.solveNow([this.ctx.net('D'), src]);
     }
+  }
+  visualState() {
+    return { _mode: this.level === 0 ? 'off' : this.level >= 16 ? 'on' : 'linear' };
   }
 }
 registerModel('mosfet', (ctx) => new MosfetModel(ctx));
